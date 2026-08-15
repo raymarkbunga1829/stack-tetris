@@ -30,6 +30,16 @@ Open the printed local URL. `npm run build` then `npm run preview` for a product
 | Drop | Hard drop |
 | A D · W · S · Space · C | Keyboard |
 
-## Stack
+## App Store (iOS)
 
-React 19, Vite, TanStack Start, Three.js, Tailwind v4.
+This repo includes a **Capacitor** wrapper. The game is copied into a native Xcode project — it does not load a website.
+
+On a Mac:
+
+```bash
+npm install
+npm run cap:sync
+npm run cap:open
+```
+
+Full steps, product IDs, and review notes: **[APP_STORE.md](./APP_STORE.md)**.

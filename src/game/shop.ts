@@ -129,16 +129,13 @@ export function grantSku<T extends Wallet>(save: T, sku: Sku): T {
   };
 }
 
-/** Demo IAP — completes locally. Swap this for StoreKit / RevenueCat later. */
-export function purchaseSku<T extends Wallet>(
+/** Web: demo grant. iOS: StoreKit via src/game/iap.ts */
+export async function purchaseSku<T extends Wallet>(
   save: T,
   skuId: string,
 ): Promise<T | null> {
-  const sku = SKUS.find((s) => s.id === skuId);
-  if (!sku) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    window.setTimeout(() => resolve(grantSku(save, sku)), 380);
-  });
+  const { buySku } = await import("./iap");
+  return buySku(save, skuId);
 }
 
 export const COIN_FOR_LINES = [0, 1, 3, 6, 14];

@@ -1,0 +1,90 @@
+{
+  "identifier" : "stack-storekit",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "credits_s",
+      "localizations" : [
+        {
+          "description" : "250 credits",
+          "displayName" : "Pocket credits",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "app.stack.play.credits_s",
+      "referenceName" : "Pocket credits",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "credits_m",
+      "localizations" : [
+        {
+          "description" : "900 credits",
+          "displayName" : "Stack of credits",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "app.stack.play.credits_m",
+      "referenceName" : "Stack of credits",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "6.99",
+      "familyShareable" : false,
+      "internalID" : "credits_l",
+      "localizations" : [
+        {
+          "description" : "2500 credits",
+          "displayName" : "Crate of credits",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "app.stack.play.credits_l",
+      "referenceName" : "Crate of credits",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "pack_ops",
+      "localizations" : [
+        {
+          "description" : "500 credits and two of each power",
+          "displayName" : "Ops pack",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "app.stack.play.pack_ops",
+      "referenceName" : "Ops pack",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "theme_night",
+      "localizations" : [
+        {
+          "description" : "Night well theme",
+          "displayName" : "Night well",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "app.stack.play.theme_night",
+      "referenceName" : "Night well",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
