@@ -62,7 +62,7 @@ export const SKUS: Sku[] = [
   {
     id: "theme_night",
     name: "Night well",
-    blurb: "High-contrast lock flash",
+    blurb: "Black-velvet pit, hard lock flash",
     price: "$0.99",
     cents: 99,
     credits: 0,

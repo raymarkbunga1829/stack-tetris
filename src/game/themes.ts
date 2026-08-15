@@ -21,7 +21,7 @@ export const THEMES: Theme[] = [
   {
     id: "ink",
     name: "Ink",
-    blurb: "The house well.",
+    blurb: "House cut. Soft aqua, citrine, and ruby in a dark pit.",
     cost: 0,
     well: "#101218",
     grid: "#1b1e28",
@@ -30,13 +30,13 @@ export const THEMES: Theme[] = [
     ghost: "rgba(232, 230, 225, 0.22)",
     flash: "#f2efe6",
     fill: {
-      I: "#5ec4c8",
-      O: "#c9b45a",
-      T: "#9a7bb8",
-      S: "#6aaa6e",
-      Z: "#c46b6b",
-      J: "#5a7ec8",
-      L: "#c4844a",
+      I: "#6ee0e4",
+      O: "#e4cc62",
+      T: "#b08ad4",
+      S: "#78c47c",
+      Z: "#e07878",
+      J: "#6a92e0",
+      L: "#e09852",
     },
     deep: {
       I: "#3a8e92",
@@ -51,7 +51,7 @@ export const THEMES: Theme[] = [
   {
     id: "slate",
     name: "Slate",
-    blurb: "Cooler pit, quieter pieces.",
+    blurb: "Muted stones. Cooler metal, quieter fire.",
     cost: 80,
     well: "#12151c",
     grid: "#1c212b",
@@ -81,7 +81,7 @@ export const THEMES: Theme[] = [
   {
     id: "deuter",
     name: "Clear",
-    blurb: "Wong-style colorblind palette.",
+    blurb: "High-separation cut. Easy to read in any light.",
     cost: 120,
     well: "#101218",
     grid: "#1b1e28",
@@ -111,7 +111,7 @@ export const THEMES: Theme[] = [
   {
     id: "night",
     name: "Night",
-    blurb: "High-contrast flash lock.",
+    blurb: "Black velvet pit. Gems throw a hard lock flash.",
     cost: 200,
     well: "#07080c",
     grid: "#141820",
@@ -139,6 +139,16 @@ export const THEMES: Theme[] = [
     },
   },
 ];
+
+export const GEM_NAME: Record<PieceId, string> = {
+  I: "Aquamarine",
+  O: "Citrine",
+  T: "Amethyst",
+  S: "Emerald",
+  Z: "Ruby",
+  J: "Sapphire",
+  L: "Topaz",
+};
 
 export function themeOf(id: ThemeId | string | undefined): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0]!;

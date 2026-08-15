@@ -77,7 +77,10 @@ export function SettingsSheet({
             );
           })}
         </ul>
-        <p className="shop-note">{credits.toLocaleString()} CR on hand. Clear is the colorblind set.</p>
+        <p className="shop-note">
+          {credits.toLocaleString()} CR on hand. Cuts: I aqua · O citrine · T amethyst · S emerald ·
+          Z ruby · J sapphire · L topaz.
+        </p>
       </div>
     </div>
   );

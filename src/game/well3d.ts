@@ -139,8 +139,13 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     envMapIntensity: 1.1,
   });
 
-  const back = new THREE.Mesh(new THREE.BoxGeometry(10.6, 20.8, 0.22), pitMat);
-  back.position.set(0, 9.5, -0.72);
+  const pitTex = makePitTexture();
+  pitTex.colorSpace = THREE.SRGBColorSpace;
+  const back = new THREE.Mesh(
+    new THREE.PlaneGeometry(10.2, 20.4),
+    new THREE.MeshBasicMaterial({ map: pitTex }),
+  );
+  back.position.set(0, 9.5, -0.7);
   scene.add(back);
   const left = new THREE.Mesh(new THREE.BoxGeometry(0.28, 20.8, 1.55), wallMat);
   left.position.set(-5.28, 9.5, 0.08);
@@ -170,13 +175,15 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const grid = makeWellGrid();
   scene.add(grid);
 
-  const geo = new RoundedBoxGeometry(0.9, 0.9, 0.9, 2, 0.08);
-  const solidMat = new THREE.MeshStandardMaterial({
-    roughness: 0.22,
-    metalness: 0.48,
-    envMapIntensity: 1.05,
-    emissive: 0x111111,
-    emissiveIntensity: 0.18,
+  const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
+  const solidMat = new THREE.MeshPhysicalMaterial({
+    roughness: 0.24,
+    metalness: 0.5,
+    clearcoat: mobile ? 0.4 : 0.8,
+    clearcoatRoughness: 0.15,
+    envMapIntensity: 1.2,
+    emissive: 0x141414,
+    emissiveIntensity: 0.2,
   });
   const ghostMat = new THREE.MeshStandardMaterial({
     roughness: 0.2,
@@ -873,6 +880,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     composer.dispose();
     renderer.dispose();
     envTex.dispose();
+    pitTex.dispose();
+    back.geometry.dispose();
+    (back.material as THREE.Material).dispose();
     geo.dispose();
     solidMat.dispose();
     ghostMat.dispose();
@@ -931,4 +941,44 @@ function makeWellGrid() {
     opacity: 0.38,
   });
   return new THREE.LineSegments(g, m);
+}
+
+function makePitTexture(): THREE.CanvasTexture {
+  const w = 256;
+  const h = 512;
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#0a0b10";
+  ctx.fillRect(0, 0, w, h);
+  const wash = ctx.createLinearGradient(0, 0, 0, h);
+  wash.addColorStop(0, "#161920");
+  wash.addColorStop(0.4, "#0c0d12");
+  wash.addColorStop(1, "#07080c");
+  ctx.fillStyle = wash;
+  ctx.fillRect(0, 0, w, h);
+  const moon = ctx.createRadialGradient(w * 0.7, h * 0.2, 6, w * 0.7, h * 0.2, w * 0.4);
+  moon.addColorStop(0, "rgba(220, 216, 204, 0.38)");
+  moon.addColorStop(0.4, "rgba(168, 166, 156, 0.12)");
+  moon.addColorStop(1, "rgba(10, 11, 16, 0)");
+  ctx.fillStyle = moon;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(190, 186, 176, 0.08)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 16; i++) {
+    const y = h * 0.54 + i * 13;
+    ctx.beginPath();
+    ctx.moveTo(10, y);
+    for (let x = 10; x < w - 10; x += 8) {
+      ctx.lineTo(x, y + Math.sin(x * 0.07 + i) * 1.2);
+    }
+    ctx.stroke();
+  }
+  const vig = ctx.createRadialGradient(w / 2, h / 2, w * 0.18, w / 2, h / 2, w * 0.7);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,0.5)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, w, h);
+  return new THREE.CanvasTexture(c);
 }

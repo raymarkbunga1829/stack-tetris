@@ -1,5 +1,5 @@
 import { SHAPES } from "@/game/pieces";
-import { themeOf, type ThemeId } from "@/game/themes";
+import { GEM_NAME, themeOf, type ThemeId } from "@/game/themes";
 import type { PieceId } from "@/game/types";
 
 export function MiniPiece({ id, theme }: { id: PieceId | null; theme?: ThemeId }) {
@@ -20,7 +20,7 @@ export function MiniPiece({ id, theme }: { id: PieceId | null; theme?: ThemeId }
         gridTemplateRows: `repeat(${h}, 1fr)`,
         aspectRatio: `${w} / ${h}`,
       }}
-      aria-label={id}
+      aria-label={GEM_NAME[id]}
     >
       {cells.map((c, i) => (
         <span
