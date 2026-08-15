@@ -6,13 +6,42 @@ export type ModeInfo = {
   blurb: string;
   lines: number | null;
   seconds: number | null;
+  startLevel: number;
 };
 
 export const MODES: ModeInfo[] = [
-  { id: "marathon", name: "Marathon", blurb: "Play until you top out.", lines: null, seconds: null },
-  { id: "sprint", name: "Sprint 40", blurb: "Clear 40 lines. Clock runs.", lines: 40, seconds: null },
-  { id: "blitz", name: "Blitz 2:00", blurb: "Two minutes. Highest score.", lines: null, seconds: 120 },
-  { id: "daily", name: "Daily", blurb: "Same bag for everyone today.", lines: null, seconds: null },
+  {
+    id: "marathon",
+    name: "Marathon",
+    blurb: "Endless. Level climbs until you top out.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+  },
+  {
+    id: "sprint",
+    name: "Sprint 40",
+    blurb: "Race to 40 lines. Clock is your score.",
+    lines: 40,
+    seconds: null,
+    startLevel: 1,
+  },
+  {
+    id: "blitz",
+    name: "Blitz 2:00",
+    blurb: "Two minutes from level 10. Highest score wins.",
+    lines: null,
+    seconds: 120,
+    startLevel: 10,
+  },
+  {
+    id: "daily",
+    name: "Daily",
+    blurb: "Today's shared bag. Same pieces for everyone.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+  },
 ];
 
 export function modeOf(id: ModeId): ModeInfo {

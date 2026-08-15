@@ -142,7 +142,7 @@ export function createSim(opts: NewGame = {}): Sim {
     next: [],
     score: 0,
     lines: 0,
-    level: 1,
+    level: info.startLevel,
     combo: -1,
     b2b: false,
     lastClear: null,

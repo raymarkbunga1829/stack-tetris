@@ -305,7 +305,7 @@ export function TetrisApp() {
       banner: null,
       score: 0,
       lines: 0,
-      level: 1,
+      level: sim.level,
       hold: null,
       next: sim.next,
       mode,
@@ -314,7 +314,11 @@ export function TetrisApp() {
       won: false,
       coach: forceCoach() || !saveRef.current.onboarded ? "drag" : null,
       picking: false,
+      shop: false,
+      settings: false,
+      board: false,
     });
+    flashBanner(mode === "daily" ? `Daily · ${utcDateKey().slice(5)}` : modeOf(mode).name);
   }
 
   function tick(dt: number) {
@@ -802,9 +806,7 @@ export function TetrisApp() {
 
   function pickMode(id: ModeId) {
     unlockAudio();
-    saveRef.current = { ...saveRef.current, mode: id };
-    writeSave(saveRef.current);
-    syncUi({ mode: id });
+    startGame(id);
   }
 
   function openSettings() {
@@ -904,18 +906,22 @@ export function TetrisApp() {
         <div className="stats">
           <Stat label="Score" value={ui.score.toLocaleString()} />
           <Stat
-            label={ui.mode === "blitz" ? "Time" : "Level"}
+            label={
+              ui.mode === "blitz" ? "Time" : ui.mode === "sprint" ? "Clock" : "Level"
+            }
             value={
               ui.mode === "blitz"
                 ? formatClock(ui.timeLeft ?? 0)
-                : String(ui.level)
+                : ui.mode === "sprint"
+                  ? formatClock(ui.clock)
+                  : String(ui.level)
             }
           />
           <Stat
-            label="Lines"
+            label={ui.mode === "sprint" ? "Goal" : "Lines"}
             value={
               ui.mode === "sprint"
-                ? `${ui.lines}/40`
+                ? `${Math.max(0, 40 - ui.lines)} left`
                 : String(ui.lines)
             }
           />
