@@ -6,12 +6,14 @@ type Props = {
   open: boolean;
   haptic: HapticProfile;
   hardConfirm: boolean;
+  ghost: boolean;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
   onClose: () => void;
   onHaptic: (p: HapticProfile) => void;
   onHard: () => void;
+  onGhost: () => void;
   onTheme: (id: ThemeId) => void;
 };
 
@@ -19,12 +21,14 @@ export function SettingsSheet({
   open,
   haptic,
   hardConfirm,
+  ghost,
   theme,
   themes,
   credits,
   onClose,
   onHaptic,
   onHard,
+  onGhost,
   onTheme,
 }: Props) {
   if (!open) return null;
@@ -54,6 +58,10 @@ export function SettingsSheet({
           <span>Hard drop confirm</span>
           <b>{hardConfirm ? "On" : "Off"}</b>
         </button>
+        <button type="button" className={`set-row${ghost ? " is-on" : ""}`} onClick={onGhost}>
+          <span>Ghost piece</span>
+          <b>{ghost ? "On" : "Off"}</b>
+        </button>
 
         <p className="shop-blurb">Well skins</p>
         <ul className="shop-list">
@@ -78,8 +86,8 @@ export function SettingsSheet({
           })}
         </ul>
         <p className="shop-note">
-          {credits.toLocaleString()} CR on hand. Cuts: I aqua · O citrine · T amethyst · S emerald ·
-          Z ruby · J sapphire · L topaz.
+          {credits.toLocaleString()} CR on hand. Ghost (the landing picture) is on
+          for every mode except Arcade.
         </p>
       </div>
     </div>

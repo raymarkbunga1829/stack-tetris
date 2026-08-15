@@ -1,4 +1,4 @@
-export type ModeId = "marathon" | "sprint" | "blitz" | "daily";
+export type ModeId = "marathon" | "sprint" | "blitz" | "daily" | "zen" | "arcade";
 
 export type ModeInfo = {
   id: ModeId;
@@ -7,40 +7,63 @@ export type ModeInfo = {
   lines: number | null;
   seconds: number | null;
   startLevel: number;
+  ghost: boolean;
 };
 
 export const MODES: ModeInfo[] = [
   {
     id: "marathon",
     name: "Marathon",
-    blurb: "Endless. Level climbs until you top out.",
+    blurb: "Landing ghost on. Endless until you top out.",
     lines: null,
     seconds: null,
     startLevel: 1,
+    ghost: true,
   },
   {
     id: "sprint",
     name: "Sprint 40",
-    blurb: "Race to 40 lines. Clock is your score.",
+    blurb: "Race to 40 lines. Ghost shows the drop.",
     lines: 40,
     seconds: null,
     startLevel: 1,
+    ghost: true,
   },
   {
     id: "blitz",
     name: "Blitz 2:00",
-    blurb: "Two minutes from level 10. Highest score wins.",
+    blurb: "Two minutes from level 10. Ghost on.",
     lines: null,
     seconds: 120,
     startLevel: 10,
+    ghost: true,
   },
   {
     id: "daily",
     name: "Daily",
-    blurb: "Today's shared bag. Same pieces for everyone.",
+    blurb: "Today's shared bag. Ghost on.",
     lines: null,
     seconds: null,
     startLevel: 1,
+    ghost: true,
+  },
+  {
+    id: "zen",
+    name: "Zen",
+    blurb: "No clock. No top-out. Ghost on.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+    ghost: true,
+  },
+  {
+    id: "arcade",
+    name: "Arcade",
+    blurb: "No landing ghost. Read the stack yourself.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+    ghost: false,
   },
 ];
 

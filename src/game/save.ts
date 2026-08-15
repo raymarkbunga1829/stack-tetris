@@ -15,6 +15,9 @@ export type ScoreRow = {
   clock: number;
   won: boolean;
   t: number;
+  combo?: number;
+  tspins?: number;
+  stacks?: number;
 };
 
 export type SaveData = {
@@ -26,6 +29,7 @@ export type SaveData = {
   inv: Inventory;
   receipts: Receipt[];
   hardConfirm: boolean;
+  ghost: boolean;
   haptic: HapticProfile;
   theme: ThemeId;
   themes: ThemeId[];
@@ -34,6 +38,8 @@ export type SaveData = {
   missions: MissionBook;
   scores: ScoreRow[];
   daily: { date: string; score: number; lines: number };
+  sprintBest: number | null;
+  dailyBoard: { date: string; rows: ScoreRow[] };
 };
 
 const DEFAULTS: SaveData = {
@@ -45,6 +51,7 @@ const DEFAULTS: SaveData = {
   inv: { zap: 1, slow: 1, shield: 0, quake: 0, pick: 1 },
   receipts: [],
   hardConfirm: false,
+  ghost: true,
   haptic: "full",
   theme: "ink",
   themes: ["ink"],
@@ -53,6 +60,8 @@ const DEFAULTS: SaveData = {
   missions: emptyBook(),
   scores: [],
   daily: { date: "", score: 0, lines: 0 },
+  sprintBest: null,
+  dailyBoard: { date: "", rows: [] },
 };
 
 export function loadSave(): SaveData {
@@ -77,6 +86,7 @@ export function loadSave(): SaveData {
       inv: { ...emptyInv(), ...parsed.inv },
       receipts: Array.isArray(parsed.receipts) ? parsed.receipts : [],
       hardConfirm: parsed.hardConfirm === true,
+      ghost: parsed.ghost !== false,
       haptic: parsed.haptic === "light" || parsed.haptic === "off" ? parsed.haptic : "full",
       theme: parsed.theme ?? "ink",
       themes: Array.isArray(parsed.themes) ? (parsed.themes as ThemeId[]) : ["ink"],
@@ -85,6 +95,8 @@ export function loadSave(): SaveData {
       missions: ensureMissions(parsed.missions),
       scores: Array.isArray(parsed.scores) ? parsed.scores : [],
       daily: parsed.daily ?? { date: "", score: 0, lines: 0 },
+      sprintBest: typeof parsed.sprintBest === "number" ? parsed.sprintBest : null,
+      dailyBoard: parsed.dailyBoard ?? { date: "", rows: [] },
     };
   } catch {
     return { ...DEFAULTS, inv: { ...DEFAULTS.inv }, missions: ensureMissions(undefined) };
@@ -110,14 +122,24 @@ export function recordRun(data: SaveData, row: ScoreRow): SaveData {
     .sort((a, b) => b.score - a.score || a.clock - b.clock)
     .slice(0, 30);
   let next: SaveData = { ...data, scores, high: Math.max(data.high, row.score) };
+  if (row.mode === "sprint" && row.won) {
+    const best = next.sprintBest;
+    if (best == null || row.clock < best) next = { ...next, sprintBest: row.clock };
+  }
   if (row.mode === "daily") {
+    const date = data.missions.date;
+    const prev = next.dailyBoard.date === date ? next.dailyBoard.rows : [];
+    const rows = [row, ...prev]
+      .sort((a, b) => b.score - a.score || a.clock - b.clock)
+      .slice(0, 10);
     next = {
       ...next,
       daily: {
-        date: data.missions.date,
-        score: Math.max(data.daily.score, row.score),
-        lines: Math.max(data.daily.lines, row.lines),
+        date,
+        score: Math.max(data.daily.date === date ? data.daily.score : 0, row.score),
+        lines: Math.max(data.daily.date === date ? data.daily.lines : 0, row.lines),
       },
+      dailyBoard: { date, rows },
     };
   }
   writeSave(next);

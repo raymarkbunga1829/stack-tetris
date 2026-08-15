@@ -66,6 +66,9 @@ export type Sim = {
   won: boolean;
   history: Snap[];
   rng: () => number;
+  maxCombo: number;
+  tspins: number;
+  stacks: number;
 };
 
 export type InputFrame = {
@@ -167,6 +170,9 @@ export function createSim(opts: NewGame = {}): Sim {
     won: false,
     history: [],
     rng,
+    maxCombo: 0,
+    tspins: 0,
+    stacks: 0,
   };
   fillBag(sim);
   sim.next = sim.bag.slice(0, 5);
@@ -197,12 +203,65 @@ function grounded(sim: Sim, p: Piece): boolean {
   return !fits(sim.board, { ...p, y: p.y + 1 });
 }
 
-export function ghostY(sim: Sim): number {
+export type GhostHit = {
+  y: number;
+  cells: Cell[];
+  contacts: { x: number; y: number; kind: "stack" | "floor" }[];
+};
+
+function firstSolidBelow(board: Board, x: number, fromY: number): number {
+  if (x < 0 || x >= COLS) return fromY + 1;
+  const start = Math.max(fromY + 1, 0);
+  for (let y = start; y < ROWS; y++) {
+    if (board[y]![x]) return y;
+  }
+  return ROWS;
+}
+
+/** Column first-contact: each mino scans its column; the tightest gap wins. */
+export function ghostLanding(sim: Sim): GhostHit | null {
   const p = sim.piece;
-  if (!p) return 0;
-  let y = p.y;
-  while (fits(sim.board, { ...p, y: y + 1 })) y += 1;
-  return y;
+  if (!p) return null;
+  const now = pieceCells(p);
+  if (now.length === 0) return null;
+  let drop = ROWS;
+  for (const c of now) {
+    drop = Math.min(drop, firstSolidBelow(sim.board, c.x, c.y) - c.y - 1);
+  }
+  if (drop < 0) drop = 0;
+  const y = p.y + drop;
+  const landed: Piece = { ...p, y };
+  if (!fits(sim.board, landed)) return { y: p.y, cells: now, contacts: [] };
+  const cells = pieceCells(landed).filter((c) => c.y >= 0 && c.y < ROWS);
+  const contacts: GhostHit["contacts"] = [];
+  const seen = new Set<string>();
+  for (const c of cells) {
+    const hit = firstSolidBelow(sim.board, c.x, c.y);
+    if (hit >= ROWS) {
+      const key = `${c.x}:floor`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        contacts.push({ x: c.x, y: ROWS - 1, kind: "floor" });
+      }
+    } else {
+      const key = `${c.x},${hit}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        contacts.push({ x: c.x, y: hit, kind: "stack" });
+      }
+    }
+  }
+  return { y, cells, contacts };
+}
+
+export function ghostY(sim: Sim): number {
+  return ghostLanding(sim)?.y ?? sim.piece?.y ?? 0;
+}
+
+function zenRescue(sim: Sim) {
+  for (let y = HIDDEN_ROWS; y < HIDDEN_ROWS + 8; y++) {
+    sim.board[y] = Array.from({ length: COLS }, () => null);
+  }
 }
 
 function spawn(sim: Sim, id: PieceId): boolean {
@@ -219,6 +278,9 @@ function spawn(sim: Sim, id: PieceId): boolean {
       for (let y = HIDDEN_ROWS; y < HIDDEN_ROWS + 6; y++) {
         sim.board[y] = Array.from({ length: COLS }, () => null);
       }
+    }
+    if (!fits(sim.board, piece) && sim.mode === "zen") {
+      zenRescue(sim);
     }
     if (!fits(sim.board, piece)) {
       sim.piece = piece;
@@ -315,6 +377,60 @@ function tCornersFilled(sim: Sim, p: Piece): number {
   return n;
 }
 
+export function canRotate(sim: Sim, dir: 1 | -1): boolean {
+  return peekKick(sim, dir) != null;
+}
+
+export function peekKick(
+  sim: Sim,
+  dir: 1 | -1,
+): { piece: Piece; index: number } | null {
+  const p = sim.piece;
+  if (!p) return null;
+  const to = ((((p.rot + dir) % 4) + 4) % 4) as Rot;
+  const kicks = kicksFor(p.id, p.rot, to);
+  for (let i = 0; i < kicks.length; i++) {
+    const k = kicks[i]!;
+    const next: Piece = { id: p.id, rot: to, x: p.x + k.x, y: p.y - k.y };
+    if (fits(sim.board, next)) return { piece: next, index: i };
+  }
+  return null;
+}
+
+export type CollisionPred = {
+  landing: GhostHit;
+  rowsLeft: number;
+  grounded: boolean;
+  lockImminent: boolean;
+  blocked: { left: boolean; right: boolean; cw: boolean; ccw: boolean };
+  kick: { cw: boolean; ccw: boolean };
+};
+
+export function predictCollision(sim: Sim): CollisionPred | null {
+  const p = sim.piece;
+  if (!p) return null;
+  const landing = ghostLanding(sim);
+  if (!landing) return null;
+  const rowsLeft = Math.max(0, landing.y - p.y);
+  const isGrounded = grounded(sim, p);
+  return {
+    landing,
+    rowsLeft,
+    grounded: isGrounded,
+    lockImminent: isGrounded || rowsLeft <= 1,
+    blocked: {
+      left: !fits(sim.board, { ...p, x: p.x - 1 }),
+      right: !fits(sim.board, { ...p, x: p.x + 1 }),
+      cw: !canRotate(sim, 1),
+      ccw: !canRotate(sim, -1),
+    },
+    kick: {
+      cw: (peekKick(sim, 1)?.index ?? 0) > 0,
+      ccw: (peekKick(sim, -1)?.index ?? 0) > 0,
+    },
+  };
+}
+
 function tryRotate(sim: Sim, dir: 1 | -1): boolean {
   const p = sim.piece;
   if (!p) return false;
@@ -370,6 +486,7 @@ function lockPiece(sim: Sim): "ok" | "clearing" | "over" {
     if (sim.tSpin) {
       sim.score += T_SPIN_SCORE[0]! * sim.level;
       sim.lastClear = "T-SPIN";
+      sim.tspins += 1;
     } else {
       sim.lastClear = null;
     }
@@ -393,8 +510,8 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
   sim.board = kept;
   sim.clearRows = [];
   sim.lines += n;
-  sim.level = Math.floor(sim.lines / LINES_PER_LEVEL) + 1;
   sim.combo += 1;
+  if (sim.combo > sim.maxCombo) sim.maxCombo = sim.combo;
 
   const tspin = sim.tSpin;
   let pts = (LINE_SCORE[n] ?? 0) * sim.level;
@@ -405,6 +522,15 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
   sim.score += pts;
   sim.pendingCoins += COIN_FOR_LINES[n] ?? 0;
   sim.b2b = difficult;
+  if (tspin) sim.tspins += 1;
+  if (n === 4) sim.stacks += 1;
+  if (sim.mode === "zen") sim.level = 1;
+  else {
+    sim.level = Math.max(
+      modeOf(sim.mode).startLevel,
+      Math.floor(sim.lines / LINES_PER_LEVEL) + 1,
+    );
+  }
   sim.lastClear = tspin
     ? n === 0
       ? "T-SPIN"

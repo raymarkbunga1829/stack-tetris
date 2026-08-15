@@ -28,7 +28,7 @@ function cellPos(col: number, row: number, z = 0) {
 
 export type Well3d = {
   resize: () => void;
-  draw: (sim: Sim | null, shake: number, theme: Theme) => void;
+  draw: (sim: Sim | null, shake: number, theme: Theme, showGhost?: boolean) => void;
   punch: (amount: number) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
@@ -185,14 +185,17 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     emissive: 0x141414,
     emissiveIntensity: 0.2,
   });
-  const ghostMat = new THREE.MeshStandardMaterial({
-    roughness: 0.2,
-    metalness: 0.15,
+  const ghostMat = new THREE.MeshPhysicalMaterial({
+    roughness: 0.32,
+    metalness: 0.28,
+    clearcoat: mobile ? 0.2 : 0.45,
+    clearcoatRoughness: 0.35,
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.72,
     depthWrite: false,
-    emissive: 0xffffff,
-    emissiveIntensity: 0.08,
+    envMapIntensity: 0.55,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
   });
   const solids = new THREE.InstancedMesh(geo, solidMat, MAX_SOLID);
   solids.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -393,7 +396,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     mesh.setColorAt(i, color);
   }
 
-  function draw(sim: Sim | null, shake: number, theme: Theme) {
+  function draw(sim: Sim | null, shake: number, theme: Theme, showGhost = true) {
     if (theme.id !== lastThemeId) {
       lastThemeId = theme.id;
       lastBg = "";
@@ -506,39 +509,21 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
     let g = 0;
     let ringOn = false;
-    if (sim?.piece && sim.phase !== "over" && sim.phase !== "clearing" && sim.phase !== "title") {
+    if (
+      showGhost &&
+      sim?.piece &&
+      sim.phase !== "over" &&
+      sim.phase !== "clearing" &&
+      sim.phase !== "title"
+    ) {
       const gy = ghostY(sim);
-      const breathe = reduce ? 0 : Math.sin(now * 0.0055) * 0.5 + 0.5;
-      ghostMat.opacity = 0.16 + breathe * 0.12;
-      ghostMat.emissiveIntensity = 0.06 + breathe * 0.1;
+      ghostMat.opacity = 0.78;
       if (gy !== sim.piece.y) {
-        let minRow = VISIBLE_ROWS;
-        let cx = 0;
-        let cn = 0;
+        const hex = theme.deep[sim.piece.id] ?? theme.fill[sim.piece.id];
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, gy)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
-          place(
-            ghosts,
-            g++,
-            c.x,
-            row,
-            0,
-            theme.fill[sim.piece.id],
-            0.86 + breathe * 0.08,
-            1.35,
-          );
-          minRow = Math.min(minRow, row);
-          cx += c.x;
-          cn += 1;
-        }
-        if (cn > 0 && !reduce) {
-          const p = cellPos(cx / cn, minRow, 0);
-          ring.position.set(p.x, p.y - 0.55, 0.42);
-          ring.scale.setScalar(1.05 + breathe * 0.18);
-          ringMat.opacity = 0.12 + breathe * 0.16;
-          ringMat.color.set(theme.fill[sim.piece.id]);
-          ringOn = true;
+          place(ghosts, g++, c.x, row, 0.04, hex, 1, 1);
         }
       }
     }

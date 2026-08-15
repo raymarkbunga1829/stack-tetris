@@ -188,7 +188,14 @@ export const SHAPES: Record<PieceId, Cell[][]> = {
 
 type Kick = { x: number; y: number };
 
-const JLSTZ: Record<string, Kick[]> = {
+export type KickTable = Record<string, Kick[]>;
+
+/**
+ * Tetris Guideline SRS wall-kick offsets.
+ * Y is up in the spec; we apply `piece.y - kick.y` in the sim.
+ * Tests: 0 spawn, 1 right, 2 reverse, 3 left.
+ */
+export const SRS_JLSTZ: KickTable = {
   "0>1": [
     { x: 0, y: 0 },
     { x: -1, y: 0 },
@@ -244,10 +251,42 @@ const JLSTZ: Record<string, Kick[]> = {
     { x: 1, y: 1 },
     { x: 0, y: -2 },
     { x: 1, y: -2 },
+  ],
+  "0>2": [
+    { x: 0, y: 0 },
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+    { x: -1, y: 1 },
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+  ],
+  "2>0": [
+    { x: 0, y: 0 },
+    { x: 0, y: -1 },
+    { x: -1, y: -1 },
+    { x: 1, y: -1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+  ],
+  "1>3": [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 2 },
+    { x: 1, y: 1 },
+    { x: 0, y: 2 },
+    { x: 0, y: 1 },
+  ],
+  "3>1": [
+    { x: 0, y: 0 },
+    { x: -1, y: 0 },
+    { x: -1, y: 2 },
+    { x: -1, y: 1 },
+    { x: 0, y: 2 },
+    { x: 0, y: 1 },
   ],
 };
 
-const I_KICKS: Record<string, Kick[]> = {
+export const SRS_I: KickTable = {
   "0>1": [
     { x: 0, y: 0 },
     { x: -2, y: 0 },
@@ -304,13 +343,36 @@ const I_KICKS: Record<string, Kick[]> = {
     { x: -1, y: 2 },
     { x: 2, y: -1 },
   ],
+  "0>2": [
+    { x: 0, y: 0 },
+    { x: 0, y: -1 },
+  ],
+  "2>0": [
+    { x: 0, y: 0 },
+    { x: 0, y: 1 },
+  ],
+  "1>3": [
+    { x: 0, y: 0 },
+    { x: -1, y: 0 },
+  ],
+  "3>1": [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+  ],
 };
+
+export const SRS_O: Kick[] = [{ x: 0, y: 0 }];
 
 export function kicksFor(id: PieceId, from: Rot, to: Rot): Kick[] {
-  if (id === "O") return [{ x: 0, y: 0 }];
+  if (id === "O") return SRS_O;
   const key = `${from}>${to}`;
-  const table = id === "I" ? I_KICKS : JLSTZ;
-  return table[key] ?? [{ x: 0, y: 0 }];
+  const table = id === "I" ? SRS_I : SRS_JLSTZ;
+  return table[key] ?? SRS_O;
+}
+
+export function kickLabel(index: number): string {
+  if (index <= 0) return "Basic";
+  return `Kick ${index}`;
 }
 
 export function cellsOf(id: PieceId, rot: Rot, x: number, y: number): Cell[] {

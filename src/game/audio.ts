@@ -2,6 +2,7 @@ type Bus = {
   ctx: AudioContext;
   master: GainNode;
   sfx: GainNode;
+  music: GainNode;
   noise: AudioBuffer;
 };
 
@@ -16,6 +17,10 @@ export function setMuted(next: boolean) {
   muted = next;
   if (bus) {
     bus.master.gain.setTargetAtTime(muted ? 0 : 1, bus.ctx.currentTime, 0.02);
+  }
+  if (!muted && musicMode && !musicRaf) {
+    musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
+    musicRaf = requestAnimationFrame(pumpMusic);
   }
 }
 
@@ -36,11 +41,14 @@ export function unlockAudio() {
     const ctx = new AudioCtx({ latencyHint: "interactive" });
     const master = ctx.createGain();
     const sfx = ctx.createGain();
+    const music = ctx.createGain();
     sfx.gain.value = 0.22;
+    music.gain.value = 0.09;
     master.gain.value = muted ? 0 : 1;
     sfx.connect(master);
+    music.connect(master);
     master.connect(ctx.destination);
-    bus = { ctx, master, sfx, noise: makeNoise(ctx) };
+    bus = { ctx, master, sfx, music, noise: makeNoise(ctx) };
   }
   if (bus.ctx.state === "suspended") void bus.ctx.resume();
 }
@@ -215,4 +223,75 @@ export function sfxPower(id: "zap" | "slow" | "shield" | "quake" | "pick") {
   else if (id === "shield") sfxShield();
   else if (id === "quake") sfxQuake();
   else sfxPick();
+}
+
+const BEDS: Record<string, { bpm: number; notes: number[] }> = {
+  marathon: { bpm: 92, notes: [196, 247, 294, 0, 330, 294, 247, 196] },
+  sprint: { bpm: 118, notes: [262, 330, 392, 330, 349, 392, 0, 330] },
+  blitz: { bpm: 148, notes: [330, 392, 494, 392, 523, 494, 392, 330] },
+  daily: { bpm: 100, notes: [220, 262, 330, 262, 294, 330, 0, 220] },
+  arcade: { bpm: 126, notes: [196, 247, 294, 247, 330, 294, 0, 247] },
+};
+
+let musicMode: string | null = null;
+let musicStep = 0;
+let musicNext = 0;
+let musicRaf = 0;
+let musicPaused = false;
+
+function hum(freq: number, dur: number, when: number, vol = 0.22) {
+  if (!bus || muted || freq <= 0) return;
+  const { ctx, music } = bus;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(freq, when);
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(vol, when + 0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.connect(g);
+  g.connect(music);
+  osc.start(when);
+  osc.stop(when + dur + 0.02);
+}
+
+function pumpMusic() {
+  musicRaf = 0;
+  if (!bus || !musicMode || musicPaused || muted) return;
+  const spec = BEDS[musicMode] ?? BEDS.marathon!;
+  const step = 60 / spec.bpm / 2;
+  const now = bus.ctx.currentTime;
+  if (musicNext < now - 0.2) musicNext = now;
+  while (musicNext < now + 0.35) {
+    const note = spec.notes[musicStep % spec.notes.length] ?? 0;
+    if (note > 0) hum(note, step * 1.6, musicNext, 0.18);
+    if (musicStep % 8 === 0) hum(note > 0 ? note / 2 : 98, step * 3.2, musicNext, 0.1);
+    musicNext += step;
+    musicStep += 1;
+  }
+  musicRaf = requestAnimationFrame(pumpMusic);
+}
+
+export function startMusic(mode: string) {
+  unlockAudio();
+  musicMode = mode;
+  musicStep = 0;
+  musicPaused = false;
+  musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
+  if (!musicRaf) musicRaf = requestAnimationFrame(pumpMusic);
+}
+
+export function stopMusic() {
+  musicMode = null;
+  musicPaused = false;
+  if (musicRaf) cancelAnimationFrame(musicRaf);
+  musicRaf = 0;
+}
+
+export function setMusicPaused(next: boolean) {
+  musicPaused = next;
+  if (!next && musicMode && !musicRaf) {
+    musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
+    musicRaf = requestAnimationFrame(pumpMusic);
+  }
 }

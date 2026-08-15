@@ -15,6 +15,9 @@ import {
   sfxStart,
   sfxSweep,
   sfxTetris,
+  setMusicPaused,
+  startMusic,
+  stopMusic,
   unlockAudio,
 } from "@/game/audio";
 import { haptic, setHaptic } from "@/game/haptics";
@@ -43,9 +46,10 @@ import {
   ghostY,
   pauseToggle,
   pickFromNext,
+  predictCollision,
   type Sim,
 } from "@/game/sim";
-import { cellsOf } from "@/game/pieces";
+import { cellsOf, kickLabel } from "@/game/pieces";
 import { HIDDEN_ROWS, COLS, type Phase, type PieceId } from "@/game/types";
 import {
   buyWithCredits,
@@ -93,8 +97,14 @@ type Ui = {
   theme: ThemeId;
   haptic: HapticProfile;
   hardConfirm: boolean;
+  ghost: boolean;
   missions: MissionBook;
   picking: boolean;
+  combo: number;
+  b2b: boolean;
+  sprintBest: number | null;
+  recap: { lines: number; combo: number; tspins: number; stacks: number; clock: number } | null;
+  pred: { rows: number; lock: boolean; kick: boolean } | null;
 };
 
 function forceCoach() {
@@ -163,8 +173,14 @@ export function TetrisApp() {
     theme: saveRef.current.theme,
     haptic: saveRef.current.haptic,
     hardConfirm: saveRef.current.hardConfirm,
+    ghost: saveRef.current.ghost,
     missions: saveRef.current.missions,
     picking: false,
+    combo: 0,
+    b2b: false,
+    sprintBest: saveRef.current.sprintBest,
+    recap: null,
+    pred: null,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -214,9 +230,12 @@ export function TetrisApp() {
       if (vizCanvas) resizeCanvas(vizCanvas);
 
       const onVis = () => {
-        if (!document.hidden) resumeAudio();
-        else if (simRef.current?.phase === "playing") {
+        if (!document.hidden) {
+          resumeAudio();
+          if (simRef.current?.phase === "playing") setMusicPaused(false);
+        } else if (simRef.current?.phase === "playing") {
           simRef.current.phase = "paused";
+          setMusicPaused(true);
           syncUi();
         }
       };
@@ -300,6 +319,7 @@ export function TetrisApp() {
     hardArm.current = 0;
     sfxStart();
     haptic("select");
+    startMusic(mode);
     syncUi({
       phase: "playing",
       banner: null,
@@ -317,6 +337,10 @@ export function TetrisApp() {
       shop: false,
       settings: false,
       board: false,
+      combo: 0,
+      b2b: false,
+      recap: null,
+      pred: null,
     });
     flashBanner(mode === "daily" ? `Daily · ${utcDateKey().slice(5)}` : modeOf(mode).name);
   }
@@ -383,6 +407,7 @@ export function TetrisApp() {
     if (ev === "rotate") {
       sfxRotate();
       haptic("rotate");
+      if (sim.lastKickIndex > 0) flashBanner(kickLabel(sim.lastKickIndex));
     }
     if (ev === "hold") {
       sfxHold();
@@ -452,23 +477,49 @@ export function TetrisApp() {
     if (sim.score !== u.score || sim.level !== u.level || sim.lines !== u.lines) {
       if (sim.lines > u.lines) payMissions({ lines: sim.lines - u.lines, level: sim.level });
       else payMissions({ level: sim.level });
+      const pred = predictCollision(sim);
       syncUi({
         slow: sim.slowT > 0,
         shield: sim.shield,
         clock: sim.clock,
         timeLeft: sim.timeLeft,
+        combo: Math.max(0, sim.combo),
+        b2b: sim.b2b,
+        pred: pred
+          ? { rows: pred.rowsLeft, lock: pred.lockImminent, kick: pred.kick.cw || pred.kick.ccw }
+          : null,
       });
     } else if (
       u.slow !== sim.slowT > 0 ||
       u.shield !== sim.shield ||
-      Math.floor(u.clock) !== Math.floor(sim.clock)
+      Math.floor(u.clock) !== Math.floor(sim.clock) ||
+      u.combo !== Math.max(0, sim.combo) ||
+      u.b2b !== sim.b2b
     ) {
+      const pred = predictCollision(sim);
       syncUi({
         slow: sim.slowT > 0,
         shield: sim.shield,
         clock: sim.clock,
         timeLeft: sim.timeLeft,
+        combo: Math.max(0, sim.combo),
+        b2b: sim.b2b,
+        pred: pred
+          ? { rows: pred.rowsLeft, lock: pred.lockImminent, kick: pred.kick.cw || pred.kick.ccw }
+          : null,
       });
+    } else {
+      const pred = predictCollision(sim);
+      const next = pred
+        ? { rows: pred.rowsLeft, lock: pred.lockImminent, kick: pred.kick.cw || pred.kick.ccw }
+        : null;
+      if (
+        u.pred?.rows !== next?.rows ||
+        u.pred?.lock !== next?.lock ||
+        u.pred?.kick !== next?.kick
+      ) {
+        syncUi({ pred: next });
+      }
     }
   }
 
@@ -490,6 +541,7 @@ export function TetrisApp() {
   }
 
   function finishRun(sim: Sim) {
+    stopMusic();
     saveRef.current = recordRun(saveRef.current, {
       mode: sim.mode,
       score: sim.score,
@@ -497,6 +549,9 @@ export function TetrisApp() {
       clock: sim.clock,
       won: sim.won,
       t: Date.now(),
+      combo: sim.maxCombo,
+      tspins: sim.tspins,
+      stacks: sim.stacks,
     });
     if (sim.won && sim.mode === "sprint") payMissions({ modeWin: "sprint" });
     if (sim.history.length > 1) {
@@ -509,6 +564,14 @@ export function TetrisApp() {
       high: saveRef.current.high,
       won: sim.won,
       clock: sim.clock,
+      sprintBest: saveRef.current.sprintBest,
+      recap: {
+        lines: sim.lines,
+        combo: sim.maxCombo,
+        tspins: sim.tspins,
+        stacks: sim.stacks,
+        clock: sim.clock,
+      },
     });
   }
 
@@ -560,7 +623,12 @@ export function TetrisApp() {
       const s = snaps[replayI.current]!;
       view = { ...view, board: s.board, piece: s.piece, score: s.score, lines: s.lines };
     }
-    well3dRef.current?.draw(view, reduce ? 0 : shakeRef.current, theme);
+    well3dRef.current?.draw(
+      view,
+      reduce ? 0 : shakeRef.current,
+      theme,
+      uiRef.current.ghost && modeOf(uiRef.current.mode).ghost,
+    );
     const vizCanvas = vizCanvasRef.current;
     const well = wellRef.current;
     if (vizCanvas && well) {
@@ -813,6 +881,7 @@ export function TetrisApp() {
     unlockAudio();
     if (simRef.current?.phase === "playing") {
       simRef.current.phase = "paused";
+      setMusicPaused(true);
       syncUi({ phase: "paused", settings: true });
     } else syncUi({ settings: true });
   }
@@ -838,6 +907,13 @@ export function TetrisApp() {
     saveRef.current = { ...saveRef.current, hardConfirm: next };
     writeSave(saveRef.current);
     syncUi({ hardConfirm: next });
+  }
+
+  function toggleGhost() {
+    const next = !saveRef.current.ghost;
+    saveRef.current = { ...saveRef.current, ghost: next };
+    writeSave(saveRef.current);
+    syncUi({ ghost: next });
   }
 
   function onTheme(id: ThemeId) {
@@ -987,6 +1063,7 @@ export function TetrisApp() {
                     unlockAudio();
                     if (simRef.current) {
                       simRef.current.phase = "playing";
+                      setMusicPaused(false);
                       syncUi({ phase: "playing" });
                     }
                   }}
@@ -1007,6 +1084,30 @@ export function TetrisApp() {
                       : "Game over"}
                 </p>
                 <p className="veil-title">{ui.score.toLocaleString()}</p>
+                {ui.recap && (
+                  <ul className="recap">
+                    <li>
+                      <span>Lines</span>
+                      <b>{ui.recap.lines}</b>
+                    </li>
+                    <li>
+                      <span>Best combo</span>
+                      <b>x{ui.recap.combo}</b>
+                    </li>
+                    <li>
+                      <span>T-spins</span>
+                      <b>{ui.recap.tspins}</b>
+                    </li>
+                    <li>
+                      <span>{ui.mode === "sprint" ? "Time" : "Stacks"}</span>
+                      <b>
+                        {ui.mode === "sprint"
+                          ? formatClock(ui.recap.clock)
+                          : ui.recap.stacks}
+                      </b>
+                    </li>
+                  </ul>
+                )}
                 <button
                   type="button"
                   className="play-btn"
@@ -1021,6 +1122,22 @@ export function TetrisApp() {
                 </button>
               </div>
             )}
+            {ui.phase === "playing" && ui.pred && modeOf(ui.mode).ghost && (
+              <p className={`pred-chip${ui.pred.lock ? " is-lock" : ""}`}>
+                {ui.pred.lock ? "Lock" : ui.pred.kick ? "Kick ready" : `${ui.pred.rows} to lock`}
+              </p>
+            )}
+            {ui.phase === "playing" && (
+              <div className="combo-meter" aria-hidden={ui.combo <= 0 && !ui.b2b}>
+                <span className={ui.combo > 0 ? "is-on" : ""}>
+                  {ui.combo > 0 ? `x${ui.combo}` : "combo"}
+                </span>
+                <i>
+                  <b style={{ width: `${Math.min(100, ui.combo * 12)}%` }} />
+                </i>
+                <em className={ui.b2b ? "is-on" : ""}>B2B</em>
+              </div>
+            )}
             {ui.phase === "playing" && (
               <button
                 type="button"
@@ -1032,6 +1149,7 @@ export function TetrisApp() {
                   unlockAudio();
                   if (simRef.current) {
                     pauseToggle(simRef.current);
+                    setMusicPaused(simRef.current.phase === "paused");
                     syncUi({ phase: simRef.current.phase });
                   }
                 }}
@@ -1118,7 +1236,7 @@ export function TetrisApp() {
         />
 
         {(ui.phase === "title" || ui.phase === "over" || ui.phase === "paused") && (
-          <ModeStrip mode={ui.mode} onPick={pickMode} />
+          <ModeStrip mode={ui.mode} sprintBest={ui.sprintBest} onPick={pickMode} />
         )}
         {ui.phase === "title" && <MissionRow book={ui.missions} />}
 
@@ -1174,17 +1292,21 @@ export function TetrisApp() {
           open={ui.settings}
           haptic={ui.haptic}
           hardConfirm={ui.hardConfirm}
+          ghost={ui.ghost}
           theme={ui.theme}
           themes={saveRef.current.themes}
           credits={ui.credits}
           onClose={() => syncUi({ settings: false })}
           onHaptic={setProfile}
           onHard={toggleHard}
+          onGhost={toggleGhost}
           onTheme={onTheme}
         />
         <BoardSheet
           open={ui.board}
           scores={saveRef.current.scores}
+          dailyRows={saveRef.current.dailyBoard.rows}
+          dailyDate={saveRef.current.dailyBoard.date}
           onClose={() => syncUi({ board: false })}
         />
       </div>
