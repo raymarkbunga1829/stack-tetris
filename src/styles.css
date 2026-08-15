@@ -372,6 +372,122 @@
   color: var(--color-fg);
 }
 
+.combo-meter span.is-pop,
+.combo-meter em.is-fire {
+  transform-origin: center;
+}
+
+.combo-meter i b.is-pop {
+  box-shadow: 0 0 10px color-mix(in oklab, var(--color-fg) 55%, transparent);
+}
+
+.combo-burst,
+.b2b-burst {
+  position: absolute;
+  left: 50%;
+  z-index: 4;
+  margin: 0;
+  pointer-events: none;
+  font: 700 1.7rem/1 var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--color-fg);
+  text-shadow: 0 0 18px color-mix(in oklab, var(--color-fg) 45%, transparent);
+}
+
+.combo-burst {
+  top: 42%;
+  transform: translate(-50%, -50%);
+}
+
+.b2b-burst {
+  top: 52%;
+  font-size: 1.35rem;
+  letter-spacing: 0.18em;
+  transform: translate(-50%, -50%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .combo-meter span.is-pop {
+    animation: chain-pop 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .combo-meter em.is-fire {
+    animation: b2b-fire 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .combo-meter i b {
+    transition: width 180ms ease-out;
+  }
+
+  .combo-burst {
+    animation: chain-float 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .b2b-burst {
+    animation: b2b-float 0.95s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes chain-pop {
+  0% {
+    transform: scale(0.55);
+    filter: brightness(1.6);
+  }
+  45% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes b2b-fire {
+  0% {
+    transform: scale(0.7);
+    color: var(--color-fg);
+    text-shadow: 0 0 0 transparent;
+  }
+  35% {
+    transform: scale(1.55);
+    text-shadow: 0 0 16px color-mix(in oklab, var(--color-fg) 70%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    text-shadow: 0 0 0 transparent;
+  }
+}
+
+@keyframes chain-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -8px) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -36px) scale(1);
+  }
+}
+
+@keyframes b2b-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.7);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -4px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -28px) scale(1);
+  }
+}
+
 .combo-meter i {
   display: block;
   height: 3px;
@@ -523,7 +639,7 @@
 
 .pad-btn:active,
 .pad-btn.is-down {
-  transform: scale(0.94);
+  transform: scale(0.96);
   background: #2b303c;
 }
 
@@ -541,7 +657,7 @@
 
 .pad-hard:active {
   background: var(--color-accent);
-  transform: scale(0.94);
+  transform: scale(0.96);
 }
 
 .next-list .pocket-sm:nth-child(n + 4) {
@@ -1150,8 +1266,148 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: no-preference) {
+  .play-btn,
+  .pad-btn,
+  .modes button,
+  .shop-buy,
+  .shop-x,
+  .set-row,
+  .text-btn,
+  .well-pause,
+  .pocket-sm.is-pickable {
+    transition:
+      transform 150ms ease-out,
+      background-color 150ms ease-out,
+      border-color 160ms ease-out,
+      color 160ms ease-out;
+  }
+
+  .play-btn:active,
+  .modes button:active,
+  .shop-buy:active,
+  .set-row:active,
+  .text-btn:active,
+  .well-pause:active {
+    transform: scale(0.96);
+  }
+
+  .veil > * {
+    animation: rise-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .veil > *:nth-child(2) {
+    animation-delay: 70ms;
+  }
+
+  .veil > *:nth-child(3) {
+    animation-delay: 130ms;
+  }
+
+  .veil > *:nth-child(4) {
+    animation-delay: 180ms;
+  }
+
+  .modes button {
+    animation: rise-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .modes button:nth-child(1) {
+    animation-delay: 40ms;
+  }
+  .modes button:nth-child(2) {
+    animation-delay: 80ms;
+  }
+  .modes button:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .modes button:nth-child(4) {
+    animation-delay: 160ms;
+  }
+  .modes button:nth-child(5) {
+    animation-delay: 200ms;
+  }
+  .modes button:nth-child(6) {
+    animation-delay: 240ms;
+  }
+
+  .shop-veil {
+    animation: fade-in 180ms ease-out;
+  }
+
+  .shop {
+    animation: sheet-up 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
   .banner {
+    animation: banner-pop 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .pred-chip {
+    animation: rise-in 240ms ease-out both;
+  }
+
+  .pwr.is-lit {
+    animation: lit-pulse 1.6s ease-in-out infinite;
+  }
+
+  .stat-value {
+    transition: color 160ms ease-out;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lit-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 12px color-mix(in oklab, var(--color-fg) 28%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner,
+  .veil > *,
+  .modes button,
+  .shop,
+  .shop-veil,
+  .combo-burst,
+  .b2b-burst,
+  .pred-chip,
+  .pwr.is-lit {
+    animation: none !important;
     transition: none;
   }
 }

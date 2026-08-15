@@ -217,6 +217,18 @@ export function sfxPick() {
   noiseBurst(0.1, 0.02, 0.16, 2400, 0.8);
 }
 
+export function sfxCombo(n: number) {
+  const step = Math.min(6, Math.max(1, n));
+  tone(420 + step * 70, 0.07, 0, "triangle", 0.28);
+  tone(620 + step * 80, 0.1, 0.04, "sine", 0.24);
+}
+
+export function sfxB2b() {
+  tone(392, 0.07, 0, "square", 0.28);
+  tone(523, 0.09, 0.05, "triangle", 0.3);
+  tone(784, 0.14, 0.1, "sine", 0.26);
+}
+
 export function sfxPower(id: "zap" | "slow" | "shield" | "quake" | "pick") {
   if (id === "zap") sfxZap();
   else if (id === "slow") sfxSlow();

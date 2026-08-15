@@ -3,6 +3,8 @@ import {
   resumeAudio,
   setMuted,
   sfxClear,
+  sfxCombo,
+  sfxB2b,
   sfxHard,
   sfxHold,
   sfxLock,
@@ -102,6 +104,8 @@ type Ui = {
   picking: boolean;
   combo: number;
   b2b: boolean;
+  comboPop: number;
+  b2bPop: number;
   sprintBest: number | null;
   recap: { lines: number; combo: number; tspins: number; stacks: number; clock: number } | null;
   pred: { rows: number; lock: boolean; kick: boolean } | null;
@@ -144,6 +148,8 @@ export function TetrisApp() {
   const replayRef = useRef<Snap[] | null>(null);
   const replayI = useRef(0);
   const replayT = useRef(0);
+  const comboSeen = useRef(-1);
+  const b2bSeen = useRef(false);
 
   const [ui, setUi] = useState<Ui>({
     phase: "title",
@@ -178,6 +184,8 @@ export function TetrisApp() {
     picking: false,
     combo: 0,
     b2b: false,
+    comboPop: 0,
+    b2bPop: 0,
     sprintBest: saveRef.current.sprintBest,
     recap: null,
     pred: null,
@@ -320,6 +328,8 @@ export function TetrisApp() {
     sfxStart();
     haptic("select");
     startMusic(mode);
+    comboSeen.current = -1;
+    b2bSeen.current = false;
     syncUi({
       phase: "playing",
       banner: null,
@@ -339,6 +349,8 @@ export function TetrisApp() {
       board: false,
       combo: 0,
       b2b: false,
+      comboPop: 0,
+      b2bPop: 0,
       recap: null,
       pred: null,
     });
@@ -433,6 +445,9 @@ export function TetrisApp() {
         juiceClear(
           sim.clearRows.length === 4 ? "stack" : sim.tSpin ? "tspin" : "clear",
         );
+      } else {
+        comboSeen.current = -1;
+        b2bSeen.current = sim.b2b;
       }
       syncUi();
     }
@@ -441,6 +456,7 @@ export function TetrisApp() {
       haptic("clear");
       shakeRef.current = 5;
       flashBanner(sim.lastClear ?? "CLEAR");
+      fireChain(sim, false);
       syncUi();
     }
     if (ev === "tetris" || ev === "tspin") {
@@ -449,6 +465,7 @@ export function TetrisApp() {
       shakeRef.current = ev === "tetris" ? 12 : 8;
       well3dRef.current?.punch(ev === "tetris" ? 0.35 : 0.25);
       flashBanner(sim.lastClear ?? "STACK");
+      fireChain(sim, ev === "tetris" || ev === "tspin");
       if (ev === "tetris") payMissions({ tetris: 1 });
       syncUi();
     }
@@ -600,6 +617,27 @@ export function TetrisApp() {
     engine.sweep(kind);
     sfxShatter();
     if (kind === "stack" || kind === "tspin") sfxSweep();
+  }
+
+  function fireChain(sim: Sim, difficult: boolean) {
+    const combo = Math.max(0, sim.combo);
+    const patch: Partial<Ui> = {};
+    if (combo > 0 && combo > comboSeen.current) {
+      sfxCombo(combo);
+      well3dRef.current?.punch(0.16 + Math.min(0.22, combo * 0.04));
+      patch.comboPop = uiRef.current.comboPop + 1;
+    }
+    comboSeen.current = sim.combo;
+    if (sim.b2b) {
+      const hit = difficult && b2bSeen.current;
+      if (hit || !b2bSeen.current) {
+        sfxB2b();
+        well3dRef.current?.punch(hit ? 0.34 : 0.2);
+        patch.b2bPop = uiRef.current.b2bPop + 1;
+      }
+    }
+    b2bSeen.current = sim.b2b;
+    if (Object.keys(patch).length) syncUi(patch);
   }
 
   function flashBanner(text: string) {
@@ -1128,15 +1166,39 @@ export function TetrisApp() {
               </p>
             )}
             {ui.phase === "playing" && (
-              <div className="combo-meter" aria-hidden={ui.combo <= 0 && !ui.b2b}>
-                <span className={ui.combo > 0 ? "is-on" : ""}>
+              <div
+                className={`combo-meter${ui.comboPop ? " is-live" : ""}`}
+                aria-hidden={ui.combo <= 0 && !ui.b2b}
+              >
+                <span
+                  key={`c-${ui.comboPop}`}
+                  className={ui.combo > 0 ? `is-on${ui.comboPop ? " is-pop" : ""}` : ""}
+                >
                   {ui.combo > 0 ? `x${ui.combo}` : "combo"}
                 </span>
                 <i>
-                  <b style={{ width: `${Math.min(100, ui.combo * 12)}%` }} />
+                  <b
+                    className={ui.comboPop ? "is-pop" : ""}
+                    style={{ width: `${Math.min(100, ui.combo * 12)}%` }}
+                  />
                 </i>
-                <em className={ui.b2b ? "is-on" : ""}>B2B</em>
+                <em
+                  key={`b-${ui.b2bPop}`}
+                  className={ui.b2b ? `is-on${ui.b2bPop ? " is-fire" : ""}` : ""}
+                >
+                  B2B
+                </em>
               </div>
+            )}
+            {ui.phase === "playing" && ui.comboPop > 0 && ui.combo > 0 && (
+              <p key={`cb-${ui.comboPop}`} className="combo-burst">
+                x{ui.combo}
+              </p>
+            )}
+            {ui.phase === "playing" && ui.b2bPop > 0 && ui.b2b && (
+              <p key={`bb-${ui.b2bPop}`} className="b2b-burst">
+                B2B
+              </p>
             )}
             {ui.phase === "playing" && (
               <button
