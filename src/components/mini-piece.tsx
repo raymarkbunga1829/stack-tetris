@@ -1,0 +1,38 @@
+import { SHAPES } from "@/game/pieces";
+import { themeOf, type ThemeId } from "@/game/themes";
+import type { PieceId } from "@/game/types";
+
+export function MiniPiece({ id, theme }: { id: PieceId | null; theme?: ThemeId }) {
+  if (!id) {
+    return <div className="mini empty" aria-hidden="true" />;
+  }
+  const cells = SHAPES[id][0]!;
+  const maxX = Math.max(...cells.map((c) => c.x));
+  const maxY = Math.max(...cells.map((c) => c.y));
+  const w = maxX + 1;
+  const h = maxY + 1;
+  const fill = themeOf(theme).fill[id];
+  return (
+    <div
+      className="mini"
+      style={{
+        gridTemplateColumns: `repeat(${w}, 1fr)`,
+        gridTemplateRows: `repeat(${h}, 1fr)`,
+        aspectRatio: `${w} / ${h}`,
+      }}
+      aria-label={id}
+    >
+      {cells.map((c, i) => (
+        <span
+          key={i}
+          className="mini-cell"
+          style={{
+            gridColumn: c.x + 1,
+            gridRow: c.y + 1,
+            background: fill,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
