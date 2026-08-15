@@ -274,6 +274,23 @@
   font: 500 0.8rem/1 var(--font-sans);
 }
 
+.play-btn {
+  margin-top: 10px;
+  min-height: 48px;
+  min-width: 148px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-fg);
+  color: var(--color-bg);
+  font: 600 0.95rem/1 var(--font-sans);
+  letter-spacing: 0.04em;
+}
+
+.play-btn:active {
+  transform: scale(0.96);
+}
+
 .banner {
   position: absolute;
   left: 50%;

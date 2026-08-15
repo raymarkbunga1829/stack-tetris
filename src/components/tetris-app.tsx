@@ -3,13 +3,17 @@ import {
   resumeAudio,
   setMuted,
   sfxClear,
+  sfxHard,
   sfxHold,
   sfxLock,
   sfxMove,
   sfxOver,
+  sfxPower,
   sfxRotate,
   sfxSelect,
+  sfxShatter,
   sfxStart,
+  sfxSweep,
   sfxTetris,
   unlockAudio,
 } from "@/game/audio";
@@ -198,66 +202,74 @@ export function TetrisApp() {
     const gestures = createGestures((ev) => applyGestureRef.current(ev));
     swipeRef.current = gestures;
 
-    const engine = createWell3d(canvas);
-    well3dRef.current = engine;
-
-    const onVis = () => {
-      if (!document.hidden) resumeAudio();
-      else if (simRef.current?.phase === "playing") {
-        simRef.current.phase = "paused";
-        syncUi();
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-
-    const ro = new ResizeObserver(() => {
+    try {
+      const engine = createWell3d(canvas);
+      well3dRef.current = engine;
+      const ro = new ResizeObserver(() => {
+        engine.resize();
+        if (vizCanvas) resizeCanvas(vizCanvas);
+      });
+      ro.observe(well);
       engine.resize();
       if (vizCanvas) resizeCanvas(vizCanvas);
-    });
-    ro.observe(well);
-    engine.resize();
-    if (vizCanvas) resizeCanvas(vizCanvas);
 
-    if (import.meta.env.DEV || new URLSearchParams(location.search).has("qa")) {
-      window.__controlsTest = {
-        getX: () => simRef.current?.piece?.x ?? 0,
-        getY: () => simRef.current?.piece?.y ?? 0,
-        getRot: () => simRef.current?.piece?.rot ?? 0,
-        getPhase: () => uiRef.current.phase,
-        getScore: () => simRef.current?.score ?? 0,
-        getPiece: () => simRef.current?.piece?.id ?? null,
-        setKeys: (codes) => input.setKeys(codes),
-        tapLeft: () => input.tap({ left: true }),
-        tapRight: () => input.tap({ right: true }),
-        getGesture: () => lastGestureRef.current,
-        feedGesture: (type, id, x, y, t) => gestures.feed(type, id, x, y, t),
-        vizAlive: () => vizRef.current.liveCount(),
-        getCredits: () => saveRef.current.credits,
-        getZap: () => saveRef.current.inv.zap,
+      const onVis = () => {
+        if (!document.hidden) resumeAudio();
+        else if (simRef.current?.phase === "playing") {
+          simRef.current.phase = "paused";
+          syncUi();
+        }
+      };
+      document.addEventListener("visibilitychange", onVis);
+
+      lastTs.current = performance.now();
+      const loop = (now: number) => {
+        const dt = Math.min(0.1, (now - lastTs.current) / 1000);
+        lastTs.current = now;
+        tick(dt);
+        paint();
+        rafRef.current = requestAnimationFrame(loop);
+      };
+      rafRef.current = requestAnimationFrame(loop);
+
+      if (import.meta.env.DEV || new URLSearchParams(location.search).has("qa")) {
+        window.__controlsTest = {
+          getX: () => simRef.current?.piece?.x ?? 0,
+          getY: () => simRef.current?.piece?.y ?? 0,
+          getRot: () => simRef.current?.piece?.rot ?? 0,
+          getPhase: () => uiRef.current.phase,
+          getScore: () => simRef.current?.score ?? 0,
+          getPiece: () => simRef.current?.piece?.id ?? null,
+          setKeys: (codes) => input.setKeys(codes),
+          tapLeft: () => input.tap({ left: true }),
+          tapRight: () => input.tap({ right: true }),
+          getGesture: () => lastGestureRef.current,
+          feedGesture: (type, id, x, y, t) => gestures.feed(type, id, x, y, t),
+          vizAlive: () => vizRef.current.liveCount(),
+          getCredits: () => saveRef.current.credits,
+          getZap: () => saveRef.current.inv.zap,
+        };
+      }
+
+      return () => {
+        cancelAnimationFrame(rafRef.current);
+        input.dispose();
+        gestures.reset();
+        swipeRef.current = null;
+        ro.disconnect();
+        document.removeEventListener("visibilitychange", onVis);
+        engine.dispose();
+        well3dRef.current = null;
+        delete window.__controlsTest;
+      };
+    } catch (err) {
+      console.error("[stack] well init failed", err);
+      return () => {
+        input.dispose();
+        gestures.reset();
+        swipeRef.current = null;
       };
     }
-
-    lastTs.current = performance.now();
-    const loop = (now: number) => {
-      const dt = Math.min(0.1, (now - lastTs.current) / 1000);
-      lastTs.current = now;
-      tick(dt);
-      paint();
-      rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      input.dispose();
-      gestures.reset();
-      swipeRef.current = null;
-      ro.disconnect();
-      document.removeEventListener("visibilitychange", onVis);
-      engine.dispose();
-      well3dRef.current = null;
-      delete window.__controlsTest;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -385,6 +397,7 @@ export function TetrisApp() {
         );
         if (just.hard && ghostAt - falling.y >= 2) {
           engine.hardStreak(falling, ghostAt, themeOf(saveRef.current.theme).fill[falling.id]);
+          sfxHard();
         }
       }
       if (sim.phase === "clearing" && sim.clearRows.length) {
@@ -518,6 +531,8 @@ export function TetrisApp() {
     engine.sparkRows(sim.clearRows, tint);
     engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(kind);
+    sfxShatter();
+    if (kind === "stack" || kind === "tspin") sfxSweep();
   }
 
   function flashBanner(text: string) {
@@ -612,6 +627,7 @@ export function TetrisApp() {
     saveRef.current = next;
     writeSave(next);
     well3dRef.current?.powerFx(id, cells);
+    sfxPower(id);
     if (id === "quake") shakeRef.current = 14;
     else if (id === "zap") shakeRef.current = 6;
     flashBanner(sim.lastClear ?? id.toUpperCase());
@@ -637,6 +653,7 @@ export function TetrisApp() {
     writeSave(next);
     flashBanner("PICK");
     haptic("select");
+    sfxPower("pick");
     if (sim.piece) {
       well3dRef.current?.powerFx(
         "pick",
@@ -831,6 +848,21 @@ export function TetrisApp() {
 
   function onWellPointer(e: React.PointerEvent<HTMLDivElement>) {
     unlockAudio();
+    const phase = uiRef.current.phase;
+    if (e.type === "pointerdown" && (phase === "title" || phase === "over")) {
+      e.preventDefault();
+      e.stopPropagation();
+      startGame();
+      return;
+    }
+    if (e.type === "pointerdown" && phase === "paused") {
+      e.preventDefault();
+      if (simRef.current) {
+        simRef.current.phase = "playing";
+        syncUi({ phase: "playing" });
+      }
+      return;
+    }
     if (e.type === "pointerdown") {
       e.preventDefault();
       try {
@@ -922,13 +954,39 @@ export function TetrisApp() {
               <div className="veil">
                 <p className="veil-kicker">{modeOf(ui.mode).blurb}</p>
                 <p className="veil-title">Stack</p>
-                <p className="veil-hint">Tap to play</p>
+                <button
+                  type="button"
+                  className="play-btn"
+                  data-qa="play"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    unlockAudio();
+                    startGame();
+                  }}
+                >
+                  Play
+                </button>
               </div>
             )}
             {ui.phase === "paused" && (
               <div className="veil">
                 <p className="veil-title">Paused</p>
-                <p className="veil-hint">Tap to resume</p>
+                <button
+                  type="button"
+                  className="play-btn"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    unlockAudio();
+                    if (simRef.current) {
+                      simRef.current.phase = "playing";
+                      syncUi({ phase: "playing" });
+                    }
+                  }}
+                >
+                  Resume
+                </button>
               </div>
             )}
             {ui.phase === "over" && (
@@ -943,9 +1001,18 @@ export function TetrisApp() {
                       : "Game over"}
                 </p>
                 <p className="veil-title">{ui.score.toLocaleString()}</p>
-                <p className="veil-hint">
-                  {replayRef.current ? "Replay · tap retry" : "Tap to retry"}
-                </p>
+                <button
+                  type="button"
+                  className="play-btn"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    unlockAudio();
+                    startGame();
+                  }}
+                >
+                  {replayRef.current ? "Play again" : "Retry"}
+                </button>
               </div>
             )}
             {ui.phase === "playing" && (
