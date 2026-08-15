@@ -554,6 +554,14 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   return "none";
 }
 
+export function dirtyRows(sim: Sim, max: number): number[] {
+  const out: number[] = [];
+  for (let y = ROWS - 1; y >= HIDDEN_ROWS && out.length < max; y--) {
+    if (sim.board[y]!.some((c) => c !== null)) out.push(y);
+  }
+  return out;
+}
+
 export function applyPower(sim: Sim, id: PowerId): boolean {
   if (sim.phase !== "playing" && sim.phase !== "clearing") return false;
   if (id === "slow") {

@@ -34,12 +34,15 @@ import {
   advance,
   applyPower,
   createSim,
+  dirtyRows,
   dragPiece,
+  ghostY,
   pauseToggle,
   pickFromNext,
   type Sim,
 } from "@/game/sim";
-import { HIDDEN_ROWS, type Phase, type PieceId } from "@/game/types";
+import { cellsOf } from "@/game/pieces";
+import { HIDDEN_ROWS, COLS, type Phase, type PieceId } from "@/game/types";
 import {
   buyWithCredits,
   consumePower,
@@ -332,6 +335,8 @@ export function TetrisApp() {
       return;
     }
 
+    const falling = sim.piece;
+    const ghostAt = falling ? ghostY(sim) : 0;
     const ev = advance(sim, dt, {
       heldLeft: held.left,
       heldRight: held.right,
@@ -372,6 +377,16 @@ export function TetrisApp() {
     if (ev === "lock") {
       sfxLock();
       haptic("lock");
+      const engine = well3dRef.current;
+      if (engine && falling) {
+        engine.lockThump(
+          cellsOf(falling.id, falling.rot, falling.x, falling.y),
+          themeOf(saveRef.current.theme).fill[falling.id],
+        );
+        if (just.hard && ghostAt - falling.y >= 2) {
+          engine.hardStreak(falling, ghostAt, themeOf(saveRef.current.theme).fill[falling.id]);
+        }
+      }
       if (sim.phase === "clearing" && sim.clearRows.length) {
         juiceClear(
           sim.clearRows.length === 4 ? "stack" : sim.tSpin ? "tspin" : "clear",
@@ -501,6 +516,8 @@ export function TetrisApp() {
           ? "#c9d6ea"
           : "#d8dde6";
     engine.sparkRows(sim.clearRows, tint);
+    engine.shatter(sim, themeOf(saveRef.current.theme));
+    engine.sweep(kind);
   }
 
   function flashBanner(text: string) {
@@ -575,11 +592,28 @@ export function TetrisApp() {
       syncUi({ picking: true });
       return;
     }
+    const theme = themeOf(saveRef.current.theme);
+    const marked =
+      id === "zap"
+        ? dirtyRows(sim, 1)
+        : id === "quake"
+          ? dirtyRows(sim, 2)
+          : [];
+    const cells: { x: number; y: number; hexCol: string }[] = [];
+    for (const y of marked) {
+      for (let x = 0; x < COLS; x++) {
+        const pid = sim.board[y]![x] as PieceId | null;
+        if (pid) cells.push({ x, y, hexCol: theme.fill[pid] });
+      }
+    }
     const next = consumePower(saveRef.current, id);
     if (!next) return;
     if (!applyPower(sim, id)) return;
     saveRef.current = next;
     writeSave(next);
+    well3dRef.current?.powerFx(id, cells);
+    if (id === "quake") shakeRef.current = 14;
+    else if (id === "zap") shakeRef.current = 6;
     flashBanner(sim.lastClear ?? id.toUpperCase());
     syncUi({
       inv: next.inv,
@@ -603,6 +637,16 @@ export function TetrisApp() {
     writeSave(next);
     flashBanner("PICK");
     haptic("select");
+    if (sim.piece) {
+      well3dRef.current?.powerFx(
+        "pick",
+        cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, sim.piece.y).map((c) => ({
+          x: c.x,
+          y: c.y,
+          hexCol: themeOf(saveRef.current.theme).fill[sim.piece!.id],
+        })),
+      );
+    }
     syncUi({
       picking: false,
       inv: next.inv,

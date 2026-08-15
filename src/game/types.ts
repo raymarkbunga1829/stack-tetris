@@ -14,7 +14,7 @@ export const LOCK_DELAY = 0.5;
 export const MAX_LOCK_RESETS = 15;
 export const DAS = 0.167;
 export const ARR = 0.033;
-export const CLEAR_TIME = 0.2;
+export const CLEAR_TIME = 0.32;
 export const LINES_PER_LEVEL = 10;
 
 export const LINE_SCORE = [0, 100, 300, 500, 800] as const;

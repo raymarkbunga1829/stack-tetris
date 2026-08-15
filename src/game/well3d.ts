@@ -8,7 +8,8 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { cellsOf } from "./pieces";
 import { ghostY, type Sim } from "./sim";
 import type { Theme } from "./themes";
-import { COLS, HIDDEN_ROWS, VISIBLE_ROWS, type PieceId } from "./types";
+import type { PowerId } from "./shop";
+import { COLS, HIDDEN_ROWS, VISIBLE_ROWS, CLEAR_TIME, PIECE_IDS, type PieceId } from "./types";
 
 const MAX_SOLID = COLS * VISIBLE_ROWS + 8;
 const MAX_GHOST = 8;
@@ -30,6 +31,18 @@ export type Well3d = {
   draw: (sim: Sim | null, shake: number, theme: Theme) => void;
   punch: (amount: number) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
+  lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
+  shatter: (sim: Sim, theme: Theme) => void;
+  sweep: (kind: "stack" | "tspin" | "clear") => void;
+  hardStreak: (
+    piece: { id: PieceId; rot: number; x: number; y: number },
+    toY: number,
+    hexCol: string,
+  ) => void;
+  powerFx: (
+    id: PowerId,
+    cells?: { x: number; y: number; hexCol: string }[],
+  ) => void;
   clientToCell: (
     rect: DOMRect,
     clientX: number,
@@ -214,6 +227,108 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   sparkPts.frustumCulled = false;
   scene.add(sparkPts);
 
+  const MAX_SHARDS = 80;
+  const shards = new THREE.InstancedMesh(geo, solidMat, MAX_SHARDS);
+  shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  shards.frustumCulled = false;
+  shards.count = 0;
+  shards.setColorAt(0, new THREE.Color(0xffffff));
+  scene.add(shards);
+
+  const MAX_STREAK = 28;
+  const streaks = new THREE.InstancedMesh(geo, ghostMat, MAX_STREAK);
+  streaks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  streaks.frustumCulled = false;
+  streaks.count = 0;
+  streaks.setColorAt(0, new THREE.Color(0xffffff));
+  scene.add(streaks);
+
+  const sweepMat = new THREE.MeshBasicMaterial({
+    color: 0xf4f1ea,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const sweepMesh = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 1.35), sweepMat);
+  sweepMesh.position.set(0, 10, 0.55);
+  sweepMesh.visible = false;
+  scene.add(sweepMesh);
+
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.9, 28), ringMat);
+  ring.position.z = 0.42;
+  ring.visible = false;
+  scene.add(ring);
+
+  const zapMat = new THREE.MeshBasicMaterial({
+    color: 0xb8fff8,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const zapMesh = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 0.42), zapMat);
+  zapMesh.visible = false;
+  scene.add(zapMesh);
+
+  const slowMat = new THREE.MeshBasicMaterial({
+    color: 0xe8c478,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+  });
+  const slowVeil = new THREE.Mesh(new THREE.PlaneGeometry(10.2, 20.4), slowMat);
+  slowVeil.position.set(0, 9.5, 0.62);
+  scene.add(slowVeil);
+
+  const shieldMat = new THREE.MeshBasicMaterial({
+    color: 0x8ec8ff,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const shieldShell = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 20.8), shieldMat);
+  shieldShell.position.set(0, 9.5, 0.7);
+  scene.add(shieldShell);
+
+  let zapT = 0;
+  let zapY = 2;
+  let quakeT = 0;
+  let pickT = 0;
+
+  type Shard = {
+    x: number;
+    y: number;
+    z: number;
+    vx: number;
+    vy: number;
+    vz: number;
+    life: number;
+    max: number;
+    hexCol: string;
+    spin: number;
+  };
+  const shardList: Shard[] = [];
+  type Streak = { x: number; y: number; z: number; life: number; hexCol: string };
+  const streakList: Streak[] = [];
+  let lockPulse = 0;
+  const lockKeys = new Set<string>();
+  let sweepT = 0;
+  let sweepKind: "stack" | "tspin" | "clear" | null = null;
+  let sparkLifeMul = 1;
+  let bloomMul = 1;
+  let idleT = 0;
+  let lastThemeId = "";
+
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(
@@ -263,6 +378,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   ) {
     const p = cellPos(col, row, z);
     dummy.position.set(p.x, p.y, p.z);
+    dummy.rotation.set(0, 0, 0);
     dummy.scale.setScalar(scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
@@ -271,6 +387,16 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   }
 
   function draw(sim: Sim | null, shake: number, theme: Theme) {
+    if (theme.id !== lastThemeId) {
+      lastThemeId = theme.id;
+      lastBg = "";
+      const night = theme.id === "night";
+      sparkLifeMul = night ? 1.55 : theme.id === "ink" ? 1 : 1.15;
+      bloomMul = night ? 1.35 : theme.id === "ink" ? 0.92 : 1;
+      scene.fog = new THREE.FogExp2(hex(theme.pit).getHex(), night ? 0.028 : 0.018);
+      rim.color.set(night ? 0x8eb4ff : 0xb7d4ff);
+      rim.intensity = night ? 0.95 : 0.7;
+    }
     if (theme.pit !== lastBg) {
       lastBg = theme.pit;
       const bg = hex(theme.pit).multiplyScalar(0.55);
@@ -282,37 +408,65 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
 
     frameCamera();
-    if (shake > 0) {
-      camera.position.x += (Math.random() - 0.5) * shake * 0.035;
-      camera.position.y += (Math.random() - 0.5) * shake * 0.035;
+    if (shake > 0 || quakeT > 0) {
+      const rumble = shake * 0.035 + quakeT * 0.09;
+      camera.position.x += (Math.random() - 0.5) * rumble;
+      camera.position.y += (Math.random() - 0.5) * rumble;
       camera.lookAt(0.05, 9.15 + punch * punch * 0.25, 0);
     }
-    bloom.strength = bloomBase + punch * punch * 0.42;
+    bloom.strength =
+      (bloomBase + punch * punch * 0.42) * bloomMul +
+      (sweepT > 0 ? 0.28 : 0) +
+      lockPulse * 0.18 +
+      zapT * 0.55 +
+      (sim && sim.slowT > 0 ? -0.08 : 0);
 
     const now = performance.now();
     const dt = Math.min(0.05, (now - lastDraw) / 1000);
     lastDraw = now;
     if (!reduce) punch = Math.max(0, punch - dt * 3.4);
     else punch = 0;
+    lockPulse = Math.max(0, lockPulse - dt * 4.6);
+    zapT = Math.max(0, zapT - dt * 3.8);
+    quakeT = Math.max(0, quakeT - dt * 2.4);
+    pickT = Math.max(0, pickT - dt * 3.2);
     stepSparks(dt);
+    stepShards(dt);
+    stepStreaks(dt);
+    stepSweep(dt);
+    idleT += dt;
+
+    const title = !sim || sim.phase === "title";
+    const clearing = sim?.phase === "clearing";
+    const clearEase = clearing
+      ? 1 - Math.max(0, Math.min(1, sim.clearT / CLEAR_TIME))
+      : 0;
+    const settle = 1 - Math.pow(1 - clearEase, 3);
 
     let n = 0;
-    if (sim) {
+    if (sim && !title) {
       for (let y = HIDDEN_ROWS; y < HIDDEN_ROWS + VISIBLE_ROWS; y++) {
         for (let x = 0; x < COLS; x++) {
           const id = sim.board[y]![x];
           if (!id) continue;
+          if (clearing && sim.clearRows.includes(y)) continue;
           const row = y - HIDDEN_ROWS;
-          const flashing = sim.phase === "clearing" && sim.clearRows.includes(y);
+          let below = 0;
+          if (clearing) {
+            for (const cy of sim.clearRows) if (cy > y) below += 1;
+          }
+          const key = `${x},${y}`;
+          const thump = lockKeys.has(key) && lockPulse > 0;
+          const pop = thump ? 1 + 0.08 * Math.sin(lockPulse * Math.PI) : 1;
           place(
             solids,
             n++,
             x,
-            row,
+            row + below * settle,
             0,
-            flashing ? theme.flash : theme.fill[id as PieceId],
-            flashing ? 0.97 : 1,
-            flashing ? 1.8 : 1.12,
+            theme.fill[id as PieceId],
+            pop,
+            thump ? 1.45 : 1.12,
           );
         }
       }
@@ -320,8 +474,23 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, sim.piece.y)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
-          place(solids, n++, c.x, row, 0.1, theme.fill[sim.piece.id], 1.03, 1.28);
+          place(solids, n++, c.x, row, 0.1, theme.fill[sim.piece.id], 1.03 + pickT * 0.22, 1.28 + pickT * 0.5);
         }
+      }
+    } else if (!reduce) {
+      const pid = PIECE_IDS[Math.floor(idleT / 5.2) % PIECE_IDS.length]!;
+      const rot = Math.floor(idleT * 0.55) % 4;
+      const bob = 7.2 + Math.sin(idleT * 0.7) * 1.4;
+      for (const c of cellsOf(pid, rot as 0 | 1 | 2 | 3, 3, 0)) {
+        const p = cellPos(c.x, 8, 0);
+        dummy.position.set(p.x * 0.92, bob + (8 - c.y) * 0.95, Math.sin(idleT * 0.5) * 0.35);
+        dummy.rotation.set(idleT * 0.35, idleT * 0.55, 0.15);
+        dummy.scale.setScalar(1.04);
+        dummy.updateMatrix();
+        solids.setMatrixAt(n, dummy.matrix);
+        color.set(theme.fill[pid]).multiplyScalar(1.2);
+        solids.setColorAt(n, color);
+        n += 1;
       }
     }
     solids.count = n;
@@ -329,19 +498,71 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (solids.instanceColor) solids.instanceColor.needsUpdate = true;
 
     let g = 0;
-    if (sim?.piece && sim.phase !== "over") {
+    let ringOn = false;
+    if (sim?.piece && sim.phase !== "over" && sim.phase !== "clearing" && sim.phase !== "title") {
       const gy = ghostY(sim);
+      const breathe = reduce ? 0 : Math.sin(now * 0.0055) * 0.5 + 0.5;
+      ghostMat.opacity = 0.16 + breathe * 0.12;
+      ghostMat.emissiveIntensity = 0.06 + breathe * 0.1;
       if (gy !== sim.piece.y) {
+        let minRow = VISIBLE_ROWS;
+        let cx = 0;
+        let cn = 0;
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, gy)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
-          place(ghosts, g++, c.x, row, 0, theme.fill[sim.piece.id], 0.9, 1.4);
+          place(
+            ghosts,
+            g++,
+            c.x,
+            row,
+            0,
+            theme.fill[sim.piece.id],
+            0.86 + breathe * 0.08,
+            1.35,
+          );
+          minRow = Math.min(minRow, row);
+          cx += c.x;
+          cn += 1;
+        }
+        if (cn > 0 && !reduce) {
+          const p = cellPos(cx / cn, minRow, 0);
+          ring.position.set(p.x, p.y - 0.55, 0.42);
+          ring.scale.setScalar(1.05 + breathe * 0.18);
+          ringMat.opacity = 0.12 + breathe * 0.16;
+          ringMat.color.set(theme.fill[sim.piece.id]);
+          ringOn = true;
         }
       }
     }
+    ring.visible = ringOn;
     ghosts.count = g;
     ghosts.instanceMatrix.needsUpdate = true;
     if (ghosts.instanceColor) ghosts.instanceColor.needsUpdate = true;
+
+    if (zapT > 0) {
+      zapMesh.visible = true;
+      zapMesh.position.set(0, zapY, 0.5);
+      zapMat.opacity = Math.min(1, zapT * 2.2) * 0.85;
+    } else zapMesh.visible = false;
+
+    const slowOn = !!sim && sim.slowT > 0 && sim.phase !== "title";
+    slowVeil.visible = slowOn;
+    if (slowOn) {
+      slowMat.opacity = 0.05 + 0.03 * (0.5 + 0.5 * Math.sin(now * 0.004));
+      shaft.color.set(0xffe0a0);
+      shaft.intensity = 22;
+    } else {
+      shaft.color.set(0xffe4c4);
+      shaft.intensity = 18;
+    }
+
+    const shieldOn = !!sim && sim.shield && sim.phase !== "title";
+    shieldShell.visible = shieldOn;
+    if (shieldOn) {
+      const p = 0.5 + 0.5 * Math.sin(now * 0.006);
+      shieldMat.opacity = 0.07 + p * 0.08;
+    }
 
     composer.render();
   }
@@ -367,7 +588,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             vx: (Math.random() - 0.5) * 5,
             vy: 1.2 + Math.random() * 3.4,
             vz: 0.8 + Math.random() * 2.4,
-            life: 0.38 + Math.random() * 0.28,
+            life: (0.38 + Math.random() * 0.28) * sparkLifeMul,
             r: c.r,
             g: c.g,
             b: c.b,
@@ -410,6 +631,232 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sparkPts.visible = n > 0;
   }
 
+  function lockThump(cells: { x: number; y: number }[], _hexCol: string) {
+    if (reduce) return;
+    lockKeys.clear();
+    for (const c of cells) lockKeys.add(`${c.x},${c.y}`);
+    lockPulse = 1;
+    punchCam(0.18);
+  }
+
+  function shatter(sim: Sim, theme: Theme) {
+    if (reduce) return;
+    for (const by of sim.clearRows) {
+      const row = by - HIDDEN_ROWS;
+      if (row < 0 || row >= VISIBLE_ROWS) continue;
+      for (let x = 0; x < COLS; x++) {
+        const id = sim.board[by]![x] as PieceId | null;
+        if (!id) continue;
+        const p = cellPos(x, row, 0);
+        shardList.push({
+          x: p.x,
+          y: p.y,
+          z: 0.15,
+          vx: (Math.random() - 0.5) * 3.2,
+          vy: -1.2 - Math.random() * 3.8,
+          vz: 0.4 + Math.random() * 1.6,
+          life: 0.42 + Math.random() * 0.22 * sparkLifeMul,
+          max: 0.55,
+          hexCol: theme.fill[id],
+          spin: (Math.random() - 0.5) * 8,
+        });
+      }
+    }
+    while (shardList.length > MAX_SHARDS) shardList.shift();
+  }
+
+  function sweep(kind: "stack" | "tspin" | "clear") {
+    if (reduce) return;
+    sweepKind = kind;
+    sweepT = kind === "clear" ? 0.22 : 0.38;
+    punchCam(kind === "stack" ? 0.35 : 0.22);
+  }
+
+  function hardStreak(
+    piece: { id: PieceId; rot: number; x: number; y: number },
+    toY: number,
+    hexCol: string,
+  ) {
+    if (reduce) return;
+    const steps = Math.min(6, Math.max(2, Math.floor((toY - piece.y) / 2)));
+    for (let s = 1; s <= steps; s++) {
+      const y = piece.y + ((toY - piece.y) * s) / (steps + 1);
+      for (const c of cellsOf(piece.id, piece.rot as 0 | 1 | 2 | 3, piece.x, Math.round(y))) {
+        const row = c.y - HIDDEN_ROWS;
+        if (row < 0 || row >= VISIBLE_ROWS) continue;
+        const p = cellPos(c.x, row, 0.05);
+        streakList.push({
+          x: p.x,
+          y: p.y,
+          z: p.z,
+          life: 0.16 + s * 0.03,
+          hexCol,
+        });
+      }
+    }
+    while (streakList.length > MAX_STREAK) streakList.shift();
+  }
+
+  function burstCells(cells: { x: number; y: number; hexCol: string }[], down = true) {
+    for (const c of cells) {
+      const row = c.y - HIDDEN_ROWS;
+      if (row < 0 || row >= VISIBLE_ROWS) continue;
+      const p = cellPos(c.x, row, 0);
+      shardList.push({
+        x: p.x,
+        y: p.y,
+        z: 0.15,
+        vx: (Math.random() - 0.5) * 3.4,
+        vy: down ? -1.4 - Math.random() * 4 : 1.2 + Math.random() * 2.4,
+        vz: 0.5 + Math.random() * 1.8,
+        life: 0.4 + Math.random() * 0.22 * sparkLifeMul,
+        max: 0.55,
+        hexCol: c.hexCol,
+        spin: (Math.random() - 0.5) * 8,
+      });
+    }
+    while (shardList.length > MAX_SHARDS) shardList.shift();
+  }
+
+  function powerFx(
+    id: PowerId,
+    cells: { x: number; y: number; hexCol: string }[] = [],
+  ) {
+    if (reduce) return;
+    if (id === "zap") {
+      burstCells(cells);
+      sparkRows(
+        [...new Set(cells.map((c) => c.y))],
+        "#b8fff8",
+      );
+      const row = cells[0] ? cells[0].y - HIDDEN_ROWS : 18;
+      zapY = VISIBLE_ROWS - 1 - row;
+      zapT = 1;
+      punchCam(0.45);
+    } else if (id === "quake") {
+      burstCells(cells);
+      sparkRows(
+        [...new Set(cells.map((c) => c.y))],
+        "#d8c4a0",
+      );
+      for (let k = 0; k < 28; k++) {
+        sparks.push({
+          x: (Math.random() - 0.5) * 9,
+          y: -0.2 + Math.random() * 0.4,
+          z: 0.3 + Math.random() * 0.4,
+          vx: (Math.random() - 0.5) * 4,
+          vy: 2 + Math.random() * 4,
+          vz: Math.random() * 1.5,
+          life: 0.45 + Math.random() * 0.25,
+          r: 0.82,
+          g: 0.72,
+          b: 0.52,
+        });
+      }
+      quakeT = 1;
+      punchCam(0.85);
+    } else if (id === "slow") {
+      punchCam(0.12);
+    } else if (id === "shield") {
+      punchCam(0.2);
+      shieldMat.opacity = 0.28;
+    } else if (id === "pick") {
+      pickT = 1;
+      lockThump(cells, cells[0]?.hexCol ?? "#f4e4b0");
+      for (const c of cells) {
+        const row = c.y - HIDDEN_ROWS;
+        if (row < 0 || row >= VISIBLE_ROWS) continue;
+        const p = cellPos(c.x, row, 0.2);
+        sparks.push({
+          x: p.x,
+          y: p.y,
+          z: p.z,
+          vx: (Math.random() - 0.5) * 3,
+          vy: 1.5 + Math.random() * 2,
+          vz: 0.6 + Math.random() * 1.2,
+          life: 0.35 + Math.random() * 0.2,
+          r: 0.96,
+          g: 0.86,
+          b: 0.55,
+        });
+      }
+      punchCam(0.22);
+    }
+    while (sparks.length > MAX_SPARKS) sparks.shift();
+  }
+
+  function stepShards(dt: number) {
+    let i = 0;
+    while (i < shardList.length) {
+      const s = shardList[i]!;
+      s.life -= dt;
+      if (s.life <= 0) {
+        shardList.splice(i, 1);
+        continue;
+      }
+      s.vy -= 18 * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.z += s.vz * dt;
+      i += 1;
+    }
+    const n = Math.min(shardList.length, MAX_SHARDS);
+    for (let k = 0; k < n; k++) {
+      const s = shardList[k]!;
+      dummy.position.set(s.x, s.y, s.z);
+      dummy.rotation.set(s.spin * (s.max - s.life), s.spin * 0.6, 0);
+      dummy.scale.setScalar(Math.max(0.15, s.life / s.max));
+      dummy.updateMatrix();
+      shards.setMatrixAt(k, dummy.matrix);
+      color.set(s.hexCol).multiplyScalar(1.25);
+      shards.setColorAt(k, color);
+    }
+    shards.count = n;
+    shards.instanceMatrix.needsUpdate = true;
+    if (shards.instanceColor) shards.instanceColor.needsUpdate = true;
+  }
+
+  function stepStreaks(dt: number) {
+    let i = 0;
+    while (i < streakList.length) {
+      const s = streakList[i]!;
+      s.life -= dt;
+      if (s.life <= 0) {
+        streakList.splice(i, 1);
+        continue;
+      }
+      i += 1;
+    }
+    const n = Math.min(streakList.length, MAX_STREAK);
+    for (let k = 0; k < n; k++) {
+      const s = streakList[k]!;
+      dummy.position.set(s.x, s.y, s.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(0.82);
+      dummy.updateMatrix();
+      streaks.setMatrixAt(k, dummy.matrix);
+      color.set(s.hexCol).multiplyScalar(0.7 * Math.min(1, s.life * 6));
+      streaks.setColorAt(k, color);
+    }
+    streaks.count = n;
+    streaks.instanceMatrix.needsUpdate = true;
+    if (streaks.instanceColor) streaks.instanceColor.needsUpdate = true;
+  }
+
+  function stepSweep(dt: number) {
+    if (sweepT <= 0 || !sweepKind) {
+      sweepMesh.visible = false;
+      return;
+    }
+    const max = sweepKind === "clear" ? 0.22 : 0.38;
+    sweepT = Math.max(0, sweepT - dt);
+    const u = 1 - sweepT / max;
+    sweepMesh.visible = true;
+    sweepMesh.position.y = 19.2 - u * 20.4;
+    sweepMat.opacity = sweepKind === "stack" ? 0.42 * (1 - u) : 0.28 * (1 - u);
+    sweepMat.color.set(sweepKind === "tspin" ? 0xc9d6ea : 0xf4f1ea);
+  }
+
   function clientToCell(rect: DOMRect, clientX: number, clientY: number) {
     ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     ndc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
@@ -436,10 +883,34 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     ghosts.dispose();
     sparkGeo.dispose();
     sparkMat.dispose();
+    sweepMat.dispose();
+    sweepMesh.geometry.dispose();
+    ringMat.dispose();
+    ring.geometry.dispose();
+    zapMat.dispose();
+    zapMesh.geometry.dispose();
+    slowMat.dispose();
+    slowVeil.geometry.dispose();
+    shieldMat.dispose();
+    shieldShell.geometry.dispose();
+    shards.dispose();
+    streaks.dispose();
   }
 
   resize();
-  return { resize, draw, punch: punchCam, sparkRows, clientToCell, dispose };
+  return {
+    resize,
+    draw,
+    punch: punchCam,
+    sparkRows,
+    lockThump,
+    shatter,
+    sweep,
+    hardStreak,
+    powerFx,
+    clientToCell,
+    dispose,
+  };
 }
 
 function makeWellGrid() {
