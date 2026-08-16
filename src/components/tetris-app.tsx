@@ -1752,7 +1752,7 @@ export function TetrisApp() {
                       : `HI ${ui.high.toLocaleString()}`}
               </span>
             </div>
-            {ui.scan && <i className="scan" aria-hidden="true" />}
+            {ui.mode === "classic" && <i className="scan" aria-hidden="true" />}
             {ui.mode === "daily" && <i className="moon-wash" aria-hidden="true" />}
             {!ui.intro && (
               <p className="carving" aria-hidden="true">

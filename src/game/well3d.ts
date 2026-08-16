@@ -143,24 +143,25 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     camera.lookAt(0.05, 9.15 + p * 0.25, 0);
   }
 
-  scene.add(new THREE.HemisphereLight(0x88c8ff, 0x180818, 0.7));
-  const key = new THREE.DirectionalLight(0xe8f4ff, 1.85);
+  const hemi = new THREE.HemisphereLight(0x9aa8bc, 0x141018, 0.62);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xf2f4f8, 1.7);
   key.position.set(6.5, 22, 14);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xff48c8, 0.42);
+  const fill = new THREE.DirectionalLight(0x6a7a98, 0.38);
   fill.position.set(-14, 9, 9);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight(0x40f0ff, 1.2);
+  const rim = new THREE.DirectionalLight(0x40f0ff, 0.85);
   rim.position.set(-2, 18, -16);
   scene.add(rim);
 
-  const shaft = new THREE.PointLight(0x66f0ff, 24, 32, 1.45);
+  const shaft = new THREE.PointLight(0xd8e4f0, 16, 28, 1.5);
   shaft.position.set(0, 20.6, 1.4);
   scene.add(shaft);
-  const bounce = new THREE.PointLight(0xff40b8, 10, 16, 1.7);
+  const bounce = new THREE.PointLight(0x3a4a62, 8, 16, 1.7);
   bounce.position.set(0, 0.2, 1.4);
   scene.add(bounce);
-  const jewel = new THREE.PointLight(0xb8ffff, 11, 14, 2);
+  const jewel = new THREE.PointLight(0xffffff, 8, 12, 2);
   jewel.position.set(0, 6, 3.2);
   scene.add(jewel);
 
@@ -204,32 +205,31 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   lip.position.set(0, 19.72, 0.42);
   scene.add(lip);
 
-  const glassFloor = new THREE.Mesh(
-    new THREE.PlaneGeometry(10.5, 1.85),
-    new THREE.MeshPhysicalMaterial({
-      color: 0x121820,
-      metalness: 0.88,
-      roughness: 0.1,
-      envMapIntensity: 1.6,
-      clearcoat: 1,
-      clearcoatRoughness: 0.05,
-    }),
-  );
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0x121820,
+    metalness: 0.88,
+    roughness: 0.12,
+    envMapIntensity: 1.4,
+    clearcoat: 1,
+    clearcoatRoughness: 0.06,
+    transparent: true,
+    opacity: 0.85,
+    alphaMap: makeFloorFade(),
+  });
+  const glassFloor = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 4.2), glassMat);
   glassFloor.rotation.x = -Math.PI / 2;
-  glassFloor.position.set(0, -0.5, 0.22);
+  glassFloor.position.set(0, 1.6, 0.18);
   scene.add(glassFloor);
 
   const shaftTex = makeShaftTexture();
-  const god = new THREE.Mesh(
-    new THREE.PlaneGeometry(7.2, 18.5),
-    new THREE.MeshBasicMaterial({
-      map: shaftTex,
-      transparent: true,
-      opacity: reduce ? 0.12 : 0.28,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
+  const godMat = new THREE.MeshBasicMaterial({
+    map: shaftTex,
+    transparent: true,
+    opacity: reduce ? 0.06 : 0.12,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const god = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 18.5), godMat);
   god.position.set(0.4, 10.2, 0.35);
   scene.add(god);
 
@@ -550,7 +550,78 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
                     ? 0x8eb4ff
                     : 0xb7d4ff,
       );
-      rim.intensity = theme.id === "neon" ? 1.45 : theme.id === "ice" ? 1.25 : theme.id === "molten" ? 1.35 : theme.id === "lcd" ? 0.4 : night ? 1.15 : 0.95;
+      rim.intensity = theme.id === "neon" ? 1.45 : theme.id === "ice" ? 1.25 : theme.id === "molten" ? 1.35 : theme.id === "lcd" ? 0.4 : night ? 1.15 : 0.85;
+      if (theme.id === "neon") {
+        hemi.color.set(0x88c8ff);
+        hemi.groundColor.set(0x180818);
+        key.color.set(0xe8f4ff);
+        fill.color.set(0xff48c8);
+        shaft.color.set(0x66f0ff);
+        bounce.color.set(0xff40b8);
+        jewel.color.set(0xb8ffff);
+        trimMat.color.set(0xc8f8ff);
+        godMat.opacity = reduce ? 0.12 : 0.26;
+      } else if (theme.id === "molten") {
+        hemi.color.set(0xffc090);
+        hemi.groundColor.set(0x1a0804);
+        key.color.set(0xffd0a0);
+        fill.color.set(0xff6020);
+        shaft.color.set(0xff8a40);
+        bounce.color.set(0xff4010);
+        jewel.color.set(0xffe0b0);
+        trimMat.color.set(0xffb070);
+        godMat.opacity = 0.14;
+      } else if (theme.id === "ice") {
+        hemi.color.set(0xd0f0ff);
+        hemi.groundColor.set(0x081018);
+        key.color.set(0xf4fcff);
+        fill.color.set(0x80c8e8);
+        shaft.color.set(0xc8f0ff);
+        bounce.color.set(0x6090b0);
+        jewel.color.set(0xffffff);
+        trimMat.color.set(0xe0f4ff);
+        godMat.opacity = 0.1;
+      } else if (theme.id === "lcd") {
+        hemi.color.set(0xc8c8a8);
+        hemi.groundColor.set(0x18180e);
+        key.color.set(0xd8d8b0);
+        fill.color.set(0x6a7048);
+        shaft.color.set(0xb8b890);
+        bounce.color.set(0x4a5038);
+        jewel.color.set(0xe8e8c8);
+        trimMat.color.set(0xd0d0b0);
+        godMat.opacity = 0.04;
+      } else if (theme.id === "citrine") {
+        hemi.color.set(0xffe8a8);
+        hemi.groundColor.set(0x181208);
+        key.color.set(0xffe8c0);
+        fill.color.set(0xc89030);
+        shaft.color.set(0xffd24a);
+        bounce.color.set(0x8a7030);
+        jewel.color.set(0xfff0c8);
+        trimMat.color.set(0xffe08a);
+        godMat.opacity = 0.12;
+      } else if (theme.id === "blood") {
+        hemi.color.set(0xffa0a8);
+        hemi.groundColor.set(0x140408);
+        key.color.set(0xffd0d0);
+        fill.color.set(0xc02838);
+        shaft.color.set(0xff6070);
+        bounce.color.set(0x801020);
+        jewel.color.set(0xffc0c0);
+        trimMat.color.set(0xff8890);
+        godMat.opacity = 0.12;
+      } else {
+        hemi.color.set(0x9aa8bc);
+        hemi.groundColor.set(0x141018);
+        key.color.set(0xf2f4f8);
+        fill.color.set(0x6a7a98);
+        shaft.color.set(0xd8e4f0);
+        bounce.color.set(0x3a4a62);
+        jewel.color.set(0xffffff);
+        trimMat.color.set(0xa8f0ff);
+        godMat.opacity = reduce ? 0.05 : 0.1;
+      }
     }
     if (theme.pit !== lastBg) {
       lastBg = theme.pit;
@@ -658,9 +729,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             x,
             row + below * settle + sink,
             0,
-            theme.fill[id as PieceId],
+            thump ? theme.flash : theme.fill[id as PieceId],
             pop,
-            failT > 0 ? 0.45 + (1 - failT) * 0.3 : thump ? 1.5 : 1.28,
+            failT > 0 ? 0.45 + (1 - failT) * 0.3 : thump ? 1.7 + lockPulse * 1.1 : 1.28,
             squash,
           );
           if (showMarks) stamp(id as PieceId, x, row + below * settle + sink, 0.42);
@@ -673,6 +744,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const omen = !!sim.omenOn;
           place(solids, n++, c.x, row, 0.1, omen ? "#e8c46a" : theme.fill[sim.piece.id], 1.06 + pickT * 0.22 + sim.lockSpark * 0.1 + (omen ? 0.08 : 0), 1.42 + pickT * 0.5 + sim.lockSpark * 1.1 + (omen ? 0.35 : 0));
           stamp(sim.piece.id, c.x, row, 0.48);
+        }
+        for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, sim.piece.y)) {
+          const row = c.y - HIDDEN_ROWS;
+          if (row < 0 || row >= VISIBLE_ROWS) continue;
+          if (n >= MAX_SOLID) break;
+          place(solids, n++, c.x, row, 0.02, theme.flash, 1.14, 0.55);
         }
       }
     } else if (!reduce) {
@@ -1308,6 +1385,22 @@ function makePitTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
+function makeFloorFade(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 32;
+  c.height = 128;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, c.height, 0, 0);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(0.45, "#9a9a9a");
+  g.addColorStop(1, "#000000");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, c.width, c.height);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function makeShaftTexture(): THREE.CanvasTexture {
   const w = 128;
   const h = 256;
@@ -1316,9 +1409,9 @@ function makeShaftTexture(): THREE.CanvasTexture {
   c.height = h;
   const ctx = c.getContext("2d")!;
   const g = ctx.createLinearGradient(w / 2, 0, w / 2, h);
-  g.addColorStop(0, "rgba(120, 255, 255, 0.6)");
-  g.addColorStop(0.22, "rgba(255, 50, 190, 0.22)");
-  g.addColorStop(1, "rgba(40, 20, 80, 0)");
+  g.addColorStop(0, "rgba(160, 230, 255, 0.45)");
+  g.addColorStop(0.28, "rgba(120, 200, 230, 0.12)");
+  g.addColorStop(1, "rgba(20, 24, 40, 0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   const side = ctx.createLinearGradient(0, 0, w, 0);
