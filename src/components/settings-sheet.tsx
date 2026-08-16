@@ -115,8 +115,8 @@ export function SettingsSheet({
           <b>{marks ? "On" : "Off"}</b>
         </button>
         <button type="button" className={`set-row${holdRight ? " is-on" : ""}`} onClick={onHoldRight}>
-          <span>Hold on the right</span>
-          <b>{holdRight ? "On" : "Off"}</b>
+          <span>Left hand</span>
+          <b>{holdRight ? "Next on left" : "Next on right"}</b>
         </button>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">

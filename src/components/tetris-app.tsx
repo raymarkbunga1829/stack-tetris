@@ -8,6 +8,7 @@ import {
   sfxB2b,
   sfxHard,
   sfxHold,
+  sfxLevel,
   sfxLock,
   sfxMove,
   sfxOver,
@@ -144,6 +145,7 @@ type Ui = {
   canHold: boolean;
   canUndo: boolean;
   lockPop: number;
+  lifting: boolean;
 };
 
 function forceCoach() {
@@ -244,6 +246,7 @@ export function TetrisApp() {
     canHold: true,
     canUndo: false,
     lockPop: 0,
+    lifting: false,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -402,6 +405,15 @@ export function TetrisApp() {
 
   function startGame(nextMode?: ModeId) {
     const mode = nextMode ?? saveRef.current.mode;
+    if (uiRef.current.phase === "title" && !uiRef.current.lifting) {
+      syncUi({ lifting: true });
+      window.setTimeout(() => beginGame(mode), 300);
+      return;
+    }
+    beginGame(mode);
+  }
+
+  function beginGame(mode: ModeId) {
     saveRef.current = { ...saveRef.current, mode };
     writeSave(saveRef.current);
     const seed = mode === "daily" ? dailySeed() : undefined;
@@ -450,6 +462,7 @@ export function TetrisApp() {
       holdPeek: null,
       failing: false,
       watching: false,
+      lifting: false,
       live: sim.piece?.id ?? null,
       danger: false,
       bag: sim.bag.slice(),
@@ -670,7 +683,6 @@ export function TetrisApp() {
       syncUi({ lockPop: u.lockPop + 1 });
     }
     if (ev === "clear") {
-      sfxClear();
       haptic("clear");
       shakeRef.current = 5;
       flashBanner(sim.lastClear ?? "CLEAR");
@@ -679,7 +691,6 @@ export function TetrisApp() {
       syncUi();
     }
     if (ev === "tetris" || ev === "tspin") {
-      sfxTetris();
       haptic("tetris");
       shakeRef.current = ev === "tetris" ? 12 : 8;
       well3dRef.current?.punch(ev === "tetris" ? 0.35 : 0.25);
@@ -718,6 +729,7 @@ export function TetrisApp() {
     if (sim.phase === "playing") setMusicTension(inDanger(sim));
 
     if (sim.score !== u.score || sim.level !== u.level || sim.lines !== u.lines) {
+      if (sim.level > u.level) sfxLevel();
       if (sim.lines > u.lines) payMissions({ lines: sim.lines - u.lines, level: sim.level });
       else payMissions({ level: sim.level });
       const pred = predictCollision(sim);
@@ -924,8 +936,10 @@ export function TetrisApp() {
     engine.sparkRows(sim.clearRows, tint);
     engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(kind);
+    const n =
+      kind === "stack" ? 4 : kind === "triple" ? 3 : kind === "double" ? 2 : kind === "tspin" ? 3 : 1;
+    sfxClear(n);
     sfxShatter();
-    if (kind === "stack" || kind === "tspin" || kind === "triple") sfxSweep();
   }
 
   function juicePerfect() {
@@ -1429,7 +1443,7 @@ export function TetrisApp() {
           <aside className="rail">
             <p className="rail-label">Hold</p>
             <div
-              className={`pocket pocket-hold${ui.phase === "playing" && !ui.canHold ? " is-spent" : ""}`}
+              className={`pocket pocket-hold${ui.phase === "playing" && !ui.canHold ? " is-spent" : ""}${ui.holdPeek ? " is-swap" : ""}`}
               role="button"
               tabIndex={0}
               aria-label="Hold piece"
@@ -1466,7 +1480,7 @@ export function TetrisApp() {
             <canvas ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
             {ui.phase === "title" && !ui.watching && (
-              <div className="veil">
+              <div className={`veil${ui.lifting ? " is-lift" : ""}`}>
                 <p className="veil-kicker">{modeOf(ui.mode).blurb}</p>
                 <p className="veil-title">Stack</p>
                 {isAndroid() && (
@@ -1743,7 +1757,7 @@ export function TetrisApp() {
             )}
           </div>
 
-          <aside className="rail">
+          <aside className="rail rail-next">
             <p className="rail-label">Next</p>
             <div className="next-list">
               {(ui.next.length ? ui.next : [null, null, null, null, null])

@@ -452,11 +452,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     hexCol: string,
     scale = 1,
     lift = 1,
+    squash = 1,
   ) {
     const p = cellPos(col, row, z);
-    dummy.position.set(p.x, p.y, p.z);
+    dummy.position.set(p.x, p.y - (1 - squash) * 0.18, p.z);
     dummy.rotation.set(0, 0, 0);
-    dummy.scale.setScalar(scale);
+    dummy.scale.set(scale * (2 - squash), scale * squash, scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
     color.set(hexCol).multiplyScalar(lift);
@@ -520,7 +521,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const clearEase = clearing
       ? 1 - Math.max(0, Math.min(1, sim.clearT / CLEAR_TIME))
       : 0;
-    const settle = 1 - Math.pow(1 - clearEase, 3);
+    const settle = 1 - Math.pow(1 - clearEase, 3) + Math.sin(clearEase * Math.PI) * 0.1 * (1 - clearEase);
+    const pinch = Math.max(0, 1 - clearEase);
 
     let n = 0;
     let pipN = 0;
@@ -541,15 +543,31 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         for (let x = 0; x < COLS; x++) {
           const id = sim.board[y]![x];
           if (!id) continue;
-          if (clearing && sim.clearRows.includes(y)) continue;
           const row = y - HIDDEN_ROWS;
+          const dyingRow = clearing && sim.clearRows.includes(y);
+          if (dyingRow) {
+            if (pinch <= 0.02) continue;
+            place(
+              solids,
+              n++,
+              x,
+              row,
+              0,
+              theme.fill[id as PieceId],
+              pinch,
+              1.2,
+              0.55 + pinch * 0.45,
+            );
+            continue;
+          }
           let below = 0;
           if (clearing) {
             for (const cy of sim.clearRows) if (cy > y) below += 1;
           }
           const key = `${x},${y}`;
           const thump = lockKeys.has(key) && lockPulse > 0;
-          const pop = thump ? 1 + 0.08 * Math.sin(lockPulse * Math.PI) : 1;
+          const pop = thump ? 1 + 0.06 * Math.sin(lockPulse * Math.PI) : 1;
+          const squash = thump ? 0.68 + 0.32 * (1 - lockPulse) : 1;
           const sink = failT > 0 ? failT * failT * (0.15 + row * 0.06) : 0;
           place(
             solids,
@@ -560,6 +578,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             theme.fill[id as PieceId],
             pop,
             failT > 0 ? 0.45 + (1 - failT) * 0.3 : thump ? 1.45 : 1.12,
+            squash,
           );
           if (showMarks) stamp(id as PieceId, x, row + below * settle + sink, 0.42);
         }

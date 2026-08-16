@@ -4,21 +4,62 @@ type Bus = {
   sfx: GainNode;
   music: GainNode;
   noise: AudioBuffer;
+  noiseLong: AudioBuffer;
+  noiseShort: AudioBuffer;
+  pulse25: PeriodicWave;
+  pulse50: PeriodicWave;
+  pulse12: PeriodicWave;
 };
 
 let bus: Bus | null = null;
 let muted = false;
 let musicVol = 1;
 let sfxVol = 1;
+let leadMute = 0;
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+function stealLead(dur: number) {
+  if (!bus) return;
+  leadMute = Math.max(leadMute, bus.ctx.currentTime + dur);
+}
+
+function pulseWave(ctx: AudioContext, duty: number) {
+  const n = 48;
+  const real = new Float32Array(n);
+  const imag = new Float32Array(n);
+  for (let i = 1; i < n; i++) {
+    imag[i] = (2 / (i * Math.PI)) * Math.sin(i * Math.PI * duty);
+  }
+  return ctx.createPeriodicWave(real, imag);
+}
+
+function makeLfsr(ctx: AudioContext, short: boolean, period: number) {
+  const len = Math.floor(ctx.sampleRate * 0.7);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  let reg = 1;
+  let hold = 1;
+  let acc = 0;
+  for (let i = 0; i < len; i++) {
+    if (acc <= 0) {
+      const bit = short ? (reg ^ (reg >> 6)) & 1 : (reg ^ (reg >> 1)) & 1;
+      reg = (reg >> 1) | (bit << 14);
+      hold = bit ? 1 : -1;
+      acc = period;
+    }
+    data[i] = hold;
+    acc -= 1;
+  }
+  return buf;
+}
+
 function applyGains() {
   if (!bus) return;
   const t = bus.ctx.currentTime;
-  bus.sfx.gain.setTargetAtTime(0.22 * sfxVol, t, 0.03);
+  bus.sfx.gain.setTargetAtTime(0.32 * sfxVol, t, 0.03);
   const bed = 0.09 * musicVol;
   bus.music.gain.setTargetAtTime(musicPaused ? bed * 0.5 : bed, t, 0.05);
   bus.master.gain.setTargetAtTime(1, t, 0.02);
@@ -48,11 +89,7 @@ export function setMuted(next: boolean) {
 }
 
 function makeNoise(ctx: AudioContext): AudioBuffer {
-  const len = Math.floor(ctx.sampleRate * 0.45);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-  return buf;
+  return makeLfsr(ctx, false, 8);
 }
 
 export function unlockAudio() {
@@ -65,19 +102,56 @@ export function unlockAudio() {
     const master = ctx.createGain();
     const sfx = ctx.createGain();
     const music = ctx.createGain();
-    sfx.gain.value = 0.22 * sfxVol;
+    sfx.gain.value = 0.32 * sfxVol;
     music.gain.value = 0.09 * musicVol;
     master.gain.value = 1;
     sfx.connect(master);
     music.connect(master);
     master.connect(ctx.destination);
-    bus = { ctx, master, sfx, music, noise: makeNoise(ctx) };
+    bus = {
+      ctx,
+      master,
+      sfx,
+      music,
+      noise: makeLfsr(ctx, false, 8),
+      noiseLong: makeLfsr(ctx, false, 12),
+      noiseShort: makeLfsr(ctx, true, 3),
+      pulse25: pulseWave(ctx, 0.25),
+      pulse50: pulseWave(ctx, 0.5),
+      pulse12: pulseWave(ctx, 0.125),
+    };
   }
   if (bus.ctx.state === "suspended") void bus.ctx.resume();
 }
 
 export function resumeAudio() {
   if (bus && bus.ctx.state === "suspended") void bus.ctx.resume();
+}
+
+function pulse(
+  freq: number,
+  dur: number,
+  when = 0,
+  duty: 12 | 25 | 50 = 25,
+  vol = 0.45,
+  dest: "sfx" | "music" = "sfx",
+) {
+  if (!bus) return;
+  if (dest === "sfx" && sfxVol <= 0) return;
+  if (dest === "music" && musicVol <= 0) return;
+  const { ctx } = bus;
+  const t = ctx.currentTime + when;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.setPeriodicWave(duty === 12 ? bus.pulse12 : duty === 50 ? bus.pulse50 : bus.pulse25);
+  osc.frequency.setValueAtTime(Math.max(20, freq), t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(g);
+  g.connect(dest === "sfx" ? bus.sfx : bus.music);
+  osc.start(t);
+  osc.stop(t + dur + 0.03);
 }
 
 function tone(
@@ -87,6 +161,10 @@ function tone(
   type: OscillatorType = "square",
   vol = 0.8,
 ) {
+  if (type === "square") {
+    pulse(freq, dur, when, 25, vol);
+    return;
+  }
   if (!bus || sfxVol <= 0) return;
   const { ctx, sfx } = bus;
   const t = ctx.currentTime + when;
@@ -108,7 +186,7 @@ function slide(
   to: number,
   dur: number,
   when = 0,
-  type: OscillatorType = "sawtooth",
+  _type: OscillatorType = "sawtooth",
   vol = 0.35,
 ) {
   if (!bus || sfxVol <= 0) return;
@@ -116,11 +194,11 @@ function slide(
   const t = ctx.currentTime + when;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(from, t);
+  osc.setPeriodicWave(bus.pulse25);
+  osc.frequency.setValueAtTime(Math.max(20, from), t);
   osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), t + dur);
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.012);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.01);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   osc.connect(g);
   g.connect(sfx);
@@ -132,21 +210,21 @@ function noiseBurst(
   dur: number,
   when = 0,
   vol = 0.28,
-  freq = 1400,
-  q = 0.8,
+  _freq = 1400,
+  _q = 0.8,
+  short = false,
 ) {
   if (!bus || sfxVol <= 0) return;
-  const { ctx, sfx, noise } = bus;
+  const { ctx, sfx } = bus;
   const t = ctx.currentTime + when;
   const src = ctx.createBufferSource();
-  src.buffer = noise;
+  src.buffer = short ? bus.noiseShort : bus.noiseLong;
   const filter = ctx.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.frequency.setValueAtTime(freq, t);
-  filter.Q.value = q;
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(short ? 4200 : 1400, t);
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.01);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.008);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   src.connect(filter);
   filter.connect(g);
@@ -155,65 +233,85 @@ function noiseBurst(
   src.stop(t + dur + 0.02);
 }
 
+function arp(notes: number[], step = 0.055, _type: OscillatorType = "square", vol = 0.46) {
+  notes.forEach((f, i) => {
+    if (f > 0) pulse(f, step * 1.4, i * step, 25, vol);
+  });
+}
+
 export function sfxMove() {
-  tone(280, 0.025, 0, "square", 0.22);
+  stealLead(0.04);
+  pulse(196, 0.028, 0, 50, 0.3);
 }
 export function sfxRotate() {
-  tone(520, 0.04, 0, "square", 0.35);
+  stealLead(0.07);
+  pulse(330, 0.03, 0, 25, 0.34);
+  pulse(392, 0.04, 0.028, 25, 0.32);
 }
 export function sfxLock() {
-  tone(140, 0.07, 0, "triangle", 0.5);
-  tone(90, 0.09, 0.01, "sine", 0.35);
-  noiseBurst(0.06, 0, 0.12, 280, 0.6);
+  stealLead(0.09);
+  pulse(165, 0.05, 0, 50, 0.4);
+  slide(165, 82, 0.07, 0.01, "square", 0.28);
+  noiseBurst(0.06, 0, 0.2, 240, 0.7, false);
 }
 export function sfxLand(mass = 1) {
   const m = Math.max(0.6, Math.min(1.4, mass));
-  const f = 210 - m * 95;
-  tone(f, 0.032 + m * 0.022, 0, m > 1 ? "sine" : "triangle", 0.16 + m * 0.12);
-  noiseBurst(0.028 + m * 0.016, 0, 0.05 + m * 0.04, 140 + m * 40, 0.18 + m * 0.12);
+  noiseBurst(0.03 + m * 0.02, 0, 0.08 + m * 0.1, 140, 0.4, m > 1);
 }
 export function sfxHold() {
-  tone(400, 0.04, 0, "square", 0.3);
-  tone(620, 0.05, 0.04, "square", 0.28);
+  stealLead(0.1);
+  pulse(262, 0.04, 0, 25, 0.34);
+  pulse(392, 0.05, 0.04, 25, 0.32);
 }
-export function sfxClear() {
-  noiseBurst(0.12, 0, 0.32, 2200, 0.7);
-  tone(660, 0.05, 0, "square", 0.4);
-  tone(880, 0.08, 0.05, "square", 0.36);
+export function sfxClear(n = 1) {
+  if (n >= 4) {
+    sfxTetris();
+    return;
+  }
+  noiseBurst(0.07, 0, 0.16, 1600, 0.7, true);
+  if (n <= 1) {
+    stealLead(0.24);
+    arp([523, 659, 784, 1047], 0.052);
+  } else if (n === 2) {
+    stealLead(0.3);
+    arp([392, 523, 659, 784, 1047], 0.05);
+  } else {
+    stealLead(0.38);
+    arp([330, 392, 523, 659, 784, 988, 1175], 0.048);
+  }
 }
 export function sfxShatter() {
-  noiseBurst(0.18, 0, 0.38, 1800, 0.55);
-  noiseBurst(0.14, 0.03, 0.22, 3200, 1.1);
-  slide(420, 140, 0.16, 0.02, "triangle", 0.22);
+  noiseBurst(0.12, 0, 0.22, 1800, 0.55, false);
+  noiseBurst(0.08, 0.02, 0.14, 2800, 1, true);
 }
 export function sfxSweep() {
-  slide(240, 1400, 0.18, 0, "sawtooth", 0.22);
-  slide(1400, 280, 0.2, 0.1, "sine", 0.18);
-  noiseBurst(0.22, 0.04, 0.16, 900, 0.4);
+  stealLead(0.2);
+  slide(240, 1400, 0.16, 0, "square", 0.2);
 }
 export function sfxHard() {
-  slide(520, 90, 0.12, 0, "sawtooth", 0.32);
-  noiseBurst(0.1, 0, 0.24, 600, 0.5);
-  tone(70, 0.1, 0.04, "sine", 0.4);
+  stealLead(0.14);
+  slide(620, 110, 0.11, 0, "square", 0.3);
+  noiseBurst(0.09, 0, 0.22, 500, 0.55, true);
 }
 export function sfxTetris() {
-  sfxSweep();
-  tone(523, 0.07, 0.04);
-  tone(659, 0.07, 0.11);
-  tone(784, 0.08, 0.18);
-  tone(1047, 0.16, 0.26);
+  stealLead(0.55);
+  noiseBurst(0.1, 0, 0.18, 1400, 0.6, true);
+  arp([392, 523, 659, 784, 659, 784, 988, 1319], 0.06, "square", 0.5);
+}
+export function sfxLevel() {
+  stealLead(0.28);
+  arp([523, 659, 784, 1047], 0.06);
 }
 export function sfxOver() {
-  tone(196, 0.12, 0, "square", 0.7);
-  tone(147, 0.16, 0.12, "square", 0.65);
-  tone(98, 0.28, 0.26, "square", 0.6);
+  stealLead(0.55);
+  arp([392, 330, 262, 196, 147], 0.1);
 }
 export function sfxStart() {
-  tone(392, 0.06, 0, "square", 0.4);
-  tone(523, 0.08, 0.07, "square", 0.45);
+  stealLead(0.18);
+  arp([392, 523, 659], 0.055);
 }
 export function sfxSelect() {
-  tone(660, 0.04, 0, "square", 0.4);
+  pulse(659, 0.035, 0, 25, 0.36);
 }
 
 export function sfxZap() {
@@ -296,15 +394,17 @@ export function setMusicTension(on: boolean) {
   musicTight = on;
 }
 
-function hum(freq: number, dur: number, when: number, vol = 0.22) {
+function hum(freq: number, dur: number, when: number, vol = 0.22, bass = false) {
   if (!bus || musicVol <= 0 || freq <= 0) return;
+  if (!bass && when < leadMute) return;
   const { ctx, music } = bus;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
-  osc.type = "sine";
+  if (bass) osc.type = "triangle";
+  else osc.setPeriodicWave(musicMode === "classic" ? bus.pulse50 : bus.pulse25);
   osc.frequency.setValueAtTime(freq, when);
   g.gain.setValueAtTime(0.0001, when);
-  g.gain.exponentialRampToValueAtTime(vol, when + 0.03);
+  g.gain.exponentialRampToValueAtTime(vol, when + 0.02);
   g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
   osc.connect(g);
   g.connect(music);
@@ -323,8 +423,10 @@ function pumpMusic() {
   while (musicNext < now + 0.35) {
     const note = spec.notes[musicStep % spec.notes.length] ?? 0;
     const lift = musicTight && note > 0 ? note * 1.122 : note;
-    if (lift > 0) hum(lift, step * 1.6, musicNext, musicTight ? 0.22 : 0.18);
-    if (musicStep % 8 === 0) hum(note > 0 ? note / 2 : 98, step * 3.2, musicNext, 0.1);
+    if (lift > 0) hum(lift, step * 1.6, musicNext, musicTight ? 0.2 : 0.16, false);
+    if (musicStep % 8 === 0) {
+      hum(note > 0 ? note / 2 : 98, step * 3.2, musicNext, 0.12, true);
+    }
     musicNext += step;
     musicStep += 1;
   }
