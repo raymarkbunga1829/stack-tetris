@@ -149,6 +149,7 @@ type Ui = {
   lifting: boolean;
   pbPop: number;
   coinTake: boolean;
+  levelPop: number;
 };
 
 function forceCoach() {
@@ -253,6 +254,7 @@ export function TetrisApp() {
     lifting: false,
     pbPop: 0,
     coinTake: false,
+    levelPop: 0,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -790,6 +792,7 @@ export function TetrisApp() {
         pred: pred
           ? { rows: pred.rowsLeft, lock: pred.lockImminent, kick: pred.kick.cw || pred.kick.ccw }
           : null,
+        levelPop: sim.level > u.level ? u.levelPop + 1 : u.levelPop,
       });
     } else if (
       u.slow !== sim.slowT > 0 ||
@@ -1465,7 +1468,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: themeOf(ui.theme).flash,
@@ -1562,7 +1565,7 @@ export function TetrisApp() {
 
           <div
             ref={wellRef}
-            className="well"
+            className={`well${ui.levelPop ? " is-level" : ""}`}
             onPointerDown={onWellPointer}
             onPointerMove={onWellPointer}
             onPointerUp={onWellPointer}
@@ -1577,7 +1580,13 @@ export function TetrisApp() {
             {ui.scan && <i className="scan" aria-hidden="true" />}
             {ui.phase === "title" && !ui.watching && (
               <div className={`veil${ui.lifting ? " is-lift" : ""}`}>
-                <p className="veil-kicker">Insert coin</p>
+                <p className="veil-kicker">
+                  {ui.mode === "daily" &&
+                  saveRef.current.daily.date === utcDateKey() &&
+                  saveRef.current.daily.score > 0
+                    ? `Daily ${saveRef.current.daily.score.toLocaleString()}`
+                    : "Insert coin"}
+                </p>
                 <p className="veil-title">Stack</p>
                 <p className="veil-hint">Press start</p>
                 {isAndroid() && (
@@ -1830,25 +1839,6 @@ export function TetrisApp() {
                 B2B
               </p>
             )}
-            {ui.phase === "playing" && (
-              <button
-                type="button"
-                className="well-pause"
-                aria-label="Pause"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  unlockAudio();
-                  if (simRef.current) {
-                    pauseToggle(simRef.current);
-                    setMusicPaused(simRef.current.phase === "paused");
-                    syncUi({ phase: simRef.current.phase });
-                  }
-                }}
-              >
-                Pause
-              </button>
-            )}
             {ui.coach && ui.phase === "playing" && (
               <CoachCard step={ui.coach} onSkip={finishCoach} />
             )}
@@ -1884,6 +1874,7 @@ export function TetrisApp() {
             </div>
             {ui.phase === "playing" && ui.bag.length > 0 && (
               <div className="bag-strip" aria-label="Left in bag">
+                <b>{ui.bag.length}</b>
                 {ui.bag.map((id, i) => (
                   <i key={`${id}-${i}`} style={{ background: themeOf(ui.theme).fill[id] }} />
                 ))}
@@ -1899,31 +1890,6 @@ export function TetrisApp() {
           onUse={usePower}
           pickOn={ui.picking}
         />
-        {ui.phase === "playing" && ui.mode === "zen" && ui.canUndo && (
-          <button
-            type="button"
-            className="text-btn undo-btn"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              const sim = simRef.current;
-              if (!sim || !undoZen(sim)) return;
-              sfxHold();
-              haptic("select");
-              syncUi({
-                canUndo: false,
-                score: sim.score,
-                lines: sim.lines,
-                hold: sim.hold,
-                next: sim.next,
-                bag: sim.bag.slice(),
-                live: sim.piece?.id ?? null,
-              });
-            }}
-          >
-            Undo last
-          </button>
-        )}
-
         <TouchPad
           onHold={(key, down) => {
             unlockAudio();
@@ -1956,6 +1922,26 @@ export function TetrisApp() {
             inputRef.current?.tap({ hold: true });
             advanceCoach("hold");
           }}
+          slam={ui.lockPop}
+          onUndo={
+            ui.phase === "playing" && ui.mode === "zen" && ui.canUndo
+              ? () => {
+                  const sim = simRef.current;
+                  if (!sim || !undoZen(sim)) return;
+                  sfxHold();
+                  haptic("select");
+                  syncUi({
+                    canUndo: false,
+                    score: sim.score,
+                    lines: sim.lines,
+                    hold: sim.hold,
+                    next: sim.next,
+                    bag: sim.bag.slice(),
+                    live: sim.piece?.id ?? null,
+                  });
+                }
+              : undefined
+          }
         />
 
         {(ui.phase === "title" || ui.phase === "over" || ui.phase === "paused") && (
