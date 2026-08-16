@@ -10,7 +10,7 @@ import { fitDpr } from "./device";
 import { ghostY, inDanger, type Sim } from "./sim";
 import type { Theme } from "./themes";
 import type { PowerId } from "./shop";
-import { COLS, HIDDEN_ROWS, VISIBLE_ROWS, CLEAR_TIME, LOCK_DELAY, PIECE_IDS, type PieceId } from "./types";
+import { COLS, HIDDEN_ROWS, ROWS, VISIBLE_ROWS, CLEAR_TIME, LOCK_DELAY, PIECE_IDS, type PieceId } from "./types";
 
 const MAX_SOLID = COLS * VISIBLE_ROWS + 8;
 const MARK: Record<PieceId, [number, number][]> = {
@@ -62,6 +62,7 @@ export type Well3d = {
   draw: (sim: Sim | null, shake: number, theme: Theme, showGhost?: boolean, showMarks?: boolean) => void;
   punch: (amount: number) => void;
   nod: (amount: number) => void;
+  setAsh: (board: import("./sim").Board | null) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
   shatter: (sim: Sim, theme: Theme) => void;
@@ -120,6 +121,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const BASE_FOV = 34;
   let punch = 0;
   let nodT = 0;
+  let ashBoard: import("./sim").Board | null = null;
+  let ashT = 0;
   let lastDraw = performance.now();
   const bloomBase = reduce ? 0.12 : mobile ? 0.32 : 0.48;
 
@@ -628,7 +631,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, sim.piece.y)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
-          place(solids, n++, c.x, row, 0.1, theme.fill[sim.piece.id], 1.03 + pickT * 0.22 + sim.lockSpark * 0.1, 1.28 + pickT * 0.5 + sim.lockSpark * 1.1);
+          const omen = !!sim.omenOn;
+          place(solids, n++, c.x, row, 0.1, omen ? "#e8c46a" : theme.fill[sim.piece.id], 1.03 + pickT * 0.22 + sim.lockSpark * 0.1 + (omen ? 0.08 : 0), 1.28 + pickT * 0.5 + sim.lockSpark * 1.1 + (omen ? 0.35 : 0));
           stamp(sim.piece.id, c.x, row, 0.48);
         }
       }
@@ -655,6 +659,19 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (solids.instanceColor) solids.instanceColor.needsUpdate = true;
 
     let g = 0;
+    if (ashBoard && ashT > 0) {
+      ashT = Math.max(0, ashT - dt * 0.14);
+      ghostMat.opacity = 0.14 * ashT;
+      for (let y = HIDDEN_ROWS; y < ROWS; y++) {
+        const row = y - HIDDEN_ROWS;
+        for (let x = 0; x < COLS; x++) {
+          const id = ashBoard[y]?.[x];
+          if (!id) continue;
+          if (g >= MAX_GHOST - 8) break;
+          place(ghosts, g++, x, row, -0.02, theme.deep[id] ?? "#333", 1, 0.45);
+        }
+      }
+    }
     let ringOn = false;
     if (
       showGhost &&
@@ -1157,6 +1174,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     draw,
     punch: punchCam,
     nod,
+    setAsh: (board) => {
+      ashBoard = board;
+      ashT = board ? 1 : 0;
+    },
     sparkRows,
     lockThump,
     shatter,

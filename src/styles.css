@@ -1982,6 +1982,25 @@ html.is-ios .help-android {
   filter: brightness(0.45);
 }
 
+.carving {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 28px;
+  z-index: 2;
+  margin: 0;
+  text-align: center;
+  color: color-mix(in oklab, var(--color-fg) 22%, transparent);
+  font: 600 0.58rem/1.3 var(--font-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.cabinet.is-play .carving {
+  bottom: 36px;
+}
+
 .scan {
   position: absolute;
   inset: 0;

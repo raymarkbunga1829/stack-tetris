@@ -39,7 +39,8 @@ import {
   utcDateKey,
   type ModeId,
 } from "@/game/modes";
-import { getLastReplay, setLastReplay } from "@/game/last-replay";
+import { getLastAsh, getLastReplay, setLastAsh, setLastReplay } from "@/game/last-replay";
+import { nameRun } from "@/game/run-name";
 import { shareRun } from "@/game/share-run";
 import { REPLAY_STEP, type Snap } from "@/game/replay";
 import { resizeCanvas } from "@/game/render";
@@ -157,6 +158,7 @@ type Ui = {
   takeover: number;
   cinema: boolean;
   handoff: PieceId | null;
+  epitaph: string | null;
 };
 
 function forceCoach() {
@@ -268,6 +270,7 @@ export function TetrisApp() {
     takeover: 0,
     cinema: false,
     handoff: null,
+    epitaph: null,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -473,6 +476,7 @@ export function TetrisApp() {
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 1.55;
+    well3dRef.current?.setAsh(getLastAsh());
     const intro =
       mode === "sprint"
         ? "40"
@@ -517,6 +521,7 @@ export function TetrisApp() {
       intro,
       takeover: 0,
       cinema: false,
+      epitaph: null,
       live: sim.piece?.id ?? null,
       danger: false,
       bag: sim.bag.slice(),
@@ -791,7 +796,11 @@ export function TetrisApp() {
       haptic("tetris");
       shakeRef.current = ev === "tetris" ? 12 : 8;
       well3dRef.current?.punch(ev === "tetris" ? 0.35 : 0.25);
-      if (!saveRef.current.niceSeen) {
+      if (sim.blessed && ev === "tetris") {
+        sim.blessed = false;
+        syncUi({ picking: true });
+        flashBanner("Name it.");
+      } else if (!saveRef.current.niceSeen) {
         saveRef.current = { ...saveRef.current, niceSeen: true };
         writeSave(saveRef.current);
         flashBanner("Nice.");
@@ -920,6 +929,27 @@ export function TetrisApp() {
       replayT.current = 0;
       setLastReplay(sim.history);
     }
+    if (!sim.won) setLastAsh(sim.board);
+    const epitaph = nameRun({
+      mode: sim.mode,
+      score: sim.score,
+      lines: sim.lines,
+      won: sim.won,
+      combo: sim.maxCombo,
+      stacks: sim.stacks,
+      perfects: sim.perfects,
+      extras: sim.mode === "finesse" ? finesseExtras.current : undefined,
+    });
+    let themes = saveRef.current.themes.slice();
+    if (sim.perfects > 0 && !themes.includes("citrine")) themes = [...themes, "citrine"];
+    if (saveRef.current.streak.count >= 10 && !themes.includes("blood")) themes = [...themes, "blood"];
+    if (sim.mode === "finesse" && sim.won && finesseExtras.current === 0 && !themes.includes("quiet")) {
+      themes = [...themes, "quiet"];
+    }
+    if (themes.length !== saveRef.current.themes.length) {
+      saveRef.current = { ...saveRef.current, themes };
+      writeSave(saveRef.current);
+    }
     dying.current = false;
     failT.current = 0;
     syncUi({
@@ -932,6 +962,7 @@ export function TetrisApp() {
       high: saveRef.current.high,
       won: sim.won,
       clock: sim.clock,
+      epitaph,
       sprintBest: saveRef.current.sprintBest,
       recap: {
         lines: sim.lines,
@@ -1661,6 +1692,9 @@ export function TetrisApp() {
               <span>HI {ui.high.toLocaleString()}</span>
             </div>
             {ui.scan && <i className="scan" aria-hidden="true" />}
+            <p className="carving" aria-hidden="true">
+              {modeOf(ui.mode).carving}
+            </p>
             {ui.intro && ui.phase === "playing" && (
               <div className="intro" aria-hidden="true">
                 <p>{modeOf(ui.mode).look}</p>
@@ -1804,13 +1838,14 @@ export function TetrisApp() {
                   <em>Home</em>
                 </button>
                 <p className="veil-kicker">
-                  {ui.won
-                    ? ui.mode === "sprint"
-                      ? formatClock(ui.clock)
-                      : "Time"
-                    : ui.score >= ui.high && ui.score > 0
-                      ? "New best"
-                      : "Game over"}
+                  {ui.epitaph ??
+                    (ui.won
+                      ? ui.mode === "sprint"
+                        ? formatClock(ui.clock)
+                        : "Time"
+                      : ui.score >= ui.high && ui.score > 0
+                        ? "New best"
+                        : "Game over")}
                 </p>
                 <p className="veil-title">{ui.score.toLocaleString()}</p>
                 {ui.tip && <p className="veil-hint">{ui.tip}</p>}

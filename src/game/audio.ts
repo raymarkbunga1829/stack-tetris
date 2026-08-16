@@ -294,9 +294,11 @@ export function sfxHard() {
   noiseBurst(0.09, 0, 0.22, 500, 0.55, true);
 }
 export function sfxTetris() {
-  stealLead(0.7);
+  stealLead(0.95);
   noiseBurst(0.14, 0, 0.22, 1200, 0.75, true);
   arp([392, 523, 659, 784, 988, 784, 1047, 1319], 0.055, "square", 0.58);
+  pulse(392 * 1.5, 0.18, 0.08, 12, 0.22);
+  pulse(392 * 1.5 * 1.5, 0.16, 0.16, 12, 0.16);
   slide(196, 98, 0.22, 0.02, "triangle", 0.22);
 }
 export function sfxLevel() {

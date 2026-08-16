@@ -160,7 +160,15 @@ export function SettingsSheet({
                   data-qa={`theme-${t.id}`}
                   onClick={() => onTheme(t.id)}
                 >
-                  {theme === t.id && owned ? "On" : owned ? "Use" : t.cost === 0 ? "Free" : `${t.cost} CR`}
+                  {theme === t.id && owned
+                    ? "On"
+                    : owned
+                      ? "Use"
+                      : t.relic
+                        ? "Rite"
+                        : t.cost === 0
+                          ? "Free"
+                          : `${t.cost} CR`}
                 </button>
               </li>
             );

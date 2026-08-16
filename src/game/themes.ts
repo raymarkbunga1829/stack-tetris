@@ -10,13 +10,17 @@ export type ThemeId =
   | "molten"
   | "ice"
   | "monolith"
-  | "lcd";
+  | "lcd"
+  | "citrine"
+  | "blood"
+  | "quiet";
 
 export type Theme = {
   id: ThemeId;
   name: string;
   blurb: string;
   cost: number;
+  relic?: "perfect" | "streak10" | "finesse";
   well: string;
   grid: string;
   pit: string;
@@ -328,6 +332,99 @@ export const THEMES: Theme[] = [
       L: "#222014",
     },
   },
+  {
+    id: "citrine",
+    name: "Citrine Well",
+    blurb: "A named stone. Earned by an all-clear.",
+    cost: 0,
+    relic: "perfect",
+    well: "#1a160c",
+    grid: "#2a2414",
+    pit: "#100c06",
+    frame: "#8a7030",
+    ghost: "rgba(255, 220, 120, 0.3)",
+    flash: "#ffe8a0",
+    fill: {
+      I: "#f0e0a0",
+      O: "#ffd24a",
+      T: "#d4b060",
+      S: "#c8c070",
+      Z: "#e8a040",
+      J: "#b89850",
+      L: "#ffb428",
+    },
+    deep: {
+      I: "#a09050",
+      O: "#b89018",
+      T: "#8a7030",
+      S: "#787040",
+      Z: "#a06018",
+      J: "#706030",
+      L: "#b87810",
+    },
+  },
+  {
+    id: "blood",
+    name: "Blood Moon",
+    blurb: "A named stone. Ten dawns in a row.",
+    cost: 0,
+    relic: "streak10",
+    well: "#16080c",
+    grid: "#241014",
+    pit: "#0c0406",
+    frame: "#6a2030",
+    ghost: "rgba(255, 80, 80, 0.28)",
+    flash: "#ffc0c0",
+    fill: {
+      I: "#e87880",
+      O: "#f0c070",
+      T: "#c04058",
+      S: "#a05050",
+      Z: "#e02838",
+      J: "#802838",
+      L: "#e07040",
+    },
+    deep: {
+      I: "#903040",
+      O: "#a08038",
+      T: "#701828",
+      S: "#602028",
+      Z: "#900818",
+      J: "#481018",
+      L: "#903018",
+    },
+  },
+  {
+    id: "quiet",
+    name: "Quiet Glass",
+    blurb: "A named stone. Twenty pieces, no extra tap.",
+    cost: 0,
+    relic: "finesse",
+    well: "#101418",
+    grid: "#1c242c",
+    pit: "#080c10",
+    frame: "#608090",
+    ghost: "rgba(200, 230, 240, 0.38)",
+    flash: "#e8f4f8",
+    fill: {
+      I: "#d0e8f0",
+      O: "#f0f4f0",
+      T: "#b8d0dc",
+      S: "#98c8c4",
+      Z: "#88b0c8",
+      J: "#7098b8",
+      L: "#d8e4e8",
+    },
+    deep: {
+      I: "#7098a8",
+      O: "#a0a8a8",
+      T: "#608088",
+      S: "#487870",
+      Z: "#406888",
+      J: "#385878",
+      L: "#889898",
+    },
+  },
 ];
 
 export const GEM_NAME: Record<PieceId, string> = {
@@ -345,6 +442,8 @@ export function themeOf(id: ThemeId | string | undefined): Theme {
 }
 
 export function ownsTheme(owned: ThemeId[], id: ThemeId): boolean {
+  const t = themeOf(id);
+  if (t.relic) return owned.includes(id);
   return id === "ink" || owned.includes(id);
 }
 
@@ -356,7 +455,7 @@ export function buyTheme<T extends { credits: number; themes: ThemeId[]; theme: 
   if (ownsTheme(save.themes, id)) {
     return { ...save, theme: id };
   }
-  if (save.credits < theme.cost) return null;
+  if (theme.relic || save.credits < theme.cost) return null;
   return {
     ...save,
     credits: save.credits - theme.cost,

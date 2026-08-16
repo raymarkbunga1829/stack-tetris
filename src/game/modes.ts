@@ -16,6 +16,7 @@ export type ModeInfo = {
   blurb: string;
   look: string;
   tint: string;
+  carving: string;
   lines: number | null;
   seconds: number | null;
   startLevel: number;
@@ -31,6 +32,7 @@ export const MODES: ModeInfo[] = [
     blurb: "Landing ghost on. Endless until you top out.",
     look: "A pale twin waits on the floor. The well never ends.",
     tint: "#7eb4c8",
+    carving: "Stack until the moon falls.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -44,6 +46,7 @@ export const MODES: ModeInfo[] = [
     blurb: "Race to 40 lines. Ghost shows the drop.",
     look: "Forty lines. Gold on the clock if you beat yourself.",
     tint: "#e8c46a",
+    carving: "Forty lines. Then silence.",
     lines: 40,
     seconds: null,
     startLevel: 1,
@@ -57,6 +60,7 @@ export const MODES: ModeInfo[] = [
     blurb: "Two minutes from level 10. Ghost on.",
     look: "Already falling hard. Amber at ten. Red at three.",
     tint: "#e87840",
+    carving: "Two minutes. Do not waste the fire.",
     lines: null,
     seconds: 120,
     startLevel: 10,
@@ -70,6 +74,7 @@ export const MODES: ModeInfo[] = [
     blurb: "Today's shared bag. Ghost on.",
     look: "The same seven as everyone alive today.",
     tint: "#b08ad4",
+    carving: "The same seven as the living.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -83,6 +88,7 @@ export const MODES: ModeInfo[] = [
     blurb: "No clock. No top-out. Ghost on.",
     look: "No top-out. Undo a drop. The well is a sketchbook.",
     tint: "#78c47c",
+    carving: "Nothing dies here.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -96,6 +102,7 @@ export const MODES: ModeInfo[] = [
     blurb: "No landing ghost. Read the stack yourself.",
     look: "No ghost. Read the stack like a cabinet.",
     tint: "#e09852",
+    carving: "No ghosts. Read the stone.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -109,6 +116,7 @@ export const MODES: ModeInfo[] = [
     blurb: "NES bag. No wall kicks. Read the stack.",
     look: "NES bag. No kicks. Green-black glass. The ghost is gone.",
     tint: "#9aa070",
+    carving: "No ghosts below.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -122,6 +130,7 @@ export const MODES: ModeInfo[] = [
     blurb: "Twenty pieces. Extra taps count.",
     look: "Twenty pieces. Extra taps stain the recap gold.",
     tint: "#6ee0e4",
+    carving: "Twenty hands. No extra.",
     lines: null,
     seconds: null,
     startLevel: 1,
