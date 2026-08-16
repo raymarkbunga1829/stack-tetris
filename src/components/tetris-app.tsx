@@ -1700,7 +1700,9 @@ export function TetrisApp() {
         className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
-          ["--accent" as string]: themeOf(ui.theme).flash,
+          ["--accent" as string]: ui.live
+            ? themeOf(ui.theme).fill[ui.live]
+            : themeOf(ui.theme).flash,
           ["--piece" as string]: ui.live
             ? themeOf(ui.theme).fill[ui.live]
             : themeOf(ui.theme).frame,

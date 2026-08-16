@@ -741,7 +741,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
           if (n >= MAX_SOLID) break;
-          place(solids, n++, c.x, row, 0.02, theme.flash, 1.14, 0.55);
+          place(solids, n++, c.x, row, 0.02, theme.fill[sim.piece.id], 1.14, 0.55);
         }
       }
     } else if (!reduce) {
@@ -809,9 +809,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
                   ))
           : 0.52 + 0.3 * (0.5 + 0.5 * Math.sin(now * 0.0036));
         ghostMat.opacity = pulse;
-        const mine = theme.deep[sim.piece.id] ?? theme.fill[sim.piece.id];
-        const nxt = sim.next[0] ? theme.fill[sim.next[0]] : mine;
-        const tint = hex(mine).lerp(hex(nxt), 0.38).getStyle();
+        const tint = theme.fill[sim.piece.id];
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, gy)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
