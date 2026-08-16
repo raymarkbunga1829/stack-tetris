@@ -506,6 +506,10 @@
   align-items: center;
   gap: 8px;
   pointer-events: none;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-bg) 55%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .combo-meter span,
@@ -940,9 +944,10 @@
 }
 
 .pad-btn svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   pointer-events: none;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.25));
 }
 
 .pad-btn:active,
@@ -1125,13 +1130,18 @@
 
 .text-btn {
   min-height: 36px;
-  padding: 4px 2px;
+  padding: 4px 10px;
   border: 0;
-  background: none;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--color-fg) 8%, #1c2028), #14181e);
   color: var(--color-muted);
   font: 600 0.7rem/1 var(--font-sans);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .text-btn:hover,
@@ -1393,7 +1403,7 @@
 .modes {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 7px;
 }
 
 .modes button {
@@ -1402,30 +1412,53 @@
   align-items: flex-start;
   gap: 3px;
   min-height: 0;
-  padding: 10px 10px 9px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-raised);
+  padding: 11px 11px 10px;
+  border: 0;
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in oklab, var(--tint, #888) 16%, #2a303c) 0%,
+      #161a22 55%,
+      #12151c 100%
+    );
   color: var(--color-muted);
   text-align: left;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 3px 0 0 var(--tint, #3a4050),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .modes button.is-on {
   color: var(--color-fg);
-  border-color: color-mix(in oklab, var(--color-fg) 55%, var(--color-line));
-  background: color-mix(in oklab, var(--color-fg) 8%, var(--color-raised));
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in oklab, var(--tint, #fff) 28%, #323846) 0%,
+      #1a1e28 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 3px 0 0 var(--tint, #fff),
+    0 0 0 1px color-mix(in oklab, var(--tint, #fff) 45%, transparent),
+    0 6px 18px color-mix(in oklab, var(--tint, #000) 28%, transparent);
 }
 
 .mode-name {
-  font: 600 0.82rem/1.1 var(--font-sans);
+  font: 700 0.84rem/1.1 var(--font-sans);
   letter-spacing: -0.02em;
 }
 
 .mode-rule {
-  color: var(--color-faint);
+  color: color-mix(in oklab, var(--tint, var(--color-faint)) 70%, var(--color-faint));
   font: 600 0.62rem/1 var(--font-sans);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.modes button.is-on .mode-rule {
+  color: var(--tint, var(--color-fg));
 }
 
 .mode-blurb {

@@ -47,6 +47,7 @@ export function ModeStrip({ mode, sprintBest, daily, streak, onPick }: Props) {
           role="tab"
           aria-selected={mode === m.id}
           className={`${mode === m.id ? "is-on" : ""}${m.id === "daily" && played ? " is-played" : ""}`}
+          style={{ ["--tint" as string]: m.tint }}
           data-qa={`mode-${m.id}`}
           onClick={() => onPick(m.id)}
         >
