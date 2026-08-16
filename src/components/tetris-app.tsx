@@ -227,6 +227,7 @@ export function TetrisApp() {
   const [crowd, setCrowd] = useState<MascotAct>("idle");
   const crowdT = useRef(0);
   const crowdRef = useRef<MascotAct>("idle");
+  const lookRef = useRef(0);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -456,6 +457,11 @@ export function TetrisApp() {
     }
 
     const sim = simRef.current;
+    if (sim?.piece) {
+      lookRef.current += ((sim.piece.x - 3.5) / 4.5 - lookRef.current) * 0.25;
+    } else {
+      lookRef.current *= 0.92;
+    }
     if (!sim || u.phase === "title") return;
 
     if (sim.phase === "paused" || sim.phase === "over") {
@@ -513,7 +519,14 @@ export function TetrisApp() {
           setCrowd("fail");
         }
         else if (live && live.phase === "playing" && inDanger(live)) pokeCrowd("panic");
-        else {
+        else if (
+          crowdRef.current === "stack" ||
+          crowdRef.current === "perfect" ||
+          crowdRef.current === "triple" ||
+          crowdRef.current === "tspin"
+        ) {
+          pokeCrowd("recover");
+        } else {
           crowdRef.current = "idle";
           setCrowd("idle");
         }
@@ -1494,7 +1507,7 @@ export function TetrisApp() {
               <p className="gchip">{ui.gesture}</p>
             )}
           </div>
-          <Mascots act={crowd} />
+          <Mascots act={crowd} lookRef={lookRef} />
           </div>
 
           <aside className="rail">
