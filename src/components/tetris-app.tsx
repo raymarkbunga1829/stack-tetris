@@ -1537,8 +1537,6 @@ export function TetrisApp() {
             <canvas ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
             <div className={`marquee${ui.phase === "over" || ui.phase === "paused" ? " is-dark" : ""}`}>
-              <span>STACK</span>
-              <b>{modeOf(ui.mode).name}</b>
               <span>HI {ui.high.toLocaleString()}</span>
             </div>
             {ui.scan && <i className="scan" aria-hidden="true" />}
@@ -1790,25 +1788,6 @@ export function TetrisApp() {
               <p key={`bb-${ui.b2bPop}`} className="b2b-burst">
                 B2B
               </p>
-            )}
-            {ui.phase === "playing" && (
-              <button
-                type="button"
-                className="well-pause"
-                aria-label="Pause"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  unlockAudio();
-                  if (simRef.current) {
-                    pauseToggle(simRef.current);
-                    setMusicPaused(simRef.current.phase === "paused");
-                    syncUi({ phase: simRef.current.phase });
-                  }
-                }}
-              >
-                Pause
-              </button>
             )}
             {ui.coach && ui.phase === "playing" && (
               <CoachCard step={ui.coach} onSkip={finishCoach} />
