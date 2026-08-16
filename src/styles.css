@@ -275,6 +275,7 @@
   border: 1px solid var(--color-line);
   overflow: hidden;
   touch-action: none;
+  box-shadow: inset 0 0 0 5px var(--bezel, #2a2e3a);
 }
 
 .cabinet.is-danger .well {
@@ -1864,4 +1865,40 @@ html.is-ios .help-android {
 
 .cabinet:not(.is-keys) .pocket-hold .mini {
   max-width: 32px;
+}
+
+.marquee {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--bezel, #2a2e3a) 55%, #08080c);
+  color: #f2efe6;
+  font: 600 0.68rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.marquee b {
+  justify-self: center;
+  font: 600 0.72rem/1 var(--font-display);
+  letter-spacing: 0.16em;
+}
+
+.marquee.is-dark {
+  filter: brightness(0.45);
+}
+
+.scan {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 2px,
+    rgba(0, 0, 0, 0.1) 2px 4px
+  );
 }

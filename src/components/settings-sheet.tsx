@@ -12,6 +12,7 @@ type Props = {
   padSize: "compact" | "huge";
   marks: boolean;
   holdRight: boolean;
+  scan: boolean;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
@@ -23,6 +24,7 @@ type Props = {
   onPadSize: (s: "compact" | "huge") => void;
   onMarks: () => void;
   onHoldRight: () => void;
+  onScan: () => void;
   onTheme: (id: ThemeId) => void;
   onPreview: (id: ThemeId) => void;
   musicVol: number;
@@ -39,6 +41,7 @@ export function SettingsSheet({
   padSize,
   marks,
   holdRight,
+  scan,
   theme,
   themes,
   credits,
@@ -50,6 +53,7 @@ export function SettingsSheet({
   onPadSize,
   onMarks,
   onHoldRight,
+  onScan,
   onTheme,
   onPreview,
   musicVol,
@@ -119,6 +123,10 @@ export function SettingsSheet({
         <button type="button" className={`set-row${holdRight ? " is-on" : ""}`} onClick={onHoldRight}>
           <span>Left hand</span>
           <b>{holdRight ? "Next on left" : "Next on right"}</b>
+        </button>
+        <button type="button" className={`set-row${scan ? " is-on" : ""}`} onClick={onScan}>
+          <span>Scanlines</span>
+          <b>{scan ? "On" : "Off"}</b>
         </button>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">

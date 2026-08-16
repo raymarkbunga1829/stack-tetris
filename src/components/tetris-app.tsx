@@ -116,6 +116,7 @@ type Ui = {
   padSize: "compact" | "huge";
   marks: boolean;
   holdRight: boolean;
+  scan: boolean;
   watching: boolean;
   streak: { count: number; last: string };
   missions: MissionBook;
@@ -227,6 +228,7 @@ export function TetrisApp() {
     padSize: saveRef.current.padSize,
     marks: saveRef.current.marks,
     holdRight: saveRef.current.holdRight,
+    scan: saveRef.current.scan,
     watching: false,
     streak: saveRef.current.streak,
     missions: saveRef.current.missions,
@@ -261,8 +263,17 @@ export function TetrisApp() {
   const pieceBorn = useRef({ x: 3, keys: 0 });
   const splitSeen = useRef(0);
   const lastMix = useRef({ music: 1, sfx: 1 });
+  const attractUntil = useRef(0);
+  const attractOn = useRef(false);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
+
+  useEffect(() => {
+    if (ui.phase !== "title" || ui.watching || ui.lifting || ui.settings || ui.shop) return;
+    if (!getLastReplay()) return;
+    const t = window.setTimeout(() => watchLast(true), 1600);
+    return () => clearTimeout(t);
+  }, [ui.phase, ui.watching, ui.lifting, ui.settings, ui.shop]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("is-android", isAndroid());
@@ -489,12 +500,14 @@ export function TetrisApp() {
     });
   }
 
-  function watchLast() {
+  function watchLast(auto = false) {
     const snaps = getLastReplay();
     if (!snaps) return;
     replayRef.current = snaps;
     replayI.current = 0;
     replayT.current = 0;
+    attractOn.current = auto;
+    attractUntil.current = auto ? performance.now() + 20000 : 0;
     if (!simRef.current) simRef.current = createSim({ mode: uiRef.current.mode });
     syncUi({ watching: true });
   }
@@ -536,6 +549,11 @@ export function TetrisApp() {
 
     const sim = simRef.current;
     if (u.phase === "title" && u.watching) {
+      if (attractOn.current && performance.now() > attractUntil.current) {
+        attractOn.current = false;
+        syncUi({ watching: false });
+        return;
+      }
       stepReplay(dt);
       return;
     }
@@ -1365,6 +1383,13 @@ export function TetrisApp() {
     syncUi({ holdRight: next });
   }
 
+  function toggleScan() {
+    const next = !saveRef.current.scan;
+    saveRef.current = { ...saveRef.current, scan: next };
+    writeSave(saveRef.current);
+    syncUi({ scan: next });
+  }
+
   function onTheme(id: ThemeId) {
     const next = buyTheme(saveRef.current, id);
     if (!next) return;
@@ -1427,6 +1452,7 @@ export function TetrisApp() {
     <main className="shell">
       <div
         className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}`}
+        style={{ ["--bezel" as string]: themeOf(ui.theme).frame }}
       >
         <header className="topbar">
           <h1 className="logo">Stack</h1>
@@ -1470,6 +1496,12 @@ export function TetrisApp() {
           />
         </div>
 
+        <div className={`marquee${ui.phase === "over" || ui.phase === "paused" ? " is-dark" : ""}`}>
+          <span>STACK</span>
+          <b>{modeOf(ui.mode).name}</b>
+          <span>HI {ui.high.toLocaleString()}</span>
+        </div>
+
         <div className={`stage${ui.holdRight ? " is-flip" : ""}`}>
           <aside className="rail">
             <p className="rail-label">Hold</p>
@@ -1510,10 +1542,12 @@ export function TetrisApp() {
           >
             <canvas ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
+            {ui.scan && <i className="scan" aria-hidden="true" />}
             {ui.phase === "title" && !ui.watching && (
               <div className={`veil${ui.lifting ? " is-lift" : ""}`}>
-                <p className="veil-kicker">{modeOf(ui.mode).blurb}</p>
+                <p className="veil-kicker">Insert coin</p>
                 <p className="veil-title">Stack</p>
+                <p className="veil-hint">Press start</p>
                 {isAndroid() && (
                   <p className="veil-hint">
                     Slide sideways on the stack. Tap to turn. Use Drop — don’t swipe down.
@@ -1548,7 +1582,7 @@ export function TetrisApp() {
                   saveRef.current.daily.date === utcDateKey() &&
                   saveRef.current.daily.score > 0
                     ? "Try again"
-                    : "Play"}
+                    : "Start"}
                 </button>
               </div>
             )}
@@ -1962,6 +1996,7 @@ export function TetrisApp() {
           padSize={ui.padSize}
           marks={ui.marks}
           holdRight={ui.holdRight}
+          scan={ui.scan}
           theme={ui.theme}
           themes={saveRef.current.themes}
           credits={ui.credits}
@@ -1973,6 +2008,7 @@ export function TetrisApp() {
           onPadSize={setPadSize}
           onMarks={toggleMarks}
           onHoldRight={toggleHoldRight}
+          onScan={toggleScan}
           onTheme={onTheme}
           onPreview={previewTheme}
           musicVol={ui.musicVol}
