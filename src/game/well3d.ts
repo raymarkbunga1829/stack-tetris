@@ -61,6 +61,7 @@ export type Well3d = {
   resize: () => void;
   draw: (sim: Sim | null, shake: number, theme: Theme, showGhost?: boolean, showMarks?: boolean) => void;
   punch: (amount: number) => void;
+  nod: (amount: number) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
   shatter: (sim: Sim, theme: Theme) => void;
@@ -118,6 +119,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 90);
   const BASE_FOV = 34;
   let punch = 0;
+  let nodT = 0;
   let lastDraw = performance.now();
   const bloomBase = reduce ? 0.12 : mobile ? 0.32 : 0.48;
 
@@ -517,6 +519,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
 
     frameCamera();
+    if (nodT > 0) camera.position.y -= nodT * 0.62;
     if (shake > 0 || quakeT > 0) {
       const rumble = shake * 0.035 + quakeT * 0.09;
       camera.position.x += (Math.random() - 0.5) * rumble;
@@ -535,6 +538,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     lastDraw = now;
     if (!reduce) punch = Math.max(0, punch - dt * 3.4);
     else punch = 0;
+    nodT = Math.max(0, nodT - dt * 3.6);
     lockPulse = Math.max(0, lockPulse - dt * 4.6);
     zapT = Math.max(0, zapT - dt * 3.8);
     quakeT = Math.max(0, quakeT - dt * 2.4);
@@ -739,6 +743,11 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   function punchCam(amount: number) {
     if (reduce) return;
     punch = Math.min(1.25, punch + amount);
+  }
+
+  function nod(amount: number) {
+    if (reduce) return;
+    nodT = Math.min(1.1, nodT + amount);
   }
 
   function sparkRows(boardRows: number[], hexCol: string) {
@@ -1141,6 +1150,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     resize,
     draw,
     punch: punchCam,
+    nod,
     sparkRows,
     lockThump,
     shatter,

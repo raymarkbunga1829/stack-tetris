@@ -19,6 +19,7 @@ export type ScoreRow = {
   combo?: number;
   tspins?: number;
   stacks?: number;
+  splits?: number[];
 };
 
 export type SaveData = {
@@ -47,6 +48,8 @@ export type SaveData = {
   scores: ScoreRow[];
   daily: { date: string; score: number; lines: number };
   sprintBest: number | null;
+  sprintSplits: number[];
+  niceSeen: boolean;
   dailyBoard: { date: string; rows: ScoreRow[] };
   streak: { count: number; last: string };
 };
@@ -77,6 +80,8 @@ const DEFAULTS: SaveData = {
   scores: [],
   daily: { date: "", score: 0, lines: 0 },
   sprintBest: null,
+  sprintSplits: [],
+  niceSeen: false,
   dailyBoard: { date: "", rows: [] },
   streak: { count: 0, last: "" },
 };
@@ -136,6 +141,8 @@ export function loadSave(): SaveData {
       scores: Array.isArray(parsed.scores) ? parsed.scores : [],
       daily: parsed.daily ?? { date: "", score: 0, lines: 0 },
       sprintBest: typeof parsed.sprintBest === "number" ? parsed.sprintBest : null,
+      sprintSplits: Array.isArray(parsed.sprintSplits) ? parsed.sprintSplits.filter((n): n is number => typeof n === "number") : [],
+      niceSeen: parsed.niceSeen === true,
       dailyBoard: parsed.dailyBoard ?? { date: "", rows: [] },
       streak: parsed.streak ?? { count: 0, last: "" },
     };
@@ -166,6 +173,13 @@ export function recordRun(data: SaveData, row: ScoreRow): SaveData {
   if (row.mode === "sprint" && row.won) {
     const best = next.sprintBest;
     if (best == null || row.clock < best) next = { ...next, sprintBest: row.clock };
+    if (row.splits?.length) {
+      const prev = next.sprintSplits;
+      const merged = row.splits.map((t, i) =>
+        prev[i] == null ? t : Math.min(prev[i]!, t),
+      );
+      next = { ...next, sprintSplits: merged };
+    }
   }
   if (row.mode === "daily") {
     const date = data.missions.date;

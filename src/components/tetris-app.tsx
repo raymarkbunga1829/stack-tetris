@@ -146,6 +146,7 @@ type Ui = {
   canUndo: boolean;
   lockPop: number;
   lifting: boolean;
+  pbPop: number;
 };
 
 function forceCoach() {
@@ -247,6 +248,7 @@ export function TetrisApp() {
     canUndo: false,
     lockPop: 0,
     lifting: false,
+    pbPop: 0,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -592,7 +594,12 @@ export function TetrisApp() {
 
     if (sim.mode === "sprint" && sim.splits.length > splitSeen.current) {
       splitSeen.current = sim.splits.length;
-      flashBanner(String(splitSeen.current * 10));
+      const mark = splitSeen.current * 10;
+      const split = sim.splits[sim.splits.length - 1] ?? sim.clock;
+      const best = saveRef.current.sprintSplits[splitSeen.current - 1];
+      const pb = best == null || split < best;
+      flashBanner(pb ? `${mark} PB` : String(mark));
+      if (pb) syncUi({ pbPop: u.pbPop + 1 });
     }
     const live = sim.piece?.id ?? null;
     const danger = sim.phase === "playing" && inDanger(sim);
@@ -685,7 +692,13 @@ export function TetrisApp() {
     if (ev === "clear") {
       haptic("clear");
       shakeRef.current = 5;
-      flashBanner(sim.lastClear ?? "CLEAR");
+      if (!saveRef.current.niceSeen) {
+        saveRef.current = { ...saveRef.current, niceSeen: true };
+        writeSave(saveRef.current);
+        flashBanner("Nice.");
+      } else {
+        flashBanner(sim.lastClear ?? "CLEAR");
+      }
       fireChain(sim, false);
       if (sim.lastPerfect) juicePerfect();
       syncUi();
@@ -694,7 +707,13 @@ export function TetrisApp() {
       haptic("tetris");
       shakeRef.current = ev === "tetris" ? 12 : 8;
       well3dRef.current?.punch(ev === "tetris" ? 0.35 : 0.25);
-      flashBanner(sim.lastClear ?? "STACK");
+      if (!saveRef.current.niceSeen) {
+        saveRef.current = { ...saveRef.current, niceSeen: true };
+        writeSave(saveRef.current);
+        flashBanner("Nice.");
+      } else {
+        flashBanner(sim.lastClear ?? "STACK");
+      }
       fireChain(sim, ev === "tetris" || ev === "tspin");
       if (ev === "tetris") payMissions({ tetris: 1 });
       if (sim.lastPerfect) juicePerfect();
@@ -807,6 +826,7 @@ export function TetrisApp() {
       combo: sim.maxCombo,
       tspins: sim.tspins,
       stacks: sim.stacks,
+      splits: sim.splits.slice(),
     });
     if (sim.won && sim.mode === "sprint") payMissions({ modeWin: "sprint" });
     if (sim.history.length > 1) {
@@ -936,6 +956,8 @@ export function TetrisApp() {
     engine.sparkRows(sim.clearRows, tint);
     engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(kind);
+    if (kind === "stack" || kind === "tspin") engine.nod(0.55);
+    else if (kind === "triple") engine.nod(0.32);
     const n =
       kind === "stack" ? 4 : kind === "triple" ? 3 : kind === "double" ? 2 : kind === "tspin" ? 3 : 1;
     sfxClear(n);
@@ -1351,6 +1373,10 @@ export function TetrisApp() {
     syncUi({ theme: next.theme, credits: next.credits });
   }
 
+  function previewTheme(id: ThemeId) {
+    syncUi({ theme: id });
+  }
+
   function onWellPointer(e: React.PointerEvent<HTMLDivElement>) {
     unlockAudio();
     const phase = uiRef.current.phase;
@@ -1410,7 +1436,7 @@ export function TetrisApp() {
           <p className="hi">Best {ui.high.toLocaleString()}</p>
         </header>
 
-        <div className={`stats${ui.lockPop ? " is-lock" : ""}`}>
+        <div className={`stats${ui.lockPop ? " is-lock" : ""}${ui.pbPop ? " is-pb" : ""}`}>
           <TickScore value={ui.score} />
           <Stat
             label={
@@ -1427,6 +1453,11 @@ export function TetrisApp() {
               ui.mode === "blitz" || ui.mode === "sprint"
                 ? undefined
                 : (ui.lines % 10) / 10
+            }
+            hint={
+              ui.mode === "sprint" && ui.sprintBest != null
+                ? `PB ${formatClock(ui.sprintBest)}`
+                : undefined
             }
           />
           <Stat
@@ -1934,7 +1965,7 @@ export function TetrisApp() {
           theme={ui.theme}
           themes={saveRef.current.themes}
           credits={ui.credits}
-          onClose={() => syncUi({ settings: false })}
+          onClose={() => syncUi({ settings: false, theme: saveRef.current.theme })}
           onHaptic={setProfile}
           onHard={toggleHard}
           onGhost={toggleGhost}
@@ -1942,10 +1973,11 @@ export function TetrisApp() {
           onPadSize={setPadSize}
           onMarks={toggleMarks}
           onHoldRight={toggleHoldRight}
+          onTheme={onTheme}
+          onPreview={previewTheme}
           musicVol={ui.musicVol}
           sfxVol={ui.sfxVol}
           onMix={setAudioMix}
-          onTheme={onTheme}
         />
         <BoardSheet
           open={ui.board}
@@ -1963,15 +1995,18 @@ function Stat({
   label,
   value,
   fill,
+  hint,
 }: {
   label: string;
   value: string;
   fill?: number;
+  hint?: string;
 }) {
   return (
     <div className="stat">
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value}</span>
+      {hint && <span className="stat-hint">{hint}</span>}
       {fill != null && (
         <i className="stat-pip" style={{ width: `${Math.max(0, Math.min(1, fill)) * 100}%` }} />
       )}

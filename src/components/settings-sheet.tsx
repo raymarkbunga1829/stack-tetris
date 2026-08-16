@@ -24,6 +24,7 @@ type Props = {
   onMarks: () => void;
   onHoldRight: () => void;
   onTheme: (id: ThemeId) => void;
+  onPreview: (id: ThemeId) => void;
   musicVol: number;
   sfxVol: number;
   onMix: (part: "music" | "sfx", value: number) => void;
@@ -50,6 +51,7 @@ export function SettingsSheet({
   onMarks,
   onHoldRight,
   onTheme,
+  onPreview,
   musicVol,
   sfxVol,
   onMix,
@@ -140,17 +142,17 @@ export function SettingsSheet({
             const owned = ownsTheme(themes, t.id);
             return (
               <li key={t.id}>
-                <div>
+                <button type="button" className="theme-preview" onClick={() => onPreview(t.id)}>
                   <p className="shop-name">{t.name}</p>
                   <p className="shop-blurb">{t.blurb}</p>
-                </div>
+                </button>
                 <button
                   type="button"
                   className="shop-buy"
                   data-qa={`theme-${t.id}`}
                   onClick={() => onTheme(t.id)}
                 >
-                  {theme === t.id ? "On" : owned ? "Use" : t.cost === 0 ? "Free" : `${t.cost} CR`}
+                  {theme === t.id && owned ? "On" : owned ? "Use" : t.cost === 0 ? "Free" : `${t.cost} CR`}
                 </button>
               </li>
             );

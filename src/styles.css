@@ -1836,3 +1836,32 @@ html.is-ios .help-android {
     transition: none;
   }
 }
+
+.stat-hint {
+  color: var(--color-muted);
+  font: 500 0.58rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.stats.is-pb .stat:nth-child(2) .stat-value {
+  color: #e8d48a;
+}
+
+.theme-preview {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cabinet:not(.is-keys) .pocket-hold {
+  min-height: 36px;
+  padding: 3px;
+}
+
+.cabinet:not(.is-keys) .pocket-hold .mini {
+  max-width: 32px;
+}
