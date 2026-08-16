@@ -643,7 +643,11 @@ export function TetrisApp() {
     }
     if (!sim || u.phase === "title") return;
 
-    if (sim.phase === "paused" || sim.phase === "over") {
+    if (sim.phase === "paused") {
+      if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 8);
+      return;
+    }
+    if (sim.phase === "over") {
       if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 8);
       if (failT.current > 0) {
         failT.current -= dt;
@@ -1713,7 +1717,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -1797,6 +1801,12 @@ export function TetrisApp() {
               <span className="stat-label">Game</span>
               <span className="stat-value">Pause</span>
             </button>
+          )}
+          {ui.phase === "paused" && (
+            <div className="stat stat-pause is-on">
+              <span className="stat-label">Game</span>
+              <span className="stat-value">Paused</span>
+            </div>
           )}
         </div>
 
@@ -1942,38 +1952,40 @@ export function TetrisApp() {
                   ×
                   <em>Home</em>
                 </button>
-                <p className="veil-kicker">Still here</p>
-                <p className="veil-title">Paused</p>
-                <button
-                  type="button"
-                  className="play-btn"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    unlockAudio();
-                    if (simRef.current) {
-                      simRef.current.phase = "playing";
-                      setMusicPaused(false);
-                      setMusicTension(simRef.current.mode === "classic" && inDanger(simRef.current));
-                      syncUi({ phase: "playing" });
-                    }
-                  }}
-                >
-                  Resume
-                </button>
-                <button
-                  type="button"
-                  className="text-btn"
-                  data-qa="new-game"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    unlockAudio();
-                    startGame(ui.mode);
-                  }}
-                >
-                  New game
-                </button>
+                <div className="pause-card">
+                  <p className="veil-kicker">Still here</p>
+                  <p className="veil-title">Paused</p>
+                  <button
+                    type="button"
+                    className="play-btn"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      unlockAudio();
+                      if (simRef.current) {
+                        simRef.current.phase = "playing";
+                        setMusicPaused(false);
+                        setMusicTension(simRef.current.mode === "classic" && inDanger(simRef.current));
+                        syncUi({ phase: "playing" });
+                      }
+                    }}
+                  >
+                    Resume
+                  </button>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    data-qa="new-game"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      unlockAudio();
+                      startGame(ui.mode);
+                    }}
+                  >
+                    New game
+                  </button>
+                </div>
               </div>
             )}
             {ui.phase === "over" && !ui.failing && ui.coinTake && (
