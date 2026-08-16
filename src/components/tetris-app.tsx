@@ -2268,7 +2268,7 @@ export function TetrisApp() {
           }
         />
 
-        {(ui.phase === "title" || ui.phase === "over") && (
+        {(ui.phase === "title" || ui.phase === "over" || ui.phase === "paused") && (
           <ModeStrip
             mode={ui.mode}
             sprintBest={ui.sprintBest}

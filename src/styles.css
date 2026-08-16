@@ -1096,21 +1096,14 @@
 }
 
 .cabinet.is-play .help,
-.cabinet.is-play .modes,
-.cabinet.is-play .missions,
-.cabinet.is-play .foot,
-.cabinet.is-play .topbar,
+.cabinet.is-play:not(.is-paused) .modes,
+.cabinet.is-play:not(.is-paused) .missions,
+.cabinet.is-play:not(.is-paused) .foot,
+.cabinet.is-play:not(.is-paused) .topbar,
 .cabinet.is-paused .pad,
 .cabinet.is-paused .powers,
-.cabinet.is-paused .siege,
-.cabinet.is-paused .modes,
-.cabinet.is-paused .foot,
-.cabinet.is-paused .help {
+.cabinet.is-paused .siege {
   display: none;
-}
-
-.cabinet.is-play.is-paused {
-  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .cabinet.is-play {
@@ -1119,8 +1112,16 @@
   padding-top: max(6px, env(safe-area-inset-top));
 }
 
+.cabinet.is-play.is-paused {
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+}
+
 .cabinet.is-play.is-siege {
   grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+}
+
+.cabinet.is-play.is-siege.is-paused {
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
 }
 
 .cabinet.is-paused {
