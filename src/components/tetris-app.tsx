@@ -1496,12 +1496,6 @@ export function TetrisApp() {
           />
         </div>
 
-        <div className={`marquee${ui.phase === "over" || ui.phase === "paused" ? " is-dark" : ""}`}>
-          <span>STACK</span>
-          <b>{modeOf(ui.mode).name}</b>
-          <span>HI {ui.high.toLocaleString()}</span>
-        </div>
-
         <div className={`stage${ui.holdRight ? " is-flip" : ""}`}>
           <aside className="rail">
             <p className="rail-label">Hold</p>
@@ -1542,6 +1536,11 @@ export function TetrisApp() {
           >
             <canvas ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
+            <div className={`marquee${ui.phase === "over" || ui.phase === "paused" ? " is-dark" : ""}`}>
+              <span>STACK</span>
+              <b>{modeOf(ui.mode).name}</b>
+              <span>HI {ui.high.toLocaleString()}</span>
+            </div>
             {ui.scan && <i className="scan" aria-hidden="true" />}
             {ui.phase === "title" && !ui.watching && (
               <div className={`veil${ui.lifting ? " is-lift" : ""}`}>

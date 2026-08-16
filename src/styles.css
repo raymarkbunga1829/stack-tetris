@@ -1868,17 +1868,23 @@ html.is-ios .help-android {
 }
 
 .marquee {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  right: 8px;
+  z-index: 4;
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: 6px;
-  background: color-mix(in oklab, var(--bezel, #2a2e3a) 55%, #08080c);
+  background: color-mix(in oklab, var(--bezel, #2a2e3a) 62%, #08080c);
   color: #f2efe6;
-  font: 600 0.68rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
+  font: 600 0.62rem/1 var(--font-mono);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  pointer-events: none;
 }
 
 .marquee b {
