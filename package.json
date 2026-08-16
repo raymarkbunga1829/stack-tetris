@@ -1,6 +1,7 @@
 {
-  "name": "app-builder-workspace",
+  "name": "stack-tetris",
   "private": true,
+  "homepage": "https://stack-tetris.vercel.app",
   "sideEffects": false,
   "type": "module",
   "overrides": {
