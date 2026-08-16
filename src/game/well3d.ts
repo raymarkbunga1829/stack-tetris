@@ -625,8 +625,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
 
     ticks.visible = sim?.mode === "sprint" && sim.phase !== "title";
-    const nid = sim?.next[0];
-    if (nid) trimMat.color.set(theme.fill[nid]);
+    const liveId = sim?.piece?.id;
+    const liveHex = liveId ? theme.fill[liveId] : theme.flash;
+    trimMat.color.set(liveHex);
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -871,6 +872,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     } else if (slowOn) {
       shaft.color.set(0xffe0a0);
       shaft.intensity = 22;
+    } else if (liveId) {
+      shaft.color.set(liveHex);
+      shaft.intensity = 22;
+      jewel.color.set(liveHex);
     } else {
       shaft.color.set(0xffe4c4);
       shaft.intensity = 18;
