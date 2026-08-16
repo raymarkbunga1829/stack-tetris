@@ -143,24 +143,24 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     camera.lookAt(0.05, 9.15 + p * 0.25, 0);
   }
 
-  scene.add(new THREE.HemisphereLight(0xb4c8e4, 0x1c1412, 0.72));
-  const key = new THREE.DirectionalLight(0xfff4e2, 2.05);
+  scene.add(new THREE.HemisphereLight(0x88c8ff, 0x180818, 0.7));
+  const key = new THREE.DirectionalLight(0xe8f4ff, 1.85);
   key.position.set(6.5, 22, 14);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x6a88c4, 0.55);
+  const fill = new THREE.DirectionalLight(0xff48c8, 0.42);
   fill.position.set(-14, 9, 9);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xc8e0ff, 1.05);
+  const rim = new THREE.DirectionalLight(0x40f0ff, 1.2);
   rim.position.set(-2, 18, -16);
   scene.add(rim);
 
-  const shaft = new THREE.PointLight(0xffe8c8, 26, 32, 1.45);
+  const shaft = new THREE.PointLight(0x66f0ff, 24, 32, 1.45);
   shaft.position.set(0, 20.6, 1.4);
   scene.add(shaft);
-  const bounce = new THREE.PointLight(0x4a6aa0, 12, 18, 1.65);
+  const bounce = new THREE.PointLight(0xff40b8, 10, 16, 1.7);
   bounce.position.set(0, 0.2, 1.4);
   scene.add(bounce);
-  const jewel = new THREE.PointLight(0xffffff, 10, 14, 2);
+  const jewel = new THREE.PointLight(0xb8ffff, 11, 14, 2);
   jewel.position.set(0, 6, 3.2);
   scene.add(jewel);
 
@@ -177,7 +177,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     envMapIntensity: 0.5,
   });
   const trimMat = new THREE.MeshStandardMaterial({
-    color: 0xe4eaf2,
+    color: 0xc8f8ff,
     roughness: 0.18,
     metalness: 0.92,
     envMapIntensity: 1.4,
@@ -236,9 +236,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const haze = new THREE.Mesh(
     new THREE.PlaneGeometry(10.2, 20.4),
     new THREE.MeshBasicMaterial({
-      color: 0x9ab4d4,
+      color: 0x50e8ff,
       transparent: true,
-      opacity: 0.055,
+      opacity: 0.06,
       depthWrite: false,
     }),
   );
@@ -258,7 +258,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     iridescenceIOR: 1.32,
     sheen: 0.22,
     sheenRoughness: 0.35,
-    sheenColor: new THREE.Color(0xf4f0e8),
+    sheenColor: new THREE.Color(0xc8f4ff),
     envMapIntensity: 1.65,
     emissive: 0x141414,
     emissiveIntensity: 0.16,
@@ -1254,9 +1254,9 @@ function makeWellGrid() {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
   const m = new THREE.LineBasicMaterial({
-    color: 0x6a82a4,
+    color: 0x4ad4e8,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.38,
   });
   return new THREE.LineSegments(g, m);
 }
@@ -1278,14 +1278,14 @@ function makePitTexture(): THREE.CanvasTexture {
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, w, h);
   const moon = ctx.createRadialGradient(w * 0.68, h * 0.16, 4, w * 0.68, h * 0.16, w * 0.48);
-  moon.addColorStop(0, "rgba(255, 246, 220, 0.55)");
-  moon.addColorStop(0.18, "rgba(210, 200, 170, 0.2)");
+  moon.addColorStop(0, "rgba(180, 255, 255, 0.42)");
+  moon.addColorStop(0.2, "rgba(255, 70, 190, 0.12)");
   moon.addColorStop(1, "rgba(10, 11, 16, 0)");
   ctx.fillStyle = moon;
   ctx.fillRect(0, 0, w, h);
   const shaft = ctx.createLinearGradient(w * 0.35, 0, w * 0.7, h);
-  shaft.addColorStop(0, "rgba(255, 236, 200, 0.16)");
-  shaft.addColorStop(0.45, "rgba(180, 190, 210, 0.04)");
+  shaft.addColorStop(0, "rgba(80, 255, 255, 0.2)");
+  shaft.addColorStop(0.4, "rgba(255, 40, 180, 0.06)");
   shaft.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = shaft;
   ctx.fillRect(0, 0, w, h);
@@ -1316,9 +1316,9 @@ function makeShaftTexture(): THREE.CanvasTexture {
   c.height = h;
   const ctx = c.getContext("2d")!;
   const g = ctx.createLinearGradient(w / 2, 0, w / 2, h);
-  g.addColorStop(0, "rgba(255, 236, 200, 0.55)");
-  g.addColorStop(0.25, "rgba(220, 210, 180, 0.18)");
-  g.addColorStop(1, "rgba(180, 190, 210, 0)");
+  g.addColorStop(0, "rgba(120, 255, 255, 0.6)");
+  g.addColorStop(0.22, "rgba(255, 50, 190, 0.22)");
+  g.addColorStop(1, "rgba(40, 20, 80, 0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   const side = ctx.createLinearGradient(0, 0, w, 0);
