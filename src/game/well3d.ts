@@ -475,11 +475,11 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         theme.id === "neon" || theme.id === "molten" ? 1.7 : night ? 1.55 : theme.id === "ice" ? 1.4 : theme.id === "ink" ? 1 : 1.15;
       bloomMul =
         theme.id === "neon"
-          ? 1.55
+          ? 1.7
           : theme.id === "ice"
-            ? 1.4
+            ? 1.55
             : theme.id === "molten"
-              ? 1.3
+              ? 1.55
               : theme.id === "lcd" || theme.id === "monolith"
                 ? 0.55
                 : night
@@ -487,9 +487,11 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
                   : theme.id === "ink"
                     ? 0.92
                     : 1;
+      const fogDen =
+        theme.id === "molten" ? 0.034 : theme.id === "ice" ? 0.022 : theme.id === "lcd" ? 0.008 : night ? 0.028 : 0.018;
       scene.fog = new THREE.FogExp2(
-        hex(theme.pit).getHex(),
-        theme.id === "lcd" ? 0.008 : night ? 0.028 : theme.id === "ice" ? 0.016 : 0.018,
+        theme.id === "molten" ? 0x2a1208 : theme.id === "ice" ? 0x102028 : hex(theme.pit).getHex(),
+        fogDen,
       );
       rim.color.set(
         theme.id === "sakura"
@@ -506,15 +508,19 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
                     ? 0x8eb4ff
                     : 0xb7d4ff,
       );
-      rim.intensity = theme.id === "neon" ? 1.1 : theme.id === "lcd" ? 0.35 : night ? 0.95 : 0.7;
+      rim.intensity = theme.id === "neon" ? 1.25 : theme.id === "ice" ? 1.05 : theme.id === "molten" ? 1.15 : theme.id === "lcd" ? 0.35 : night ? 0.95 : 0.7;
     }
     if (theme.pit !== lastBg) {
       lastBg = theme.pit;
-      const bg = hex(theme.pit).multiplyScalar(0.55);
+      const bg =
+        theme.id === "molten"
+          ? hex("#1a0c06")
+          : theme.id === "ice"
+            ? hex("#0c141c")
+            : hex(theme.pit).multiplyScalar(0.55);
       renderer.setClearColor(bg, 1);
       scene.background = bg;
-      scene.fog = new THREE.FogExp2(bg.getHex(), 0.018);
-      pitMat.color.copy(hex(theme.well).multiplyScalar(0.55));
+      pitMat.color.copy(hex(theme.well).multiplyScalar(theme.id === "molten" ? 0.7 : 0.55));
       wallMat.color.copy(hex(theme.frame).multiplyScalar(0.45));
     }
 
@@ -669,7 +675,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
                   Math.sin(
                     now * (0.014 + (sim.lockT / LOCK_DELAY) * 0.05),
                   ))
-          : 0.78;
+          : 0.52 + 0.3 * (0.5 + 0.5 * Math.sin(now * 0.0036));
         ghostMat.opacity = pulse;
         const mine = theme.deep[sim.piece.id] ?? theme.fill[sim.piece.id];
         const nxt = sim.next[0] ? theme.fill[sim.next[0]] : mine;

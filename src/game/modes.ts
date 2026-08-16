@@ -15,6 +15,7 @@ export type ModeInfo = {
   name: string;
   blurb: string;
   look: string;
+  tint: string;
   lines: number | null;
   seconds: number | null;
   startLevel: number;
@@ -29,6 +30,7 @@ export const MODES: ModeInfo[] = [
     name: "Marathon",
     blurb: "Landing ghost on. Endless until you top out.",
     look: "A pale twin waits on the floor. The well never ends.",
+    tint: "#7eb4c8",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -41,6 +43,7 @@ export const MODES: ModeInfo[] = [
     name: "Sprint 40",
     blurb: "Race to 40 lines. Ghost shows the drop.",
     look: "Forty lines. Gold on the clock if you beat yourself.",
+    tint: "#e8c46a",
     lines: 40,
     seconds: null,
     startLevel: 1,
@@ -53,6 +56,7 @@ export const MODES: ModeInfo[] = [
     name: "Blitz 2:00",
     blurb: "Two minutes from level 10. Ghost on.",
     look: "Already falling hard. Amber at ten. Red at three.",
+    tint: "#e87840",
     lines: null,
     seconds: 120,
     startLevel: 10,
@@ -65,6 +69,7 @@ export const MODES: ModeInfo[] = [
     name: "Daily",
     blurb: "Today's shared bag. Ghost on.",
     look: "The same seven as everyone alive today.",
+    tint: "#b08ad4",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -77,6 +82,7 @@ export const MODES: ModeInfo[] = [
     name: "Zen",
     blurb: "No clock. No top-out. Ghost on.",
     look: "No top-out. Undo a drop. The well is a sketchbook.",
+    tint: "#78c47c",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -89,6 +95,7 @@ export const MODES: ModeInfo[] = [
     name: "Arcade",
     blurb: "No landing ghost. Read the stack yourself.",
     look: "No ghost. Read the stack like a cabinet.",
+    tint: "#e09852",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -101,6 +108,7 @@ export const MODES: ModeInfo[] = [
     name: "Classic",
     blurb: "NES bag. No wall kicks. Read the stack.",
     look: "NES bag. No kicks. Green-black glass. The ghost is gone.",
+    tint: "#9aa070",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -113,6 +121,7 @@ export const MODES: ModeInfo[] = [
     name: "Finesse",
     blurb: "Twenty pieces. Extra taps count.",
     look: "Twenty pieces. Extra taps stain the recap gold.",
+    tint: "#6ee0e4",
     lines: null,
     seconds: null,
     startLevel: 1,

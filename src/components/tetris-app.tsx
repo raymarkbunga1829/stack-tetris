@@ -156,6 +156,7 @@ type Ui = {
   intro: string | null;
   takeover: number;
   cinema: boolean;
+  handoff: PieceId | null;
 };
 
 function forceCoach() {
@@ -266,6 +267,7 @@ export function TetrisApp() {
     intro: null,
     takeover: 0,
     cinema: false,
+    handoff: null,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -665,6 +667,12 @@ export function TetrisApp() {
     }
     const live = sim.piece?.id ?? null;
     const danger = sim.phase === "playing" && inDanger(sim);
+    if (live && live !== u.live && u.phase === "playing") {
+      syncUi({ handoff: live });
+      window.setTimeout(() => {
+        if (uiRef.current.handoff === live) syncUi({ handoff: null });
+      }, 280);
+    }
     if (sim.bag.length > bagN.current + 3) {
       syncUi({ bagPop: u.bagPop + 1, bag: sim.bag.slice() });
     }
@@ -1536,6 +1544,7 @@ export function TetrisApp() {
           ["--piece" as string]: ui.live
             ? themeOf(ui.theme).fill[ui.live]
             : themeOf(ui.theme).frame,
+          ["--mode" as string]: modeOf(ui.mode).tint,
         }}
       >
         <header className="topbar">
@@ -1775,12 +1784,12 @@ export function TetrisApp() {
               </div>
             )}
             {ui.phase === "over" && !ui.failing && !ui.coinTake && (
-              <div className="veil">
-                {ui.recap && ui.recap.stacks > 0 && (
+              <div className="veil is-polaroid">
+                {ui.recap && ui.recap.stacks > 0 ? (
                   <p className="stamp" aria-hidden="true">
                     Stack
                   </p>
-                )}
+                ) : null}
                 <button
                   type="button"
                   className="veil-x"
@@ -1945,7 +1954,7 @@ export function TetrisApp() {
                 .map((id, i) => (
                   <button
                     type="button"
-                    className={`pocket pocket-sm${ui.picking ? " is-pickable" : ""}`}
+                    className={`pocket pocket-sm${ui.picking ? " is-pickable" : ""}${i === 0 && ui.handoff ? " is-handoff" : ""}`}
                     key={i}
                     disabled={!ui.picking || !id}
                     aria-label={ui.picking ? `Use ${id ?? "piece"}` : undefined}
