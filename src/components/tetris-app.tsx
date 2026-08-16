@@ -292,6 +292,7 @@ export function TetrisApp() {
   const holdUsed = useRef(false);
   const lockN = useRef(0);
   const sawOmen = useRef(false);
+  const uglySaid = useRef(false);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -477,6 +478,7 @@ export function TetrisApp() {
     holdUsed.current = false;
     lockN.current = 0;
     sawOmen.current = false;
+    uglySaid.current = false;
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 1.55;
@@ -690,6 +692,10 @@ export function TetrisApp() {
       sawOmen.current = true;
       sfxOmen();
     }
+    if (sim.curseLeft === 1 && !uglySaid.current) {
+      uglySaid.current = true;
+      flashBanner("The bag is ugly.");
+    }
     const live = sim.piece?.id ?? null;
     const danger = sim.phase === "playing" && inDanger(sim);
     if (live && live !== u.live && u.phase === "playing") {
@@ -860,7 +866,7 @@ export function TetrisApp() {
       syncUi({ credits: saveRef.current.credits });
     }
 
-    if (sim.phase === "playing") setMusicTension(inDanger(sim));
+    if (sim.phase === "playing") setMusicTension(sim.mode === "classic" && inDanger(sim));
 
     if (sim.score !== u.score || sim.level !== u.level || sim.lines !== u.lines) {
       if (sim.level > u.level) sfxLevel();
@@ -1619,7 +1625,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: themeOf(ui.theme).flash,
@@ -1854,7 +1860,7 @@ export function TetrisApp() {
                     if (simRef.current) {
                       simRef.current.phase = "playing";
                       setMusicPaused(false);
-                      setMusicTension(inDanger(simRef.current));
+                      setMusicTension(simRef.current.mode === "classic" && inDanger(simRef.current));
                       syncUi({ phase: "playing" });
                     }
                   }}

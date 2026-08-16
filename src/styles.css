@@ -2029,8 +2029,16 @@ html.is-ios .help-android {
   color: #e8c46a;
 }
 
-.pad-hard.is-ask {
-  animation: drop-ask 0.45s ease-in-out infinite;
+.cabinet.is-zen .pad-hard {
+  background: color-mix(in oklab, var(--color-raised) 80%, #8a8680);
+  color: var(--color-fg);
+  box-shadow: none;
+}
+
+.cabinet.is-zen .pad-hard.is-slam,
+.cabinet.is-zen .pad-hard.is-ask {
+  animation: none;
+  filter: none;
 }
 
 @keyframes drop-ask {

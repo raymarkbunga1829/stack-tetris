@@ -247,6 +247,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const grid = makeWellGrid();
   scene.add(grid);
+  const ticks = makeSprintTicks();
+  ticks.visible = false;
+  scene.add(ticks);
 
   const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
   const solidMat = new THREE.MeshPhysicalMaterial({
@@ -637,6 +640,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       wallMat.color.copy(hex(theme.frame).multiplyScalar(0.7));
     }
 
+    ticks.visible = sim?.mode === "sprint" && sim.phase !== "title";
+    const nid = sim?.next[0];
+    if (nid) trimMat.color.set(theme.fill[nid]);
+
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
     if (shake > 0 || quakeT > 0) {
@@ -825,6 +832,15 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           if (row < 0 || row >= VISIBLE_ROWS) continue;
           place(ghosts, g++, c.x, row, 0.04, tint, 1, locking ? 1.15 : 1);
         }
+      }
+    }
+    if (sim?.hold && sim.piece && sim.phase === "playing" && g < MAX_GHOST - 4) {
+      ghostMat.opacity = 0.2;
+      for (const c of cellsOf(sim.hold, 0, sim.piece.x, sim.piece.y)) {
+        const row = c.y - HIDDEN_ROWS;
+        if (row < 0 || row >= VISIBLE_ROWS) continue;
+        if (g >= MAX_GHOST) break;
+        place(ghosts, g++, c.x, row, 0.07, theme.fill[sim.hold], 1, 0.7);
       }
     }
     ring.visible = ringOn;
@@ -1334,6 +1350,22 @@ function makeWellGrid() {
     color: 0x4ad4e8,
     transparent: true,
     opacity: 0.38,
+  });
+  return new THREE.LineSegments(g, m);
+}
+
+function makeSprintTicks() {
+  const pts: number[] = [];
+  const z = -0.52;
+  for (const y of [5, 10, 15]) {
+    pts.push(-COLS / 2, y, z, COLS / 2, y, z);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  const m = new THREE.LineBasicMaterial({
+    color: 0xe8c46a,
+    transparent: true,
+    opacity: 0.45,
   });
   return new THREE.LineSegments(g, m);
 }
