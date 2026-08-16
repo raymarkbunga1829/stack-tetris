@@ -205,22 +205,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   lip.position.set(0, 19.72, 0.42);
   scene.add(lip);
 
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0x121820,
-    metalness: 0.88,
-    roughness: 0.12,
-    envMapIntensity: 1.4,
-    clearcoat: 1,
-    clearcoatRoughness: 0.06,
-    transparent: true,
-    opacity: 0.85,
-    alphaMap: makeFloorFade(),
-  });
-  const glassFloor = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 4.2), glassMat);
-  glassFloor.rotation.x = -Math.PI / 2;
-  glassFloor.position.set(0, 1.6, 0.18);
-  scene.add(glassFloor);
-
   const shaftTex = makeShaftTexture();
   const godMat = new THREE.MeshBasicMaterial({
     map: shaftTex,
@@ -1415,22 +1399,6 @@ function makePitTexture(): THREE.CanvasTexture {
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, w, h);
   return new THREE.CanvasTexture(c);
-}
-
-function makeFloorFade(): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 32;
-  c.height = 128;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createLinearGradient(0, c.height, 0, 0);
-  g.addColorStop(0, "#ffffff");
-  g.addColorStop(0.45, "#9a9a9a");
-  g.addColorStop(1, "#000000");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, c.width, c.height);
-  const tex = new THREE.CanvasTexture(c);
-  tex.needsUpdate = true;
-  return tex;
 }
 
 function makeShaftTexture(): THREE.CanvasTexture {
