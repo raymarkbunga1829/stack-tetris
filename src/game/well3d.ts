@@ -468,12 +468,43 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (theme.id !== lastThemeId) {
       lastThemeId = theme.id;
       lastBg = "";
-      const night = theme.id === "night";
-      sparkLifeMul = night ? 1.55 : theme.id === "ink" ? 1 : 1.15;
-      bloomMul = night ? 1.35 : theme.id === "ink" ? 0.92 : 1;
-      scene.fog = new THREE.FogExp2(hex(theme.pit).getHex(), night ? 0.028 : 0.018);
-      rim.color.set(night ? 0x8eb4ff : 0xb7d4ff);
-      rim.intensity = night ? 0.95 : 0.7;
+      const night = theme.id === "night" || theme.id === "neon" || theme.id === "molten";
+      sparkLifeMul =
+        theme.id === "neon" || theme.id === "molten" ? 1.7 : night ? 1.55 : theme.id === "ice" ? 1.4 : theme.id === "ink" ? 1 : 1.15;
+      bloomMul =
+        theme.id === "neon"
+          ? 1.55
+          : theme.id === "ice"
+            ? 1.4
+            : theme.id === "molten"
+              ? 1.3
+              : theme.id === "lcd" || theme.id === "monolith"
+                ? 0.55
+                : night
+                  ? 1.35
+                  : theme.id === "ink"
+                    ? 0.92
+                    : 1;
+      scene.fog = new THREE.FogExp2(
+        hex(theme.pit).getHex(),
+        theme.id === "lcd" ? 0.008 : night ? 0.028 : theme.id === "ice" ? 0.016 : 0.018,
+      );
+      rim.color.set(
+        theme.id === "sakura"
+          ? 0xffb8d0
+          : theme.id === "molten"
+            ? 0xff8a40
+            : theme.id === "ice"
+              ? 0xc8f0ff
+              : theme.id === "neon"
+                ? 0xff40d0
+                : theme.id === "lcd"
+                  ? 0xd8d8b0
+                  : night
+                    ? 0x8eb4ff
+                    : 0xb7d4ff,
+      );
+      rim.intensity = theme.id === "neon" ? 1.1 : theme.id === "lcd" ? 0.35 : night ? 0.95 : 0.7;
     }
     if (theme.pit !== lastBg) {
       lastBg = theme.pit;
