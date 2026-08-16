@@ -229,6 +229,14 @@ export function sfxB2b() {
   tone(784, 0.14, 0.1, "sine", 0.26);
 }
 
+export function sfxPerfect() {
+  tone(523, 0.1, 0, "triangle", 0.32);
+  tone(659, 0.12, 0.05, "sine", 0.3);
+  tone(784, 0.16, 0.1, "triangle", 0.28);
+  tone(1046, 0.22, 0.16, "sine", 0.22);
+  noiseBurst(0.14, 0.02, 0.18, 1800, 0.6);
+}
+
 export function sfxPower(id: "zap" | "slow" | "shield" | "quake" | "pick") {
   if (id === "zap") sfxZap();
   else if (id === "slow") sfxSlow();
@@ -250,6 +258,11 @@ let musicStep = 0;
 let musicNext = 0;
 let musicRaf = 0;
 let musicPaused = false;
+let musicTight = false;
+
+export function setMusicTension(on: boolean) {
+  musicTight = on;
+}
 
 function hum(freq: number, dur: number, when: number, vol = 0.22) {
   if (!bus || muted || freq <= 0) return;
@@ -271,12 +284,14 @@ function pumpMusic() {
   musicRaf = 0;
   if (!bus || !musicMode || musicPaused || muted) return;
   const spec = BEDS[musicMode] ?? BEDS.marathon!;
-  const step = 60 / spec.bpm / 2;
+  const bpm = spec.bpm * (musicTight ? 1.32 : 1);
+  const step = 60 / bpm / 2;
   const now = bus.ctx.currentTime;
   if (musicNext < now - 0.2) musicNext = now;
   while (musicNext < now + 0.35) {
     const note = spec.notes[musicStep % spec.notes.length] ?? 0;
-    if (note > 0) hum(note, step * 1.6, musicNext, 0.18);
+    const lift = musicTight && note > 0 ? note * 1.122 : note;
+    if (lift > 0) hum(lift, step * 1.6, musicNext, musicTight ? 0.22 : 0.18);
     if (musicStep % 8 === 0) hum(note > 0 ? note / 2 : 98, step * 3.2, musicNext, 0.1);
     musicNext += step;
     musicStep += 1;
@@ -296,12 +311,15 @@ export function startMusic(mode: string) {
 export function stopMusic() {
   musicMode = null;
   musicPaused = false;
+  musicTight = false;
   if (musicRaf) cancelAnimationFrame(musicRaf);
   musicRaf = 0;
 }
 
 export function setMusicPaused(next: boolean) {
-  musicPaused = next;
+  if (bus) {
+    bus.music.gain.setTargetAtTime(next ? 0.045 : 0.09, bus.ctx.currentTime, 0.06);
+  }
   if (!next && musicMode && !musicRaf) {
     musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
     musicRaf = requestAnimationFrame(pumpMusic);

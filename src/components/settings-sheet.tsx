@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import type { PadMode } from "@/game/device";
 import type { HapticProfile } from "@/game/save";
 import { THEMES, ownsTheme, type ThemeId } from "@/game/themes";
 
@@ -7,6 +8,7 @@ type Props = {
   haptic: HapticProfile;
   hardConfirm: boolean;
   ghost: boolean;
+  padMode: PadMode;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
@@ -14,6 +16,7 @@ type Props = {
   onHaptic: (p: HapticProfile) => void;
   onHard: () => void;
   onGhost: () => void;
+  onPadMode: (m: PadMode) => void;
   onTheme: (id: ThemeId) => void;
 };
 
@@ -22,6 +25,7 @@ export function SettingsSheet({
   haptic,
   hardConfirm,
   ghost,
+  padMode,
   theme,
   themes,
   credits,
@@ -29,6 +33,7 @@ export function SettingsSheet({
   onHaptic,
   onHard,
   onGhost,
+  onPadMode,
   onTheme,
 }: Props) {
   if (!open) return null;
@@ -62,6 +67,14 @@ export function SettingsSheet({
           <span>Ghost piece</span>
           <b>{ghost ? "On" : "Off"}</b>
         </button>
+        <p className="shop-blurb">On-screen pad</p>
+        <div className="shop-tabs">
+          {(["auto", "on", "off"] as const).map((m) => (
+            <button key={m} type="button" className={padMode === m ? "is-on" : ""} onClick={() => onPadMode(m)}>
+              {m === "auto" ? "Auto" : m === "on" ? "Always" : "Hide"}
+            </button>
+          ))}
+        </div>
 
         <p className="shop-blurb">Well skins</p>
         <ul className="shop-list">

@@ -1,3 +1,5 @@
+import { PIECE_IDS, type PieceId } from "./types";
+
 export type ModeId = "marathon" | "sprint" | "blitz" | "daily" | "zen" | "arcade";
 
 export type ModeInfo = {
@@ -103,4 +105,16 @@ export function formatClock(sec: number): string {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
+export function peekDailyBag(n = 4): PieceId[] {
+  const rng = mulberry32(dailySeed());
+  const bag = PIECE_IDS.slice();
+  for (let i = bag.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = bag[i]!;
+    bag[i] = bag[j]!;
+    bag[j] = t;
+  }
+  return bag.slice(0, n);
 }

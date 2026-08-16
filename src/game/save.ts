@@ -2,6 +2,7 @@ import { ensureMissions, emptyBook, type MissionBook } from "./missions";
 import type { ModeId } from "./modes";
 import { emptyInv, type Inventory, type Receipt } from "./shop";
 import type { ThemeId } from "./themes";
+import type { PadMode } from "./device";
 
 const KEY = "stack-tetris-v1";
 const SAVE_VERSION = 3;
@@ -34,6 +35,8 @@ export type SaveData = {
   theme: ThemeId;
   themes: ThemeId[];
   onboarded: boolean;
+  tipSeen: boolean;
+  padMode: PadMode;
   mode: ModeId;
   missions: MissionBook;
   scores: ScoreRow[];
@@ -56,6 +59,8 @@ const DEFAULTS: SaveData = {
   theme: "ink",
   themes: ["ink"],
   onboarded: false,
+  tipSeen: false,
+  padMode: "auto",
   mode: "marathon",
   missions: emptyBook(),
   scores: [],
@@ -91,6 +96,11 @@ export function loadSave(): SaveData {
       theme: parsed.theme ?? "ink",
       themes: Array.isArray(parsed.themes) ? (parsed.themes as ThemeId[]) : ["ink"],
       onboarded: parsed.onboarded === true,
+      tipSeen: parsed.tipSeen === true,
+      padMode:
+        parsed.padMode === "on" || parsed.padMode === "off" || parsed.padMode === "auto"
+          ? parsed.padMode
+          : "auto",
       mode: parsed.mode ?? "marathon",
       missions: ensureMissions(parsed.missions),
       scores: Array.isArray(parsed.scores) ? parsed.scores : [],

@@ -50,6 +50,7 @@ export type Sim = {
   gravityAcc: number;
   lockT: number;
   lockResets: number;
+  lockSpark: number;
   dasDir: -1 | 0 | 1;
   dasT: number;
   arrT: number;
@@ -69,6 +70,9 @@ export type Sim = {
   maxCombo: number;
   tspins: number;
   stacks: number;
+  perfects: number;
+  lastPerfect: boolean;
+  splits: number[];
 };
 
 export type InputFrame = {
@@ -154,6 +158,7 @@ export function createSim(opts: NewGame = {}): Sim {
     gravityAcc: 0,
     lockT: 0,
     lockResets: 0,
+    lockSpark: 0,
     dasDir: 0,
     dasT: 0,
     arrT: 0,
@@ -173,6 +178,9 @@ export function createSim(opts: NewGame = {}): Sim {
     maxCombo: 0,
     tspins: 0,
     stacks: 0,
+    perfects: 0,
+    lastPerfect: false,
+    splits: [],
   };
   fillBag(sim);
   sim.next = sim.bag.slice(0, 5);
@@ -356,6 +364,7 @@ function bumpLock(sim: Sim) {
   if (sim.lockResets < MAX_LOCK_RESETS) {
     sim.lockT = 0;
     sim.lockResets += 1;
+    sim.lockSpark = 1;
   }
 }
 
@@ -524,24 +533,35 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
   sim.b2b = difficult;
   if (tspin) sim.tspins += 1;
   if (n === 4) sim.stacks += 1;
-  if (sim.mode === "zen") sim.level = 1;
-  else {
+  if (sim.mode !== "zen") {
     sim.level = Math.max(
       modeOf(sim.mode).startLevel,
       Math.floor(sim.lines / LINES_PER_LEVEL) + 1,
     );
+  } else sim.level = 1;
+  const prevLines = sim.lines - n;
+  for (const mark of [10, 20, 30, 40]) {
+    if (prevLines < mark && sim.lines >= mark) sim.splits.push(sim.clock);
   }
-  sim.lastClear = tspin
-    ? n === 0
-      ? "T-SPIN"
-      : `T-SPIN ${n}`
-    : n === 4
-      ? "STACK"
-      : n === 3
-        ? "TRIPLE"
-        : n === 2
-          ? "DOUBLE"
-          : "SINGLE";
+  sim.lastPerfect = boardEmpty(sim.board);
+  if (sim.lastPerfect) {
+    sim.score += 2000 * sim.level;
+    sim.perfects += 1;
+    sim.pendingCoins += 25;
+    sim.lastClear = "ALL CLEAR";
+  } else {
+    sim.lastClear = tspin
+      ? n === 0
+        ? "T-SPIN"
+        : `T-SPIN ${n}`
+      : n === 4
+        ? "STACK"
+        : n === 3
+          ? "TRIPLE"
+          : n === 2
+            ? "DOUBLE"
+            : "SINGLE";
+  }
   sim.tSpin = false;
   sim.phase = "playing";
   if (sim.lineGoal && sim.lines >= sim.lineGoal) {
@@ -602,6 +622,7 @@ function handleShift(sim: Sim, input: InputFrame, dt: number) {
 export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   const capped = Math.min(dt, 0.1);
   if (sim.slowT > 0) sim.slowT = Math.max(0, sim.slowT - capped);
+  if (sim.lockSpark > 0) sim.lockSpark = Math.max(0, sim.lockSpark - capped * 5);
   if (sim.phase === "over" || sim.phase === "paused" || sim.phase === "title") {
     return "none";
   }
@@ -678,6 +699,20 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
     return r === "over" ? "over" : "lock";
   }
   return "none";
+}
+
+function boardEmpty(board: Board): boolean {
+  for (let y = 0; y < ROWS; y++) {
+    if (board[y]!.some((c) => c !== null)) return false;
+  }
+  return true;
+}
+
+export function inDanger(sim: Sim): boolean {
+  for (let y = HIDDEN_ROWS; y < HIDDEN_ROWS + 6; y++) {
+    if (sim.board[y]!.some((c) => c !== null)) return true;
+  }
+  return false;
 }
 
 export function dirtyRows(sim: Sim, max: number): number[] {

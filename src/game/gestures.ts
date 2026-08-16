@@ -58,7 +58,7 @@ export type StrokeView = {
   samples: Sample[];
 };
 
-const TAP_SLOP = 14;
+const TAP_SLOP = 18;
 const LONG_MS = 430;
 const TAP_MAX_MS = 260;
 
@@ -120,13 +120,6 @@ export function createGestures(emit: (ev: GestureEmit) => void) {
       for (const s of strokes.values()) s.multi = true;
     }
     strokes.set(id, stroke);
-    const timer = window.setTimeout(() => {
-      const live = strokes.get(id);
-      if (!live || live.moved || live.longFired || live.multi) return;
-      live.longFired = true;
-      emit({ action: { name: "hold" }, label: "long-press" });
-    }, LONG_MS);
-    longs.set(id, timer);
   }
 
   function onMove(id: number, x: number, y: number, t: number) {

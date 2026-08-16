@@ -1,4 +1,5 @@
-import { formatClock, MODES, type ModeId } from "@/game/modes";
+import { formatClock, MODES, peekDailyBag, utcDateKey, type ModeId } from "@/game/modes";
+import { PIECE_FILL } from "@/game/pieces";
 
 type Props = {
   mode: ModeId;
@@ -11,12 +12,13 @@ function rule(m: (typeof MODES)[number], sprintBest: number | null): string {
   if (m.id === "arcade") return "No ghost";
   if (m.seconds) return `${Math.round(m.seconds / 60)}:00 · Lv ${m.startLevel}`;
   if (m.lines) return `${m.lines} lines`;
-  if (m.id === "daily") return "Shared bag";
+  if (m.id === "daily") return utcDateKey().slice(5);
   if (m.id === "zen") return "No fail";
   return "Ghost on";
 }
 
 export function ModeStrip({ mode, sprintBest, onPick }: Props) {
+  const dailyBag = peekDailyBag(4);
   return (
     <div className="modes" role="tablist" aria-label="Game mode">
       {MODES.map((m) => (
@@ -31,7 +33,15 @@ export function ModeStrip({ mode, sprintBest, onPick }: Props) {
         >
           <span className="mode-name">{m.name}</span>
           <span className="mode-rule">{rule(m, sprintBest)}</span>
-          <span className="mode-blurb">{m.blurb}</span>
+          {m.id === "daily" ? (
+            <span className="daily-bag" aria-hidden="true">
+              {dailyBag.map((id, i) => (
+                <i key={`${id}-${i}`} style={{ background: PIECE_FILL[id] }} />
+              ))}
+            </span>
+          ) : (
+            <span className="mode-blurb">{m.blurb}</span>
+          )}
         </button>
       ))}
     </div>

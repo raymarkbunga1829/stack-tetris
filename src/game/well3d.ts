@@ -6,10 +6,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { cellsOf } from "./pieces";
-import { ghostY, type Sim } from "./sim";
+import { fitDpr } from "./device";
+import { ghostY, inDanger, type Sim } from "./sim";
 import type { Theme } from "./themes";
 import type { PowerId } from "./shop";
-import { COLS, HIDDEN_ROWS, VISIBLE_ROWS, CLEAR_TIME, PIECE_IDS, type PieceId } from "./types";
+import { COLS, HIDDEN_ROWS, VISIBLE_ROWS, CLEAR_TIME, LOCK_DELAY, PIECE_IDS, type PieceId } from "./types";
 
 const MAX_SOLID = COLS * VISIBLE_ROWS + 8;
 const MAX_GHOST = 8;
@@ -33,7 +34,7 @@ export type Well3d = {
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
   shatter: (sim: Sim, theme: Theme) => void;
-  sweep: (kind: "stack" | "tspin" | "clear") => void;
+  sweep: (kind: "stack" | "tspin" | "clear" | "single" | "double" | "triple") => void;
   hardStreak: (
     piece: { id: PieceId; rot: number; x: number; y: number },
     toY: number,
@@ -43,6 +44,7 @@ export type Well3d = {
     id: PowerId,
     cells?: { x: number; y: number; hexCol: string }[],
   ) => void;
+  perfectBurst: () => void;
   clientToCell: (
     rect: DOMRect,
     clientX: number,
@@ -298,6 +300,29 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   slowVeil.position.set(0, 9.5, 0.62);
   scene.add(slowVeil);
 
+  const dangerMat = new THREE.MeshBasicMaterial({
+    color: 0xc23a3a,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+  });
+  const dangerVeil = new THREE.Mesh(new THREE.PlaneGeometry(10.2, 20.4), dangerMat);
+  dangerVeil.position.set(0, 9.5, 0.58);
+  dangerVeil.visible = false;
+  scene.add(dangerVeil);
+
+  const pcMat = new THREE.MeshBasicMaterial({
+    color: 0xf2efe6,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const pcFlash = new THREE.Mesh(new THREE.PlaneGeometry(12, 22), pcMat);
+  pcFlash.position.set(0, 9.5, 0.7);
+  pcFlash.visible = false;
+  scene.add(pcFlash);
+
   const shieldMat = new THREE.MeshBasicMaterial({
     color: 0x8ec8ff,
     transparent: true,
@@ -314,6 +339,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let zapY = 2;
   let quakeT = 0;
   let pickT = 0;
+  let pcT = 0;
 
   type Shard = {
     x: number;
@@ -333,7 +359,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let lockPulse = 0;
   const lockKeys = new Set<string>();
   let sweepT = 0;
-  let sweepKind: "stack" | "tspin" | "clear" | null = null;
+  let sweepKind: "stack" | "tspin" | "clear" | "single" | "double" | "triple" | null = null;
   let sparkLifeMul = 1;
   let bloomMul = 1;
   let idleT = 0;
@@ -363,9 +389,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const parent = canvas.parentElement;
     if (!parent) return;
     const rect = parent.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.6 : 2);
     const w = Math.max(1, Math.floor(rect.width));
     const h = Math.max(1, Math.floor(rect.height));
+    const dpr = fitDpr(w, h, mobile);
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     composer.setPixelRatio(dpr);
@@ -440,6 +466,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     zapT = Math.max(0, zapT - dt * 3.8);
     quakeT = Math.max(0, quakeT - dt * 2.4);
     pickT = Math.max(0, pickT - dt * 3.2);
+    pcT = Math.max(0, pcT - dt * 1.8);
     stepSparks(dt);
     stepShards(dt);
     stepStreaks(dt);
@@ -484,7 +511,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, sim.piece.y)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
-          place(solids, n++, c.x, row, 0.1, theme.fill[sim.piece.id], 1.03 + pickT * 0.22, 1.28 + pickT * 0.5);
+          place(solids, n++, c.x, row, 0.1, theme.fill[sim.piece.id], 1.03 + pickT * 0.22 + sim.lockSpark * 0.1, 1.28 + pickT * 0.5 + sim.lockSpark * 1.1);
         }
       }
     } else if (!reduce) {
@@ -517,13 +544,24 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       sim.phase !== "title"
     ) {
       const gy = ghostY(sim);
-      ghostMat.opacity = 0.78;
-      if (gy !== sim.piece.y) {
+      const locking = sim.lockT > 0;
+      const atRest = gy === sim.piece.y;
+      if (!atRest || locking) {
+        const pulse = locking
+          ? 0.22 +
+            0.7 *
+              (0.5 +
+                0.5 *
+                  Math.sin(
+                    now * (0.014 + (sim.lockT / LOCK_DELAY) * 0.05),
+                  ))
+          : 0.78;
+        ghostMat.opacity = pulse;
         const hex = theme.deep[sim.piece.id] ?? theme.fill[sim.piece.id];
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, gy)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
-          place(ghosts, g++, c.x, row, 0.04, hex, 1, 1);
+          place(ghosts, g++, c.x, row, 0.04, hex, 1, locking ? 1.15 : 1);
         }
       }
     }
@@ -538,10 +576,37 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       zapMat.opacity = Math.min(1, zapT * 2.2) * 0.85;
     } else zapMesh.visible = false;
 
+    const paused = sim?.phase === "paused";
+    const danger = !!sim && sim.phase === "playing" && inDanger(sim);
+    if (paused) {
+      dangerVeil.visible = true;
+      dangerMat.color.set(0x07080c);
+      dangerMat.opacity = 0.42;
+    } else {
+      dangerMat.color.set(0xc23a3a);
+      dangerVeil.visible = danger;
+      if (danger) {
+        dangerMat.opacity = 0.07 + 0.05 * (0.5 + 0.5 * Math.sin(now * 0.008));
+      }
+    }
+
+    if (pcT > 0) {
+      pcFlash.visible = true;
+      pcMat.opacity = Math.min(1, pcT) * 0.55;
+    } else pcFlash.visible = false;
+
     const slowOn = !!sim && sim.slowT > 0 && sim.phase !== "title";
     slowVeil.visible = slowOn;
     if (slowOn) {
       slowMat.opacity = 0.05 + 0.03 * (0.5 + 0.5 * Math.sin(now * 0.004));
+    }
+    if (paused) {
+      shaft.color.set(0x8a8c94);
+      shaft.intensity = 8;
+    } else if (danger) {
+      shaft.color.set(0xff6a5a);
+      shaft.intensity = 24;
+    } else if (slowOn) {
       shaft.color.set(0xffe0a0);
       shaft.intensity = 22;
     } else {
@@ -657,11 +722,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     while (shardList.length > MAX_SHARDS) shardList.shift();
   }
 
-  function sweep(kind: "stack" | "tspin" | "clear") {
+  function sweep(kind: "stack" | "tspin" | "clear" | "single" | "double" | "triple") {
     if (reduce) return;
     sweepKind = kind;
-    sweepT = kind === "clear" ? 0.22 : 0.38;
-    punchCam(kind === "stack" ? 0.35 : 0.22);
+    sweepT =
+      kind === "single" ? 0.28 : kind === "double" ? 0.2 : kind === "triple" ? 0.32 : kind === "clear" ? 0.22 : 0.38;
+    punchCam(kind === "stack" ? 0.35 : kind === "triple" ? 0.28 : 0.18);
   }
 
   function hardStreak(
@@ -840,13 +906,47 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       sweepMesh.visible = false;
       return;
     }
-    const max = sweepKind === "clear" ? 0.22 : 0.38;
+    const max =
+      sweepKind === "single"
+        ? 0.28
+        : sweepKind === "double"
+          ? 0.2
+          : sweepKind === "triple"
+            ? 0.32
+            : sweepKind === "clear"
+              ? 0.22
+              : 0.38;
     sweepT = Math.max(0, sweepT - dt);
     const u = 1 - sweepT / max;
     sweepMesh.visible = true;
     sweepMesh.position.y = 19.2 - u * 20.4;
-    sweepMat.opacity = sweepKind === "stack" ? 0.42 * (1 - u) : 0.28 * (1 - u);
-    sweepMat.color.set(sweepKind === "tspin" ? 0xc9d6ea : 0xf4f1ea);
+    const fade = 1 - u;
+    sweepMat.opacity =
+      sweepKind === "stack"
+        ? 0.5 * fade
+        : sweepKind === "triple"
+          ? 0.38 * fade
+          : sweepKind === "double"
+            ? 0.3 * fade
+            : 0.2 * fade;
+    sweepMat.color.set(
+      sweepKind === "tspin"
+        ? 0xc9d6ea
+        : sweepKind === "stack"
+          ? 0xf7f4ee
+          : sweepKind === "triple"
+            ? 0xd4c4f0
+            : sweepKind === "double"
+              ? 0xe8d4a0
+              : 0xa8b4c4,
+    );
+  }
+
+  function perfectBurst() {
+    if (reduce) return;
+    pcT = 1;
+    punchCam(0.7);
+    sweep("stack");
   }
 
   function clientToCell(rect: DOMRect, clientX: number, clientY: number) {
@@ -886,6 +986,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     zapMesh.geometry.dispose();
     slowMat.dispose();
     slowVeil.geometry.dispose();
+    dangerMat.dispose();
+    dangerVeil.geometry.dispose();
+    pcMat.dispose();
+    pcFlash.geometry.dispose();
     shieldMat.dispose();
     shieldShell.geometry.dispose();
     shards.dispose();
@@ -903,6 +1007,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sweep,
     hardStreak,
     powerFx,
+    perfectBurst,
     clientToCell,
     dispose,
   };

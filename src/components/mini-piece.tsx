@@ -11,7 +11,9 @@ export function MiniPiece({ id, theme }: { id: PieceId | null; theme?: ThemeId }
   const maxY = Math.max(...cells.map((c) => c.y));
   const w = maxX + 1;
   const h = maxY + 1;
-  const fill = themeOf(theme).fill[id];
+  const skin = themeOf(theme);
+  const fill = skin.fill[id];
+  const deep = skin.deep[id];
   return (
     <div
       className="mini"
@@ -30,6 +32,8 @@ export function MiniPiece({ id, theme }: { id: PieceId | null; theme?: ThemeId }
             gridColumn: c.x + 1,
             gridRow: c.y + 1,
             background: fill,
+            ["--gem" as string]: fill,
+            ["--gem-deep" as string]: deep,
           }}
         />
       ))}

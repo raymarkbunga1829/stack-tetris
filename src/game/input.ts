@@ -1,3 +1,6 @@
+import { noteKeyboard } from "./device";
+import type { PowerId } from "./shop";
+
 export type Pad = {
   left: boolean;
   right: boolean;
@@ -27,6 +30,19 @@ const EMPTY: Pad = {
   confirm: false,
 };
 
+const POWER_CODES: Record<string, PowerId> = {
+  Digit1: "zap",
+  Digit2: "slow",
+  Digit3: "shield",
+  Digit4: "quake",
+  Digit5: "pick",
+  Numpad1: "zap",
+  Numpad2: "slow",
+  Numpad3: "shield",
+  Numpad4: "quake",
+  Numpad5: "pick",
+};
+
 const GAME_CODES = new Set([
   "ArrowLeft",
   "ArrowRight",
@@ -38,6 +54,7 @@ const GAME_CODES = new Set([
   "KeyS",
   "KeyZ",
   "KeyX",
+  "KeyQ",
   "KeyC",
   "Space",
   "ShiftLeft",
@@ -46,10 +63,26 @@ const GAME_CODES = new Set([
   "Enter",
   "Escape",
   "KeyP",
+  "KeyH",
+  "Slash",
+  "Numpad0",
+  "Numpad2",
+  "Numpad4",
+  "Numpad5",
+  "Numpad6",
+  "Numpad8",
+  "NumpadEnter",
+  ...Object.keys(POWER_CODES),
 ]);
 
 function blank(): Pad {
   return { ...EMPTY };
+}
+
+function typingInField(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
 }
 
 export function createInput() {
@@ -58,21 +91,33 @@ export function createInput() {
   let inject = blank();
   let touch = blank();
   let nudgeAcc = 0;
+  const powerQ: PowerId[] = [];
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.metaKey || e.altKey) return;
-    if (GAME_CODES.has(e.code)) e.preventDefault();
-    keys.add(e.code);
+    if (e.isComposing) return;
+    if (typingInField(e.target)) return;
+    const code = e.code || "";
+    const key = e.key;
+    if (GAME_CODES.has(code) || key === " " || key === "ArrowLeft" || key === "ArrowRight" || key === "ArrowDown" || key === "ArrowUp") {
+      e.preventDefault();
+    }
+    if (code) keys.add(code);
+    if (key === " ") keys.add("Space");
+    noteKeyboard();
+    const power = POWER_CODES[code];
+    if (power && !e.repeat) powerQ.push(power);
   };
   const onKeyUp = (e: KeyboardEvent) => {
     keys.delete(e.code);
+    if (e.key === " ") keys.delete("Space");
   };
   const clearKeys = () => {
     keys.clear();
     touch = blank();
   };
 
-  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keydown", onKeyDown, { passive: false });
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("blur", clearKeys);
   document.addEventListener("visibilitychange", () => {
@@ -81,15 +126,17 @@ export function createInput() {
 
   function poll(): Pad {
     const p = blank();
-    if (keys.has("ArrowLeft") || keys.has("KeyA")) p.left = true;
-    if (keys.has("ArrowRight") || keys.has("KeyD")) p.right = true;
-    if (keys.has("ArrowDown") || keys.has("KeyS")) p.down = true;
-    if (keys.has("Space")) p.hard = true;
-    if (keys.has("ArrowUp") || keys.has("KeyX") || keys.has("KeyW")) p.cw = true;
-    if (keys.has("KeyZ") || keys.has("ControlLeft")) p.ccw = true;
-    if (keys.has("KeyC") || keys.has("ShiftLeft") || keys.has("ShiftRight")) p.hold = true;
+    if (keys.has("ArrowLeft") || keys.has("KeyA") || keys.has("Numpad4")) p.left = true;
+    if (keys.has("ArrowRight") || keys.has("KeyD") || keys.has("Numpad6")) p.right = true;
+    if (keys.has("ArrowDown") || keys.has("KeyS") || keys.has("Numpad2")) p.down = true;
+    if (keys.has("Space") || keys.has("Slash") || keys.has("Numpad0")) p.hard = true;
+    if (keys.has("ArrowUp") || keys.has("KeyX") || keys.has("KeyW") || keys.has("Numpad8") || keys.has("Numpad5")) {
+      p.cw = true;
+    }
+    if (keys.has("KeyZ") || keys.has("KeyQ") || keys.has("ControlLeft")) p.ccw = true;
+    if (keys.has("KeyC") || keys.has("KeyH") || keys.has("ShiftLeft") || keys.has("ShiftRight")) p.hold = true;
     if (keys.has("Escape") || keys.has("KeyP")) p.pause = true;
-    if (keys.has("Enter")) p.confirm = true;
+    if (keys.has("Enter") || keys.has("NumpadEnter")) p.confirm = true;
 
     const pads = navigator.getGamepads?.() ?? [];
     for (const pad of pads) {
@@ -158,6 +205,10 @@ export function createInput() {
     return n;
   }
 
+  function takePower(): PowerId | null {
+    return powerQ.shift() ?? null;
+  }
+
   function setKeys(codes: string[]) {
     keys.clear();
     for (const c of codes) keys.add(c);
@@ -169,7 +220,7 @@ export function createInput() {
     window.removeEventListener("blur", clearKeys);
   }
 
-  return { sample, tap, setTouch, nudge, takeNudge, setKeys, dispose };
+  return { sample, tap, setTouch, nudge, takeNudge, takePower, setKeys, dispose };
 }
 
 export type InputApi = ReturnType<typeof createInput>;

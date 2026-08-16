@@ -14,13 +14,13 @@ export const Route = createRootRoute({
       {
         name: "viewport",
         content:
-          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content",
       },
       { title: APP_NAME },
       {
         name: "description",
         content:
-          "A Tetris-like stacking game. Hold, ghost piece, and hard drops. Add it to your iPhone home screen.",
+          "A Tetris-like stacking game. Play on iPhone, iPad, Android, or a keyboard.",
       },
       { name: "apple-mobile-web-app-title", content: APP_NAME },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -32,7 +32,7 @@ export const Route = createRootRoute({
       { property: "og:title", content: APP_NAME },
       {
         property: "og:description",
-        content: "Drop, clear, repeat. A Tetris-like game for your phone.",
+        content: "Drop, clear, repeat. A Tetris-like game for phone, tablet, and keyboard.",
       },
       ...(ogImage
         ? [
