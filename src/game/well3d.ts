@@ -114,9 +114,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const scene = new THREE.Scene();
   scene.environment = envTex;
-  scene.environmentIntensity = 0.55;
-  scene.fog = new THREE.FogExp2(0x07080c, 0.018);
-  scene.background = new THREE.Color(0x05060a);
+  scene.environmentIntensity = reduce ? 0.4 : 0.92;
+  scene.fog = new THREE.FogExp2(0x0a0c12, 0.012);
+  scene.background = new THREE.Color(0x08090e);
 
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 90);
   const BASE_FOV = 34;
@@ -126,7 +126,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let ashT = 0;
   let stainCells: { x: number; y: number }[] = [];
   let lastDraw = performance.now();
-  const bloomBase = reduce ? 0.12 : mobile ? 0.32 : 0.48;
+  const bloomBase = reduce ? 0.14 : mobile ? 0.4 : 0.62;
 
   function frameCamera() {
     const wellH = 21.6;
@@ -143,41 +143,44 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     camera.lookAt(0.05, 9.15 + p * 0.25, 0);
   }
 
-  scene.add(new THREE.HemisphereLight(0x8ea4c4, 0x1a1410, 0.55));
-  const key = new THREE.DirectionalLight(0xfff1dc, 1.55);
-  key.position.set(7, 24, 16);
+  scene.add(new THREE.HemisphereLight(0xb4c8e4, 0x1c1412, 0.72));
+  const key = new THREE.DirectionalLight(0xfff4e2, 2.05);
+  key.position.set(6.5, 22, 14);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x6d88b8, 0.42);
-  fill.position.set(-12, 8, 8);
+  const fill = new THREE.DirectionalLight(0x6a88c4, 0.55);
+  fill.position.set(-14, 9, 9);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xb7d4ff, 0.7);
-  rim.position.set(-2, 16, -14);
+  const rim = new THREE.DirectionalLight(0xc8e0ff, 1.05);
+  rim.position.set(-2, 18, -16);
   scene.add(rim);
 
-  const shaft = new THREE.PointLight(0xffe4c4, 18, 28, 1.6);
-  shaft.position.set(0, 20.4, 1.2);
+  const shaft = new THREE.PointLight(0xffe8c8, 26, 32, 1.45);
+  shaft.position.set(0, 20.6, 1.4);
   scene.add(shaft);
-  const bounce = new THREE.PointLight(0x3d5a88, 8, 16, 1.8);
-  bounce.position.set(0, 0.4, 1.1);
+  const bounce = new THREE.PointLight(0x4a6aa0, 12, 18, 1.65);
+  bounce.position.set(0, 0.2, 1.4);
   scene.add(bounce);
+  const jewel = new THREE.PointLight(0xffffff, 10, 14, 2);
+  jewel.position.set(0, 6, 3.2);
+  scene.add(jewel);
 
   const wallMat = new THREE.MeshStandardMaterial({
-    color: 0x12151c,
-    roughness: 0.55,
-    metalness: 0.42,
-    envMapIntensity: 0.7,
+    color: 0x161a22,
+    roughness: 0.42,
+    metalness: 0.55,
+    envMapIntensity: 0.95,
   });
   const pitMat = new THREE.MeshStandardMaterial({
-    color: 0x08090d,
-    roughness: 0.78,
-    metalness: 0.22,
-    envMapIntensity: 0.35,
+    color: 0x0c0e14,
+    roughness: 0.7,
+    metalness: 0.28,
+    envMapIntensity: 0.5,
   });
   const trimMat = new THREE.MeshStandardMaterial({
-    color: 0xc8d0dc,
-    roughness: 0.28,
-    metalness: 0.85,
-    envMapIntensity: 1.1,
+    color: 0xe4eaf2,
+    roughness: 0.18,
+    metalness: 0.92,
+    envMapIntensity: 1.4,
   });
 
   const pitTex = makePitTexture();
@@ -201,12 +204,41 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   lip.position.set(0, 19.72, 0.42);
   scene.add(lip);
 
+  const glassFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(10.5, 1.85),
+    new THREE.MeshPhysicalMaterial({
+      color: 0x121820,
+      metalness: 0.88,
+      roughness: 0.1,
+      envMapIntensity: 1.6,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+    }),
+  );
+  glassFloor.rotation.x = -Math.PI / 2;
+  glassFloor.position.set(0, -0.5, 0.22);
+  scene.add(glassFloor);
+
+  const shaftTex = makeShaftTexture();
+  const god = new THREE.Mesh(
+    new THREE.PlaneGeometry(7.2, 18.5),
+    new THREE.MeshBasicMaterial({
+      map: shaftTex,
+      transparent: true,
+      opacity: reduce ? 0.12 : 0.28,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  god.position.set(0.4, 10.2, 0.35);
+  scene.add(god);
+
   const haze = new THREE.Mesh(
     new THREE.PlaneGeometry(10.2, 20.4),
     new THREE.MeshBasicMaterial({
-      color: 0x8aa4c8,
+      color: 0x9ab4d4,
       transparent: true,
-      opacity: 0.08,
+      opacity: 0.055,
       depthWrite: false,
     }),
   );
@@ -218,19 +250,24 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
   const solidMat = new THREE.MeshPhysicalMaterial({
-    roughness: 0.24,
-    metalness: 0.5,
-    clearcoat: mobile ? 0.4 : 0.8,
-    clearcoatRoughness: 0.15,
-    envMapIntensity: 1.2,
-    emissive: 0x1c1c1c,
-    emissiveIntensity: 0.28,
+    roughness: mobile ? 0.2 : 0.12,
+    metalness: 0.32,
+    clearcoat: reduce ? 0.25 : mobile ? 0.65 : 1,
+    clearcoatRoughness: 0.06,
+    iridescence: reduce ? 0 : 0.28,
+    iridescenceIOR: 1.32,
+    sheen: 0.22,
+    sheenRoughness: 0.35,
+    sheenColor: new THREE.Color(0xf4f0e8),
+    envMapIntensity: 1.65,
+    emissive: 0x141414,
+    emissiveIntensity: 0.16,
   });
   const ghostMat = new THREE.MeshPhysicalMaterial({
-    roughness: 0.32,
-    metalness: 0.28,
-    clearcoat: mobile ? 0.2 : 0.45,
-    clearcoatRoughness: 0.35,
+    roughness: 0.22,
+    metalness: 0.18,
+    clearcoat: mobile ? 0.25 : 0.55,
+    clearcoatRoughness: 0.22,
     transparent: true,
     opacity: 0.72,
     depthWrite: false,
@@ -418,8 +455,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(512, 512),
     bloomBase,
-    0.55,
-    0.62,
+    0.42,
+    0.72,
   );
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
@@ -513,7 +550,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
                     ? 0x8eb4ff
                     : 0xb7d4ff,
       );
-      rim.intensity = theme.id === "neon" ? 1.25 : theme.id === "ice" ? 1.05 : theme.id === "molten" ? 1.15 : theme.id === "lcd" ? 0.35 : night ? 0.95 : 0.7;
+      rim.intensity = theme.id === "neon" ? 1.45 : theme.id === "ice" ? 1.25 : theme.id === "molten" ? 1.35 : theme.id === "lcd" ? 0.4 : night ? 1.15 : 0.95;
     }
     if (theme.pit !== lastBg) {
       lastBg = theme.pit;
@@ -634,7 +671,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
           const omen = !!sim.omenOn;
-          place(solids, n++, c.x, row, 0.1, omen ? "#e8c46a" : theme.fill[sim.piece.id], 1.03 + pickT * 0.22 + sim.lockSpark * 0.1 + (omen ? 0.08 : 0), 1.28 + pickT * 0.5 + sim.lockSpark * 1.1 + (omen ? 0.35 : 0));
+          place(solids, n++, c.x, row, 0.1, omen ? "#e8c46a" : theme.fill[sim.piece.id], 1.06 + pickT * 0.22 + sim.lockSpark * 0.1 + (omen ? 0.08 : 0), 1.42 + pickT * 0.5 + sim.lockSpark * 1.1 + (omen ? 0.35 : 0));
           stamp(sim.piece.id, c.x, row, 0.48);
         }
       }
@@ -1217,9 +1254,9 @@ function makeWellGrid() {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
   const m = new THREE.LineBasicMaterial({
-    color: 0x4a5c78,
+    color: 0x6a82a4,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.42,
   });
   return new THREE.LineSegments(g, m);
 }
@@ -1231,19 +1268,26 @@ function makePitTexture(): THREE.CanvasTexture {
   c.width = w;
   c.height = h;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#141820";
+  ctx.fillStyle = "#12161e";
   ctx.fillRect(0, 0, w, h);
   const wash = ctx.createLinearGradient(0, 0, 0, h);
-  wash.addColorStop(0, "#2a3240");
-  wash.addColorStop(0.45, "#1a1e28");
-  wash.addColorStop(1, "#12161e");
+  wash.addColorStop(0, "#3a4658");
+  wash.addColorStop(0.22, "#222a38");
+  wash.addColorStop(0.62, "#161b26");
+  wash.addColorStop(1, "#10141c");
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, w, h);
-  const moon = ctx.createRadialGradient(w * 0.7, h * 0.2, 6, w * 0.7, h * 0.2, w * 0.4);
-  moon.addColorStop(0, "rgba(220, 216, 204, 0.38)");
-  moon.addColorStop(0.4, "rgba(168, 166, 156, 0.12)");
+  const moon = ctx.createRadialGradient(w * 0.68, h * 0.16, 4, w * 0.68, h * 0.16, w * 0.48);
+  moon.addColorStop(0, "rgba(255, 246, 220, 0.55)");
+  moon.addColorStop(0.18, "rgba(210, 200, 170, 0.2)");
   moon.addColorStop(1, "rgba(10, 11, 16, 0)");
   ctx.fillStyle = moon;
+  ctx.fillRect(0, 0, w, h);
+  const shaft = ctx.createLinearGradient(w * 0.35, 0, w * 0.7, h);
+  shaft.addColorStop(0, "rgba(255, 236, 200, 0.16)");
+  shaft.addColorStop(0.45, "rgba(180, 190, 210, 0.04)");
+  shaft.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = shaft;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = "rgba(190, 186, 176, 0.08)";
   ctx.lineWidth = 1;
@@ -1262,4 +1306,29 @@ function makePitTexture(): THREE.CanvasTexture {
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, w, h);
   return new THREE.CanvasTexture(c);
+}
+
+function makeShaftTexture(): THREE.CanvasTexture {
+  const w = 128;
+  const h = 256;
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createLinearGradient(w / 2, 0, w / 2, h);
+  g.addColorStop(0, "rgba(255, 236, 200, 0.55)");
+  g.addColorStop(0.25, "rgba(220, 210, 180, 0.18)");
+  g.addColorStop(1, "rgba(180, 190, 210, 0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  const side = ctx.createLinearGradient(0, 0, w, 0);
+  side.addColorStop(0, "rgba(0,0,0,0.85)");
+  side.addColorStop(0.45, "rgba(0,0,0,0)");
+  side.addColorStop(0.55, "rgba(0,0,0,0)");
+  side.addColorStop(1, "rgba(0,0,0,0.85)");
+  ctx.fillStyle = side;
+  ctx.fillRect(0, 0, w, h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
