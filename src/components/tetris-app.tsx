@@ -694,8 +694,11 @@ export function TetrisApp() {
       replayI.current = 0;
       replayT.current = 0;
     }
+    dying.current = false;
+    failT.current = 0;
     syncUi({
       phase: "over",
+      failing: false,
       high: saveRef.current.high,
       won: sim.won,
       clock: sim.clock,
