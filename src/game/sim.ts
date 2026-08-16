@@ -73,6 +73,7 @@ export type Sim = {
   perfects: number;
   lastPerfect: boolean;
   splits: number[];
+  lastDealt: PieceId | null;
 };
 
 export type InputFrame = {
@@ -117,7 +118,22 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return a;
 }
 
+function rollNes(sim: Sim): PieceId {
+  const first = PIECE_IDS[Math.floor(sim.rng() * PIECE_IDS.length)]!;
+  if (first !== sim.lastDealt) {
+    sim.lastDealt = first;
+    return first;
+  }
+  const again = PIECE_IDS[Math.floor(sim.rng() * PIECE_IDS.length)]!;
+  sim.lastDealt = again;
+  return again;
+}
+
 function fillBag(sim: Sim) {
+  if (modeOf(sim.mode).rng === "nes") {
+    while (sim.bag.length < 14) sim.bag.push(rollNes(sim));
+    return;
+  }
   while (sim.bag.length < 14) {
     sim.bag.push(...shuffle(PIECE_IDS, sim.rng));
   }
@@ -181,6 +197,7 @@ export function createSim(opts: NewGame = {}): Sim {
     perfects: 0,
     lastPerfect: false,
     splits: [],
+    lastDealt: null,
   };
   fillBag(sim);
   sim.next = sim.bag.slice(0, 5);
@@ -397,7 +414,7 @@ export function peekKick(
   const p = sim.piece;
   if (!p) return null;
   const to = ((((p.rot + dir) % 4) + 4) % 4) as Rot;
-  const kicks = kicksFor(p.id, p.rot, to);
+  const kicks = kickTable(sim, p.id, p.rot, to);
   for (let i = 0; i < kicks.length; i++) {
     const k = kicks[i]!;
     const next: Piece = { id: p.id, rot: to, x: p.x + k.x, y: p.y - k.y };
@@ -440,11 +457,16 @@ export function predictCollision(sim: Sim): CollisionPred | null {
   };
 }
 
+function kickTable(sim: Sim, id: PieceId, from: Rot, to: Rot) {
+  if (!modeOf(sim.mode).kicks) return [{ x: 0, y: 0 }];
+  return kicksFor(id, from, to);
+}
+
 function tryRotate(sim: Sim, dir: 1 | -1): boolean {
   const p = sim.piece;
   if (!p) return false;
   const to = ((((p.rot + dir) % 4) + 4) % 4) as Rot;
-  const kicks = kicksFor(p.id, p.rot, to);
+  const kicks = kickTable(sim, p.id, p.rot, to);
   for (let i = 0; i < kicks.length; i++) {
     const k = kicks[i]!;
     const next: Piece = {

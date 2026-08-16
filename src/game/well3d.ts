@@ -45,6 +45,8 @@ export type Well3d = {
     cells?: { x: number; y: number; hexCol: string }[],
   ) => void;
   perfectBurst: () => void;
+  softTrail: (piece: { id: PieceId; rot: number; x: number; y: number }, hexCol: string) => void;
+  failBeat: () => void;
   clientToCell: (
     rect: DOMRect,
     clientX: number,
@@ -340,6 +342,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let quakeT = 0;
   let pickT = 0;
   let pcT = 0;
+  let failT = 0;
 
   type Shard = {
     x: number;
@@ -467,6 +470,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     quakeT = Math.max(0, quakeT - dt * 2.4);
     pickT = Math.max(0, pickT - dt * 3.2);
     pcT = Math.max(0, pcT - dt * 1.8);
+    failT = Math.max(0, failT - dt * 1.15);
     stepSparks(dt);
     stepShards(dt);
     stepStreaks(dt);
@@ -495,15 +499,16 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const key = `${x},${y}`;
           const thump = lockKeys.has(key) && lockPulse > 0;
           const pop = thump ? 1 + 0.08 * Math.sin(lockPulse * Math.PI) : 1;
+          const sink = failT > 0 ? failT * failT * (0.15 + row * 0.06) : 0;
           place(
             solids,
             n++,
             x,
-            row + below * settle,
+            row + below * settle + sink,
             0,
             theme.fill[id as PieceId],
             pop,
-            thump ? 1.45 : 1.12,
+            failT > 0 ? 0.45 + (1 - failT) * 0.3 : thump ? 1.45 : 1.12,
           );
         }
       }
@@ -942,6 +947,31 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     );
   }
 
+  function softTrail(
+    piece: { id: PieceId; rot: number; x: number; y: number },
+    hexCol: string,
+  ) {
+    if (reduce) return;
+    for (const c of cellsOf(piece.id, piece.rot as 0 | 1 | 2 | 3, piece.x, piece.y)) {
+      const row = c.y - HIDDEN_ROWS - 1;
+      if (row < 0 || row >= VISIBLE_ROWS) continue;
+      const p = cellPos(c.x, row, 0.04);
+      streakList.push({
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        life: 0.12,
+        hexCol,
+      });
+    }
+    while (streakList.length > MAX_STREAK) streakList.shift();
+  }
+
+  function failBeat() {
+    failT = 1;
+    punchCam(0.55);
+  }
+
   function perfectBurst() {
     if (reduce) return;
     pcT = 1;
@@ -1008,6 +1038,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     hardStreak,
     powerFx,
     perfectBurst,
+    softTrail,
+    failBeat,
     clientToCell,
     dispose,
   };

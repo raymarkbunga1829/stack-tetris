@@ -8,20 +8,43 @@ type Bus = {
 
 let bus: Bus | null = null;
 let muted = false;
+let musicVol = 1;
+let sfxVol = 1;
 
-export function isMuted(): boolean {
-  return muted;
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
 }
 
-export function setMuted(next: boolean) {
-  muted = next;
-  if (bus) {
-    bus.master.gain.setTargetAtTime(muted ? 0 : 1, bus.ctx.currentTime, 0.02);
-  }
-  if (!muted && musicMode && !musicRaf) {
+function applyGains() {
+  if (!bus) return;
+  const t = bus.ctx.currentTime;
+  bus.sfx.gain.setTargetAtTime(0.22 * sfxVol, t, 0.03);
+  const bed = 0.09 * musicVol;
+  bus.music.gain.setTargetAtTime(musicPaused ? bed * 0.5 : bed, t, 0.05);
+  bus.master.gain.setTargetAtTime(1, t, 0.02);
+}
+
+export function isMuted(): boolean {
+  return musicVol <= 0 && sfxVol <= 0;
+}
+
+export function getMix() {
+  return { music: musicVol, sfx: sfxVol };
+}
+
+export function setMix(next: { music?: number; sfx?: number }) {
+  if (next.music != null) musicVol = clamp01(next.music);
+  if (next.sfx != null) sfxVol = clamp01(next.sfx);
+  muted = isMuted();
+  applyGains();
+  if (musicVol > 0 && musicMode && !musicRaf) {
     musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
     musicRaf = requestAnimationFrame(pumpMusic);
   }
+}
+
+export function setMuted(next: boolean) {
+  setMix({ music: next ? 0 : 1, sfx: next ? 0 : 1 });
 }
 
 function makeNoise(ctx: AudioContext): AudioBuffer {
@@ -42,9 +65,9 @@ export function unlockAudio() {
     const master = ctx.createGain();
     const sfx = ctx.createGain();
     const music = ctx.createGain();
-    sfx.gain.value = 0.22;
-    music.gain.value = 0.09;
-    master.gain.value = muted ? 0 : 1;
+    sfx.gain.value = 0.22 * sfxVol;
+    music.gain.value = 0.09 * musicVol;
+    master.gain.value = 1;
     sfx.connect(master);
     music.connect(master);
     master.connect(ctx.destination);
@@ -64,7 +87,7 @@ function tone(
   type: OscillatorType = "square",
   vol = 0.8,
 ) {
-  if (!bus || muted) return;
+  if (!bus || sfxVol <= 0) return;
   const { ctx, sfx } = bus;
   const t = ctx.currentTime + when;
   const osc = ctx.createOscillator();
@@ -88,7 +111,7 @@ function slide(
   type: OscillatorType = "sawtooth",
   vol = 0.35,
 ) {
-  if (!bus || muted) return;
+  if (!bus || sfxVol <= 0) return;
   const { ctx, sfx } = bus;
   const t = ctx.currentTime + when;
   const osc = ctx.createOscillator();
@@ -112,7 +135,7 @@ function noiseBurst(
   freq = 1400,
   q = 0.8,
 ) {
-  if (!bus || muted) return;
+  if (!bus || sfxVol <= 0) return;
   const { ctx, sfx, noise } = bus;
   const t = ctx.currentTime + when;
   const src = ctx.createBufferSource();
@@ -251,6 +274,7 @@ const BEDS: Record<string, { bpm: number; notes: number[] }> = {
   blitz: { bpm: 148, notes: [330, 392, 494, 392, 523, 494, 392, 330] },
   daily: { bpm: 100, notes: [220, 262, 330, 262, 294, 330, 0, 220] },
   arcade: { bpm: 126, notes: [196, 247, 294, 247, 330, 294, 0, 247] },
+  classic: { bpm: 88, notes: [196, 220, 247, 196, 262, 247, 0, 196] },
 };
 
 let musicMode: string | null = null;
@@ -265,7 +289,7 @@ export function setMusicTension(on: boolean) {
 }
 
 function hum(freq: number, dur: number, when: number, vol = 0.22) {
-  if (!bus || muted || freq <= 0) return;
+  if (!bus || musicVol <= 0 || freq <= 0) return;
   const { ctx, music } = bus;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
@@ -282,7 +306,7 @@ function hum(freq: number, dur: number, when: number, vol = 0.22) {
 
 function pumpMusic() {
   musicRaf = 0;
-  if (!bus || !musicMode || musicPaused || muted) return;
+  if (!bus || !musicMode || musicVol <= 0) return;
   const spec = BEDS[musicMode] ?? BEDS.marathon!;
   const bpm = spec.bpm * (musicTight ? 1.32 : 1);
   const step = 60 / bpm / 2;
@@ -317,10 +341,9 @@ export function stopMusic() {
 }
 
 export function setMusicPaused(next: boolean) {
-  if (bus) {
-    bus.music.gain.setTargetAtTime(next ? 0.045 : 0.09, bus.ctx.currentTime, 0.06);
-  }
-  if (!next && musicMode && !musicRaf) {
+  musicPaused = next;
+  applyGains();
+  if (!next && musicMode && musicVol > 0 && !musicRaf) {
     musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
     musicRaf = requestAnimationFrame(pumpMusic);
   }

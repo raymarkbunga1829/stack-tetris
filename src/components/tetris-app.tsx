@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   resumeAudio,
+  setMix,
   setMuted,
   sfxClear,
   sfxCombo,
@@ -87,6 +88,8 @@ type Ui = {
   banner: string | null;
   gesture: string | null;
   muted: boolean;
+  musicVol: number;
+  sfxVol: number;
   drag: boolean;
   standalone: boolean;
   credits: number;
@@ -124,6 +127,8 @@ type Ui = {
   } | null;
   tip: string | null;
   pred: { rows: number; lock: boolean; kick: boolean } | null;
+  holdPeek: PieceId | null;
+  failing: boolean;
 };
 
 function forceCoach() {
@@ -165,6 +170,9 @@ export function TetrisApp() {
   const replayT = useRef(0);
   const comboSeen = useRef(-1);
   const b2bSeen = useRef(false);
+  const failT = useRef(0);
+  const dying = useRef(false);
+  const holdPeekT = useRef(0);
 
   const [ui, setUi] = useState<Ui>({
     phase: "title",
@@ -177,6 +185,8 @@ export function TetrisApp() {
     banner: null,
     gesture: null,
     muted: saveRef.current.muted,
+    musicVol: saveRef.current.musicVol,
+    sfxVol: saveRef.current.sfxVol,
     drag: saveRef.current.drag,
     standalone: false,
     credits: saveRef.current.credits,
@@ -206,6 +216,8 @@ export function TetrisApp() {
     recap: null,
     tip: null,
     pred: null,
+    holdPeek: null,
+    failing: false,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -234,7 +246,7 @@ export function TetrisApp() {
   }, []);
 
   useEffect(() => {
-    setMuted(saveRef.current.muted);
+    setMix({ music: saveRef.current.musicVol, sfx: saveRef.current.sfxVol });
     setHaptic(saveRef.current.haptic);
     setUi((p) => ({
       ...p,
@@ -369,6 +381,9 @@ export function TetrisApp() {
     startMusic(mode);
     comboSeen.current = -1;
     b2bSeen.current = false;
+    dying.current = false;
+    failT.current = 0;
+    holdPeekT.current = 0;
     syncUi({
       phase: "playing",
       banner: null,
@@ -391,8 +406,10 @@ export function TetrisApp() {
       comboPop: 0,
       b2bPop: 0,
       recap: null,
-    tip: null,
+      tip: null,
       pred: null,
+      holdPeek: null,
+      failing: false,
     });
     flashBanner(mode === "daily" ? `Daily · ${utcDateKey().slice(5)}` : modeOf(mode).name);
   }
@@ -437,7 +454,15 @@ export function TetrisApp() {
 
     if (sim.phase === "paused" || sim.phase === "over") {
       if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 8);
-      stepReplay(dt);
+      if (failT.current > 0) {
+        failT.current -= dt;
+        if (failT.current <= 0 && dying.current) {
+          failT.current = 0;
+          finishRun(sim);
+        }
+      } else if (!dying.current) {
+        stepReplay(dt);
+      }
       return;
     }
 
@@ -461,6 +486,17 @@ export function TetrisApp() {
       bannerT.current -= dt;
       if (bannerT.current <= 0) syncUi({ banner: null });
     }
+    if (holdPeekT.current > 0) {
+      holdPeekT.current -= dt;
+      if (holdPeekT.current <= 0) syncUi({ holdPeek: null });
+    }
+    if (failT.current > 0) {
+      failT.current -= dt;
+      if (failT.current <= 0 && dying.current && simRef.current) {
+        failT.current = 0;
+        finishRun(simRef.current);
+      }
+    }
     if (gestureT.current > 0) {
       gestureT.current -= dt;
       if (gestureT.current <= 0) syncUi({ gesture: null });
@@ -480,7 +516,8 @@ export function TetrisApp() {
       haptic("select");
       payMissions({ hold: 1 });
       well3dRef.current?.punch(0.12);
-      syncUi();
+      holdPeekT.current = 0.85;
+      syncUi({ holdPeek: sim.piece?.id ?? null });
     }
     if (ev === "lock") {
       sfxLock();
@@ -495,6 +532,12 @@ export function TetrisApp() {
           engine.hardStreak(falling, ghostAt, themeOf(saveRef.current.theme).fill[falling.id]);
           sfxHard();
         }
+      }
+      if (held.down && falling && sim.piece && sim.piece.y > falling.y) {
+        well3dRef.current?.softTrail(
+          falling,
+          themeOf(saveRef.current.theme).fill[falling.id],
+        );
       }
       if (sim.phase === "clearing" && sim.clearRows.length) {
         juiceClear(
@@ -539,11 +582,15 @@ export function TetrisApp() {
         sfxTetris();
         haptic("win");
         flashBanner(sim.won && sim.mode === "sprint" ? "CLEAR" : "TIME");
-      } else {
+        finishRun(sim);
+      } else if (!dying.current) {
+        dying.current = true;
         sfxOver();
         haptic("over");
+        well3dRef.current?.failBeat();
+        failT.current = 0.9;
+        syncUi({ failing: true });
       }
-      finishRun(sim);
     }
 
     if (sim.pendingCoins) {
@@ -774,11 +821,24 @@ export function TetrisApp() {
 
   function toggleMute() {
     unlockAudio();
-    const next = !uiRef.current.muted;
-    setMuted(next);
-    saveRef.current = { ...saveRef.current, muted: next };
+    const off = uiRef.current.musicVol <= 0 && uiRef.current.sfxVol <= 0;
+    const music = off ? 1 : 0;
+    const sfx = off ? 1 : 0;
+    setMix({ music, sfx });
+    saveRef.current = { ...saveRef.current, musicVol: music, sfxVol: sfx, muted: !off };
     writeSave(saveRef.current);
-    syncUi({ muted: next });
+    syncUi({ musicVol: music, sfxVol: sfx, muted: !off });
+  }
+
+  function setAudioMix(part: "music" | "sfx", value: number) {
+    unlockAudio();
+    const music = part === "music" ? value : uiRef.current.musicVol;
+    const sfx = part === "sfx" ? value : uiRef.current.sfxVol;
+    setMix({ music, sfx });
+    const muted = music <= 0 && sfx <= 0;
+    saveRef.current = { ...saveRef.current, musicVol: music, sfxVol: sfx, muted };
+    writeSave(saveRef.current);
+    syncUi({ musicVol: music, sfxVol: sfx, muted });
   }
 
   function openShop() {
@@ -1159,6 +1219,11 @@ export function TetrisApp() {
               }}
             >
               <MiniPiece key={ui.hold ?? "empty"} id={ui.hold} theme={ui.theme} />
+              {ui.holdPeek && (
+                <span className="hold-peek" aria-hidden="true">
+                  <MiniPiece id={ui.holdPeek} theme={ui.theme} />
+                </span>
+              )}
             </div>
           </aside>
 
@@ -1218,9 +1283,22 @@ export function TetrisApp() {
                 >
                   Resume
                 </button>
+                <button
+                  type="button"
+                  className="text-btn"
+                  data-qa="new-game"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    unlockAudio();
+                    startGame(ui.mode);
+                  }}
+                >
+                  New game
+                </button>
               </div>
             )}
-            {ui.phase === "over" && (
+            {ui.phase === "over" && !ui.failing && (
               <div className="veil">
                 <p className="veil-kicker">
                   {ui.won
@@ -1445,7 +1523,12 @@ export function TetrisApp() {
         />
 
         {(ui.phase === "title" || ui.phase === "over" || ui.phase === "paused") && (
-          <ModeStrip mode={ui.mode} sprintBest={ui.sprintBest} onPick={pickMode} />
+          <ModeStrip
+            mode={ui.mode}
+            sprintBest={ui.sprintBest}
+            daily={saveRef.current.daily}
+            onPick={pickMode}
+          />
         )}
         {ui.phase === "title" && <MissionRow book={ui.missions} />}
 
@@ -1519,6 +1602,9 @@ export function TetrisApp() {
           onHard={toggleHard}
           onGhost={toggleGhost}
           onPadMode={setPadMode}
+          musicVol={ui.musicVol}
+          sfxVol={ui.sfxVol}
+          onMix={setAudioMix}
           onTheme={onTheme}
         />
         <BoardSheet

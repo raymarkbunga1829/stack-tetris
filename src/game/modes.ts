@@ -1,6 +1,6 @@
 import { PIECE_IDS, type PieceId } from "./types";
 
-export type ModeId = "marathon" | "sprint" | "blitz" | "daily" | "zen" | "arcade";
+export type ModeId = "marathon" | "sprint" | "blitz" | "daily" | "zen" | "arcade" | "classic";
 
 export type ModeInfo = {
   id: ModeId;
@@ -10,6 +10,8 @@ export type ModeInfo = {
   seconds: number | null;
   startLevel: number;
   ghost: boolean;
+  kicks: boolean;
+  rng: "bag" | "nes";
 };
 
 export const MODES: ModeInfo[] = [
@@ -21,6 +23,8 @@ export const MODES: ModeInfo[] = [
     seconds: null,
     startLevel: 1,
     ghost: true,
+    kicks: true,
+    rng: "bag",
   },
   {
     id: "sprint",
@@ -30,6 +34,8 @@ export const MODES: ModeInfo[] = [
     seconds: null,
     startLevel: 1,
     ghost: true,
+    kicks: true,
+    rng: "bag",
   },
   {
     id: "blitz",
@@ -39,6 +45,8 @@ export const MODES: ModeInfo[] = [
     seconds: 120,
     startLevel: 10,
     ghost: true,
+    kicks: true,
+    rng: "bag",
   },
   {
     id: "daily",
@@ -48,6 +56,8 @@ export const MODES: ModeInfo[] = [
     seconds: null,
     startLevel: 1,
     ghost: true,
+    kicks: true,
+    rng: "bag",
   },
   {
     id: "zen",
@@ -57,6 +67,8 @@ export const MODES: ModeInfo[] = [
     seconds: null,
     startLevel: 1,
     ghost: true,
+    kicks: true,
+    rng: "bag",
   },
   {
     id: "arcade",
@@ -66,6 +78,19 @@ export const MODES: ModeInfo[] = [
     seconds: null,
     startLevel: 1,
     ghost: false,
+    kicks: true,
+    rng: "bag",
+  },
+  {
+    id: "classic",
+    name: "Classic",
+    blurb: "NES bag. No wall kicks. Read the stack.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+    ghost: false,
+    kicks: false,
+    rng: "nes",
   },
 ];
 

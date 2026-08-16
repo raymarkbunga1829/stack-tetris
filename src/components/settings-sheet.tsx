@@ -18,6 +18,9 @@ type Props = {
   onGhost: () => void;
   onPadMode: (m: PadMode) => void;
   onTheme: (id: ThemeId) => void;
+  musicVol: number;
+  sfxVol: number;
+  onMix: (part: "music" | "sfx", value: number) => void;
 };
 
 export function SettingsSheet({
@@ -35,6 +38,9 @@ export function SettingsSheet({
   onGhost,
   onPadMode,
   onTheme,
+  musicVol,
+  sfxVol,
+  onMix,
 }: Props) {
   if (!open) return null;
   return (
@@ -50,6 +56,31 @@ export function SettingsSheet({
           </button>
         </header>
 
+        <p className="shop-blurb">Mix</p>
+        <label className="mix-row">
+          <span>Music</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={musicVol}
+            onChange={(e) => onMix("music", Number(e.target.value))}
+          />
+          <b>{Math.round(musicVol * 100)}</b>
+        </label>
+        <label className="mix-row">
+          <span>SFX</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={sfxVol}
+            onChange={(e) => onMix("sfx", Number(e.target.value))}
+          />
+          <b>{Math.round(sfxVol * 100)}</b>
+        </label>
         <p className="shop-blurb">Haptics</p>
         <div className="shop-tabs">
           {(["full", "light", "off"] as const).map((p) => (

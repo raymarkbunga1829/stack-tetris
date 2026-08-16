@@ -622,6 +622,47 @@
 .pocket-hold {
   cursor: pointer;
   border-color: color-mix(in oklab, var(--color-fg) 28%, var(--color-line));
+  position: relative;
+}
+
+.hold-peek {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 28px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--color-raised);
+  border: 1px solid color-mix(in oklab, var(--color-fg) 22%, transparent);
+  pointer-events: none;
+}
+
+.hold-peek .mini {
+  max-width: 22px;
+}
+
+.modes button.is-played .mode-rule {
+  color: var(--color-fg);
+}
+
+.mix-row {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr 2rem;
+  gap: 8px;
+  align-items: center;
+  color: var(--color-muted);
+  font: 600 0.72rem/1 var(--font-sans);
+}
+
+.mix-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-fg);
+}
+
+.mix-row b {
+  font: 600 0.68rem/1 var(--font-mono);
+  color: var(--color-fg);
+  text-align: right;
 }
 
 .pad {

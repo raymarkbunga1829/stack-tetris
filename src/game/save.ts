@@ -25,6 +25,8 @@ export type SaveData = {
   version: number;
   high: number;
   muted: boolean;
+  musicVol: number;
+  sfxVol: number;
   drag: boolean;
   credits: number;
   inv: Inventory;
@@ -49,6 +51,8 @@ const DEFAULTS: SaveData = {
   version: SAVE_VERSION,
   high: 0,
   muted: false,
+  musicVol: 1,
+  sfxVol: 1,
   drag: true,
   credits: 80,
   inv: { zap: 1, slow: 1, shield: 0, quake: 0, pick: 1 },
@@ -87,6 +91,18 @@ export function loadSave(): SaveData {
       version: SAVE_VERSION,
       high: Math.max(0, parsed.high ?? 0),
       drag: parsed.drag !== false,
+      musicVol:
+        typeof parsed.musicVol === "number"
+          ? Math.max(0, Math.min(1, parsed.musicVol))
+          : parsed.muted
+            ? 0
+            : 1,
+      sfxVol:
+        typeof parsed.sfxVol === "number"
+          ? Math.max(0, Math.min(1, parsed.sfxVol))
+          : parsed.muted
+            ? 0
+            : 1,
       credits: Math.max(0, parsed.credits ?? DEFAULTS.credits),
       inv: { ...emptyInv(), ...parsed.inv },
       receipts: Array.isArray(parsed.receipts) ? parsed.receipts : [],
