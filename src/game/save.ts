@@ -1,11 +1,11 @@
 import { ensureMissions, emptyBook, type MissionBook } from "./missions";
-import type { ModeId } from "./modes";
+import { utcDateKey, utcShift, type ModeId } from "./modes";
 import { emptyInv, type Inventory, type Receipt } from "./shop";
 import type { ThemeId } from "./themes";
 import type { PadMode } from "./device";
 
 const KEY = "stack-tetris-v1";
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 export type HapticProfile = "full" | "light" | "off";
 
@@ -39,12 +39,15 @@ export type SaveData = {
   onboarded: boolean;
   tipSeen: boolean;
   padMode: PadMode;
+  padSize: "compact" | "huge";
+  marks: boolean;
   mode: ModeId;
   missions: MissionBook;
   scores: ScoreRow[];
   daily: { date: string; score: number; lines: number };
   sprintBest: number | null;
   dailyBoard: { date: string; rows: ScoreRow[] };
+  streak: { count: number; last: string };
 };
 
 const DEFAULTS: SaveData = {
@@ -65,12 +68,15 @@ const DEFAULTS: SaveData = {
   onboarded: false,
   tipSeen: false,
   padMode: "auto",
+  padSize: "compact",
+  marks: false,
   mode: "marathon",
   missions: emptyBook(),
   scores: [],
   daily: { date: "", score: 0, lines: 0 },
   sprintBest: null,
   dailyBoard: { date: "", rows: [] },
+  streak: { count: 0, last: "" },
 };
 
 export function loadSave(): SaveData {
@@ -117,12 +123,15 @@ export function loadSave(): SaveData {
         parsed.padMode === "on" || parsed.padMode === "off" || parsed.padMode === "auto"
           ? parsed.padMode
           : "auto",
+      padSize: parsed.padSize === "huge" ? "huge" : "compact",
+      marks: parsed.marks === true,
       mode: parsed.mode ?? "marathon",
       missions: ensureMissions(parsed.missions),
       scores: Array.isArray(parsed.scores) ? parsed.scores : [],
       daily: parsed.daily ?? { date: "", score: 0, lines: 0 },
       sprintBest: typeof parsed.sprintBest === "number" ? parsed.sprintBest : null,
       dailyBoard: parsed.dailyBoard ?? { date: "", rows: [] },
+      streak: parsed.streak ?? { count: 0, last: "" },
     };
   } catch {
     return { ...DEFAULTS, inv: { ...DEFAULTS.inv }, missions: ensureMissions(undefined) };
@@ -167,6 +176,14 @@ export function recordRun(data: SaveData, row: ScoreRow): SaveData {
       },
       dailyBoard: { date, rows },
     };
+  }
+  if (row.mode === "daily") {
+    const today = utcDateKey();
+    const prev = next.streak;
+    let count = 1;
+    if (prev.last === today) count = Math.max(1, prev.count);
+    else if (prev.last === utcShift(-1, today)) count = prev.count + 1;
+    next = { ...next, streak: { count, last: today } };
   }
   writeSave(next);
   return next;

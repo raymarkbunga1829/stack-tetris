@@ -37,6 +37,7 @@ import {
   utcDateKey,
   type ModeId,
 } from "@/game/modes";
+import { getLastReplay, setLastReplay } from "@/game/last-replay";
 import { shareRun } from "@/game/share-run";
 import { REPLAY_STEP, type Snap } from "@/game/replay";
 import { resizeCanvas } from "@/game/render";
@@ -110,6 +111,10 @@ type Ui = {
   hardConfirm: boolean;
   ghost: boolean;
   padMode: PadMode;
+  padSize: "compact" | "huge";
+  marks: boolean;
+  watching: boolean;
+  streak: { count: number; last: string };
   missions: MissionBook;
   picking: boolean;
   combo: number;
@@ -125,11 +130,16 @@ type Ui = {
     clock: number;
     splits: number[];
     perfects: number;
+    extras?: number;
   } | null;
   tip: string | null;
   pred: { rows: number; lock: boolean; kick: boolean } | null;
   holdPeek: PieceId | null;
   failing: boolean;
+  live: PieceId | null;
+  danger: boolean;
+  bag: PieceId[];
+  canHold: boolean;
 };
 
 function forceCoach() {
@@ -207,6 +217,10 @@ export function TetrisApp() {
     hardConfirm: saveRef.current.hardConfirm,
     ghost: saveRef.current.ghost,
     padMode: saveRef.current.padMode,
+    padSize: saveRef.current.padSize,
+    marks: saveRef.current.marks,
+    watching: false,
+    streak: saveRef.current.streak,
     missions: saveRef.current.missions,
     picking: false,
     combo: 0,
@@ -219,12 +233,22 @@ export function TetrisApp() {
     pred: null,
     holdPeek: null,
     failing: false,
+    live: null,
+    danger: false,
+    bag: [],
+    canHold: true,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const [buying, setBuying] = useState<string | null>(null);
   const [keysOn, setKeysOn] = useState(() => hasKeyboard());
   const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
+  const finesseKeys = useRef(0);
+  const finesseN = useRef(0);
+  const finesseExtras = useRef(0);
+  const pieceBorn = useRef({ x: 3, keys: 0 });
+  const splitSeen = useRef(0);
+  const lastMix = useRef({ music: 1, sfx: 1 });
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -387,6 +411,11 @@ export function TetrisApp() {
     dying.current = false;
     failT.current = 0;
     holdPeekT.current = 0;
+    finesseKeys.current = 0;
+    finesseN.current = 0;
+    finesseExtras.current = 0;
+    pieceBorn.current = { x: sim.piece?.x ?? 3, keys: 0 };
+    splitSeen.current = 0;
     syncUi({
       phase: "playing",
       banner: null,
@@ -413,8 +442,39 @@ export function TetrisApp() {
       pred: null,
       holdPeek: null,
       failing: false,
+      watching: false,
+      live: sim.piece?.id ?? null,
+      danger: false,
+      bag: sim.bag.slice(),
+      canHold: true,
     });
     flashBanner(mode === "daily" ? `Daily · ${utcDateKey().slice(5)}` : modeOf(mode).name);
+  }
+
+  function goHome() {
+    unlockAudio();
+    stopMusic();
+    setMusicPaused(false);
+    dying.current = false;
+    failT.current = 0;
+    if (simRef.current) simRef.current.phase = "title";
+    syncUi({
+      phase: "title",
+      watching: false,
+      failing: false,
+      danger: false,
+      live: null,
+    });
+  }
+
+  function watchLast() {
+    const snaps = getLastReplay();
+    if (!snaps) return;
+    replayRef.current = snaps;
+    replayI.current = 0;
+    replayT.current = 0;
+    if (!simRef.current) simRef.current = createSim({ mode: uiRef.current.mode });
+    syncUi({ watching: true });
   }
 
   function tick(dt: number) {
@@ -453,6 +513,10 @@ export function TetrisApp() {
     }
 
     const sim = simRef.current;
+    if (u.phase === "title" && u.watching) {
+      stepReplay(dt);
+      return;
+    }
     if (!sim || u.phase === "title") return;
 
     if (sim.phase === "paused" || sim.phase === "over") {
@@ -506,6 +570,19 @@ export function TetrisApp() {
       if (gestureT.current <= 0) syncUi({ gesture: null });
     }
 
+    if (sim.mode === "sprint" && sim.splits.length > splitSeen.current) {
+      splitSeen.current = sim.splits.length;
+      flashBanner(String(splitSeen.current * 10));
+    }
+    const live = sim.piece?.id ?? null;
+    const danger = sim.phase === "playing" && inDanger(sim);
+    if (live !== u.live || danger !== u.danger || sim.canHold !== u.canHold) {
+      syncUi({ live, danger, bag: sim.bag.slice(), canHold: sim.canHold });
+    }
+
+    if (sim.mode === "finesse") {
+      if (just.left || just.right || just.cw || just.ccw) pieceBorn.current.keys += 1;
+    }
     if (ev === "move" && (just.left || just.right)) {
       sfxMove();
       haptic("move");
@@ -559,6 +636,19 @@ export function TetrisApp() {
         comboSeen.current = -1;
         b2bSeen.current = sim.b2b;
       }
+      if (sim.mode === "finesse" && falling) {
+        const spins = falling.rot === 0 ? 0 : falling.rot === 2 ? 2 : 1;
+        const extra = Math.max(0, pieceBorn.current.keys - (Math.abs(falling.x - pieceBorn.current.x) + spins));
+        finesseN.current += 1;
+        finesseExtras.current += extra;
+        flashBanner(extra === 0 ? "CLEAN" : `+${extra}`);
+        if (finesseN.current >= 20 && !dying.current) {
+          sim.won = true;
+          sim.phase = "over";
+          finishRun(sim);
+        }
+      }
+      if (sim.piece) pieceBorn.current = { x: sim.piece.x, keys: 0 };
       syncUi();
     }
     if (ev === "clear") {
@@ -693,12 +783,16 @@ export function TetrisApp() {
       replayRef.current = sim.history.slice();
       replayI.current = 0;
       replayT.current = 0;
+      setLastReplay(sim.history);
     }
     dying.current = false;
     failT.current = 0;
     syncUi({
       phase: "over",
       failing: false,
+      streak: saveRef.current.streak,
+      danger: false,
+      live: null,
       high: saveRef.current.high,
       won: sim.won,
       clock: sim.clock,
@@ -711,6 +805,7 @@ export function TetrisApp() {
         clock: sim.clock,
         splits: sim.splits.slice(),
         perfects: sim.perfects,
+        extras: sim.mode === "finesse" ? finesseExtras.current : undefined,
       },
       tip:
         !sim.won && !saveRef.current.tipSeen
@@ -740,6 +835,9 @@ export function TetrisApp() {
       return;
     }
     if (!sim || sim.phase !== "playing") return;
+    if (sim.mode === "finesse" && (p.left || p.right || p.cw || p.ccw)) {
+      pieceBorn.current.keys += 1;
+    }
     const ev = pulseAction(sim, p);
     if (ev === "move") {
       sfxMove();
@@ -859,15 +957,18 @@ export function TetrisApp() {
     const theme = themeOf(saveRef.current.theme);
     const snaps = replayRef.current;
     let view = simRef.current;
-    if (view && snaps && view.phase === "over" && snaps[replayI.current]) {
+    if (snaps && snaps[replayI.current] && (uiRef.current.watching || view?.phase === "over")) {
       const s = snaps[replayI.current]!;
-      view = { ...view, board: s.board, piece: s.piece, score: s.score, lines: s.lines };
+      view = view
+        ? { ...view, phase: "over", board: s.board, piece: s.piece, score: s.score, lines: s.lines }
+        : null;
     }
     well3dRef.current?.draw(
       view,
       reduce ? 0 : shakeRef.current,
       theme,
       uiRef.current.ghost && modeOf(uiRef.current.mode).ghost,
+      uiRef.current.marks,
     );
     const vizCanvas = vizCanvasRef.current;
     const well = wellRef.current;
@@ -884,13 +985,28 @@ export function TetrisApp() {
 
   function toggleMute() {
     unlockAudio();
-    const off = uiRef.current.musicVol <= 0 && uiRef.current.sfxVol <= 0;
-    const music = off ? 1 : 0;
-    const sfx = off ? 1 : 0;
-    setMix({ music, sfx });
-    saveRef.current = { ...saveRef.current, musicVol: music, sfxVol: sfx, muted: !off };
+    const music = uiRef.current.musicVol;
+    const sfx = uiRef.current.sfxVol;
+    if (music > 0) {
+      lastMix.current = { music, sfx: sfx > 0 ? sfx : 1 };
+      setMix({ music: 0, sfx });
+      saveRef.current = { ...saveRef.current, musicVol: 0, sfxVol: sfx, muted: sfx <= 0 };
+      writeSave(saveRef.current);
+      syncUi({ musicVol: 0, sfxVol: sfx, muted: sfx <= 0 });
+      return;
+    }
+    if (sfx > 0) {
+      setMix({ music: 0, sfx: 0 });
+      saveRef.current = { ...saveRef.current, musicVol: 0, sfxVol: 0, muted: true };
+      writeSave(saveRef.current);
+      syncUi({ musicVol: 0, sfxVol: 0, muted: true });
+      return;
+    }
+    const restore = lastMix.current;
+    setMix(restore);
+    saveRef.current = { ...saveRef.current, musicVol: restore.music, sfxVol: restore.sfx, muted: false };
     writeSave(saveRef.current);
-    syncUi({ musicVol: music, sfxVol: sfx, muted: !off });
+    syncUi({ musicVol: restore.music, sfxVol: restore.sfx, muted: false });
   }
 
   function setAudioMix(part: "music" | "sfx", value: number) {
@@ -1175,6 +1291,19 @@ export function TetrisApp() {
     syncUi({ padMode: m });
   }
 
+  function setPadSize(s: "compact" | "huge") {
+    saveRef.current = { ...saveRef.current, padSize: s };
+    writeSave(saveRef.current);
+    syncUi({ padSize: s });
+  }
+
+  function toggleMarks() {
+    const next = !saveRef.current.marks;
+    saveRef.current = { ...saveRef.current, marks: next };
+    writeSave(saveRef.current);
+    syncUi({ marks: next });
+  }
+
   function onTheme(id: ThemeId) {
     const next = buyTheme(saveRef.current, id);
     if (!next) return;
@@ -1232,7 +1361,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}`}
       >
         <header className="topbar">
           <h1 className="logo">Stack</h1>
@@ -1243,7 +1372,7 @@ export function TetrisApp() {
         </header>
 
         <div className="stats">
-          <Stat label="Score" value={ui.score.toLocaleString()} />
+          <TickScore value={ui.score} />
           <Stat
             label={
               ui.mode === "blitz" ? "Time" : ui.mode === "sprint" ? "Clock" : "Level"
@@ -1254,6 +1383,11 @@ export function TetrisApp() {
                 : ui.mode === "sprint"
                   ? formatClock(ui.clock)
                   : String(ui.level)
+            }
+            fill={
+              ui.mode === "blitz" || ui.mode === "sprint"
+                ? undefined
+                : (ui.lines % 10) / 10
             }
           />
           <Stat
@@ -1270,7 +1404,7 @@ export function TetrisApp() {
           <aside className="rail">
             <p className="rail-label">Hold</p>
             <div
-              className="pocket pocket-hold"
+              className={`pocket pocket-hold${ui.phase === "playing" && !ui.canHold ? " is-spent" : ""}`}
               role="button"
               tabIndex={0}
               aria-label="Hold piece"
@@ -1282,6 +1416,11 @@ export function TetrisApp() {
               }}
             >
               <MiniPiece key={ui.hold ?? "empty"} id={ui.hold} theme={ui.theme} />
+              {ui.phase === "playing" && ui.live && !ui.holdPeek && (
+                <span className="hold-swap" aria-hidden="true">
+                  <MiniPiece id={ui.live} theme={ui.theme} />
+                </span>
+              )}
               {ui.holdPeek && (
                 <span className="hold-peek" aria-hidden="true">
                   <MiniPiece id={ui.holdPeek} theme={ui.theme} />
@@ -1301,7 +1440,7 @@ export function TetrisApp() {
           >
             <canvas ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
-            {ui.phase === "title" && (
+            {ui.phase === "title" && !ui.watching && (
               <div className="veil">
                 <p className="veil-kicker">{modeOf(ui.mode).blurb}</p>
                 <p className="veil-title">Stack</p>
@@ -1309,6 +1448,20 @@ export function TetrisApp() {
                   <p className="veil-hint">
                     Slide sideways on the stack. Tap to turn. Use Drop — don’t swipe down.
                   </p>
+                )}
+                {!!getLastReplay() && (
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      unlockAudio();
+                      watchLast();
+                    }}
+                  >
+                    Watch last
+                  </button>
                 )}
                 <button
                   type="button"
@@ -1325,8 +1478,32 @@ export function TetrisApp() {
                 </button>
               </div>
             )}
+            {ui.phase === "title" && ui.watching && (
+              <button
+                type="button"
+                className="text-btn watch-stop"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  syncUi({ watching: false });
+                }}
+              >
+                Stop
+              </button>
+            )}
             {ui.phase === "paused" && (
               <div className="veil is-pause">
+                <button
+                  type="button"
+                  className="veil-x"
+                  aria-label="Home"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    goHome();
+                  }}
+                >
+                  ×
+                </button>
                 <p className="veil-kicker">Still here</p>
                 <p className="veil-title">Paused</p>
                 <button
@@ -1363,6 +1540,18 @@ export function TetrisApp() {
             )}
             {ui.phase === "over" && !ui.failing && (
               <div className="veil">
+                <button
+                  type="button"
+                  className="veil-x"
+                  aria-label="Home"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    goHome();
+                  }}
+                >
+                  ×
+                </button>
                 <p className="veil-kicker">
                   {ui.won
                     ? ui.mode === "sprint"
@@ -1400,6 +1589,12 @@ export function TetrisApp() {
                       <li>
                         <span>All clear</span>
                         <b>{ui.recap.perfects}</b>
+                      </li>
+                    )}
+                    {ui.recap.extras != null && (
+                      <li>
+                        <span>Extra taps</span>
+                        <b>{ui.recap.extras}</b>
                       </li>
                     )}
                   </ul>
@@ -1440,10 +1635,11 @@ export function TetrisApp() {
                         combo: ui.recap!.combo,
                         clock: ui.recap!.clock,
                         splits: ui.mode === "sprint" ? ui.recap!.splits : undefined,
+                        frames: getLastReplay() ?? replayRef.current ?? undefined,
                       });
                     }}
                   >
-                    Share run
+                    Share clip
                   </button>
                 )}
               </div>
@@ -1540,6 +1736,13 @@ export function TetrisApp() {
                   </button>
                 ))}
             </div>
+            {ui.phase === "playing" && ui.bag.length > 0 && (
+              <div className="bag-strip" aria-label="Left in bag">
+                {ui.bag.map((id, i) => (
+                  <i key={`${id}-${i}`} style={{ background: themeOf(ui.theme).fill[id] }} />
+                ))}
+              </div>
+            )}
           </aside>
         </div>
 
@@ -1590,6 +1793,7 @@ export function TetrisApp() {
             mode={ui.mode}
             sprintBest={ui.sprintBest}
             daily={saveRef.current.daily}
+            streak={ui.streak}
             onPick={pickMode}
           />
         )}
@@ -1606,7 +1810,7 @@ export function TetrisApp() {
             Scores
           </button>
           <button type="button" className="text-btn" onClick={toggleMute}>
-            {ui.muted ? "Sound off" : "Sound on"}
+            {ui.musicVol > 0 ? "Quiet" : ui.sfxVol > 0 ? "Sound off" : "Sound on"}
           </button>
           {ui.phase === "playing" && (
             <button
@@ -1657,6 +1861,8 @@ export function TetrisApp() {
           hardConfirm={ui.hardConfirm}
           ghost={ui.ghost}
           padMode={ui.padMode}
+          padSize={ui.padSize}
+          marks={ui.marks}
           theme={ui.theme}
           themes={saveRef.current.themes}
           credits={ui.credits}
@@ -1665,6 +1871,8 @@ export function TetrisApp() {
           onHard={toggleHard}
           onGhost={toggleGhost}
           onPadMode={setPadMode}
+          onPadSize={setPadSize}
+          onMarks={toggleMarks}
           musicVol={ui.musicVol}
           sfxVol={ui.sfxVol}
           onMix={setAudioMix}
@@ -1682,13 +1890,46 @@ export function TetrisApp() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  fill,
+}: {
+  label: string;
+  value: string;
+  fill?: number;
+}) {
   return (
     <div className="stat">
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value}</span>
+      {fill != null && (
+        <i className="stat-pip" style={{ width: `${Math.max(0, Math.min(1, fill)) * 100}%` }} />
+      )}
     </div>
   );
+}
+
+function TickScore({ value }: { value: number }) {
+  const [shown, setShown] = useState(value);
+  useEffect(() => {
+    if (Math.abs(shown - value) < 1) {
+      setShown(value);
+      return;
+    }
+    let raf = 0;
+    const step = () => {
+      setShown((s) => {
+        const next = s + (value - s) * 0.24;
+        if (Math.abs(value - next) < 1) return value;
+        return next;
+      });
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value, shown]);
+  return <Stat label="Score" value={Math.round(shown).toLocaleString()} />;
 }
 
 declare global {

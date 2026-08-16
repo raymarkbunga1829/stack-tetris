@@ -1,6 +1,14 @@
 import { PIECE_IDS, type PieceId } from "./types";
 
-export type ModeId = "marathon" | "sprint" | "blitz" | "daily" | "zen" | "arcade" | "classic";
+export type ModeId =
+  | "marathon"
+  | "sprint"
+  | "blitz"
+  | "daily"
+  | "zen"
+  | "arcade"
+  | "classic"
+  | "finesse";
 
 export type ModeInfo = {
   id: ModeId;
@@ -92,6 +100,17 @@ export const MODES: ModeInfo[] = [
     kicks: false,
     rng: "nes",
   },
+  {
+    id: "finesse",
+    name: "Finesse",
+    blurb: "Twenty pieces. Extra taps count.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+    ghost: true,
+    kicks: true,
+    rng: "bag",
+  },
 ];
 
 export function modeOf(id: ModeId): ModeInfo {
@@ -99,6 +118,12 @@ export function modeOf(id: ModeId): ModeInfo {
 }
 
 export function utcDateKey(d = new Date()): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export function utcShift(days: number, from = utcDateKey()): string {
+  const d = new Date(`${from}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 

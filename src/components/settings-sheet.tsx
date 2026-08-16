@@ -9,6 +9,8 @@ type Props = {
   hardConfirm: boolean;
   ghost: boolean;
   padMode: PadMode;
+  padSize: "compact" | "huge";
+  marks: boolean;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
@@ -17,6 +19,8 @@ type Props = {
   onHard: () => void;
   onGhost: () => void;
   onPadMode: (m: PadMode) => void;
+  onPadSize: (s: "compact" | "huge") => void;
+  onMarks: () => void;
   onTheme: (id: ThemeId) => void;
   musicVol: number;
   sfxVol: number;
@@ -29,6 +33,8 @@ export function SettingsSheet({
   hardConfirm,
   ghost,
   padMode,
+  padSize,
+  marks,
   theme,
   themes,
   credits,
@@ -37,6 +43,8 @@ export function SettingsSheet({
   onHard,
   onGhost,
   onPadMode,
+  onPadSize,
+  onMarks,
   onTheme,
   musicVol,
   sfxVol,
@@ -98,11 +106,22 @@ export function SettingsSheet({
           <span>Ghost piece</span>
           <b>{ghost ? "On" : "Off"}</b>
         </button>
+        <button type="button" className={`set-row${marks ? " is-on" : ""}`} onClick={onMarks}>
+          <span>Colorblind marks</span>
+          <b>{marks ? "On" : "Off"}</b>
+        </button>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">
           {(["auto", "on", "off"] as const).map((m) => (
             <button key={m} type="button" className={padMode === m ? "is-on" : ""} onClick={() => onPadMode(m)}>
               {m === "auto" ? "Auto" : m === "on" ? "Always" : "Hide"}
+            </button>
+          ))}
+        </div>
+        <div className="shop-tabs">
+          {(["compact", "huge"] as const).map((s) => (
+            <button key={s} type="button" className={padSize === s ? "is-on" : ""} onClick={() => onPadSize(s)}>
+              {s === "huge" ? "Huge" : "Compact"}
             </button>
           ))}
         </div>

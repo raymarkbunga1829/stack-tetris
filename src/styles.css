@@ -136,6 +136,7 @@
   background: var(--color-raised);
   border-radius: 8px;
   min-width: 0;
+  position: relative;
 }
 
 .stat-label {
@@ -149,6 +150,15 @@
   font: 600 1rem/1.2 var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+.stat-pip {
+  display: block;
+  height: 2px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--color-fg);
+  opacity: 0.45;
 }
 
 .stage {
@@ -356,7 +366,22 @@
 }
 
 .veil.is-pause {
-  background: color-mix(in oklab, var(--color-bg) 42%, transparent);
+  background: color-mix(in oklab, var(--color-bg) 48%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.veil-x {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--color-bg) 55%, transparent);
+  color: var(--color-fg);
+  font: 500 1.4rem/1 var(--font-sans);
 }
 
 .daily-bag {
@@ -641,6 +666,39 @@
   max-width: 22px;
 }
 
+.hold-swap {
+  position: absolute;
+  inset: 6px;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.hold-swap .mini {
+  max-width: 36px;
+}
+
+.bag-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 6px;
+  justify-content: center;
+}
+
+.bag-strip i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.cabinet.is-danger .pad-hard {
+  box-shadow: 0 0 0 2px #c45a5a, 0 0 14px rgba(196, 80, 80, 0.45);
+}
+
+.cabinet.is-danger .pad-hold {
+  box-shadow: 0 0 0 1px rgba(196, 120, 80, 0.7);
+}
+
 .modes button.is-played .mode-rule {
   color: var(--color-fg);
 }
@@ -744,9 +802,49 @@
   border-radius: 18px;
 }
 
+.cabinet.is-pad-huge .pad {
+  min-height: 72px;
+  gap: 10px;
+}
+
+.cabinet.is-pad-huge .pad-btn {
+  min-height: 64px;
+  border-radius: 20px;
+}
+
+.cabinet.is-pad-huge .pad-btn svg {
+  width: 28px;
+  height: 28px;
+}
+
+.watch-stop {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+}
+}
+
 .pad-hard:active {
   background: var(--color-accent);
   transform: scale(0.96);
+}
+
+.pocket-hold.is-spent {
+  opacity: 0.38;
+}
+
+.next-list .pocket-sm:first-child {
+  min-height: 52px;
+}
+
+.next-list .pocket-sm:nth-child(n + 2) {
+  min-height: 30px;
+  opacity: 0.72;
+}
+
+.next-list .pocket-sm:nth-child(n + 2) .mini {
+  max-width: 32px;
 }
 
 .next-list .pocket-sm:nth-child(n + 4) {

@@ -13,6 +13,36 @@ import type { PowerId } from "./shop";
 import { COLS, HIDDEN_ROWS, VISIBLE_ROWS, CLEAR_TIME, LOCK_DELAY, PIECE_IDS, type PieceId } from "./types";
 
 const MAX_SOLID = COLS * VISIBLE_ROWS + 8;
+const MARK: Record<PieceId, [number, number][]> = {
+  I: [
+    [0, 0.2],
+    [0, -0.2],
+  ],
+  O: [[0, 0]],
+  T: [
+    [0, 0.18],
+    [-0.16, -0.12],
+    [0.16, -0.12],
+  ],
+  S: [
+    [-0.16, 0.12],
+    [0.16, -0.12],
+  ],
+  Z: [
+    [0.16, 0.12],
+    [-0.16, -0.12],
+  ],
+  J: [
+    [-0.16, 0.16],
+    [-0.16, -0.16],
+    [0.12, -0.16],
+  ],
+  L: [
+    [0.16, 0.16],
+    [0.16, -0.16],
+    [-0.12, -0.16],
+  ],
+};
 const MAX_GHOST = 8;
 
 function hex(c: string) {
@@ -29,7 +59,7 @@ function cellPos(col: number, row: number, z = 0) {
 
 export type Well3d = {
   resize: () => void;
-  draw: (sim: Sim | null, shake: number, theme: Theme, showGhost?: boolean) => void;
+  draw: (sim: Sim | null, shake: number, theme: Theme, showGhost?: boolean, showMarks?: boolean) => void;
   punch: (amount: number) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
@@ -208,6 +238,14 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   ghosts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   ghosts.frustumCulled = false;
   scene.add(solids, ghosts);
+
+  const pipGeo = new THREE.BoxGeometry(0.14, 0.14, 0.05);
+  const pipMat = new THREE.MeshBasicMaterial({ color: 0x141414 });
+  const pips = new THREE.InstancedMesh(pipGeo, pipMat, MAX_SOLID * 3);
+  pips.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  pips.frustumCulled = false;
+  pips.count = 0;
+  scene.add(pips);
 
   const MAX_SPARKS = 180;
   type Spark = {
@@ -425,7 +463,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     mesh.setColorAt(i, color);
   }
 
-  function draw(sim: Sim | null, shake: number, theme: Theme, showGhost = true) {
+  function draw(sim: Sim | null, shake: number, theme: Theme, showGhost = true, showMarks = false) {
     if (theme.id !== lastThemeId) {
       lastThemeId = theme.id;
       lastBg = "";
@@ -485,6 +523,19 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const settle = 1 - Math.pow(1 - clearEase, 3);
 
     let n = 0;
+    let pipN = 0;
+    const stamp = (id: PieceId, col: number, row: number, z: number) => {
+      if (!showMarks) return;
+      for (const [ox, oy] of MARK[id]) {
+        const p = cellPos(col, row, z);
+        dummy.position.set(p.x + ox, p.y + oy, p.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.setScalar(1);
+        dummy.updateMatrix();
+        pips.setMatrixAt(pipN, dummy.matrix);
+        pipN += 1;
+      }
+    };
     if (sim && !title) {
       for (let y = HIDDEN_ROWS; y < HIDDEN_ROWS + VISIBLE_ROWS; y++) {
         for (let x = 0; x < COLS; x++) {
@@ -510,6 +561,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             pop,
             failT > 0 ? 0.45 + (1 - failT) * 0.3 : thump ? 1.45 : 1.12,
           );
+          if (showMarks) stamp(id as PieceId, x, row + below * settle + sink, 0.42);
         }
       }
       if (sim.piece && sim.phase !== "over" && sim.phase !== "clearing") {
@@ -517,6 +569,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
           place(solids, n++, c.x, row, 0.1, theme.fill[sim.piece.id], 1.03 + pickT * 0.22 + sim.lockSpark * 0.1, 1.28 + pickT * 0.5 + sim.lockSpark * 1.1);
+          stamp(sim.piece.id, c.x, row, 0.48);
         }
       }
     } else if (!reduce) {
@@ -537,6 +590,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
     solids.count = n;
     solids.instanceMatrix.needsUpdate = true;
+    pips.count = pipN;
+    pips.instanceMatrix.needsUpdate = true;
     if (solids.instanceColor) solids.instanceColor.needsUpdate = true;
 
     let g = 0;
@@ -1006,6 +1061,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     trimMat.dispose();
     solids.dispose();
     ghosts.dispose();
+    pipGeo.dispose();
+    pipMat.dispose();
+    pips.dispose();
     sparkGeo.dispose();
     sparkMat.dispose();
     sweepMat.dispose();

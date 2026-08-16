@@ -277,10 +277,12 @@ export function sfxPower(id: "zap" | "slow" | "shield" | "quake" | "pick") {
 const BEDS: Record<string, { bpm: number; notes: number[] }> = {
   marathon: { bpm: 92, notes: [196, 247, 294, 0, 330, 294, 247, 196] },
   sprint: { bpm: 118, notes: [262, 330, 392, 330, 349, 392, 0, 330] },
-  blitz: { bpm: 148, notes: [330, 392, 494, 392, 523, 494, 392, 330] },
+  blitz: { bpm: 168, notes: [311, 370, 466, 0, 415, 370, 311, 247] },
   daily: { bpm: 100, notes: [220, 262, 330, 262, 294, 330, 0, 220] },
   arcade: { bpm: 126, notes: [196, 247, 294, 247, 330, 294, 0, 247] },
   classic: { bpm: 88, notes: [196, 220, 247, 196, 262, 247, 0, 196] },
+  zen: { bpm: 64, notes: [196, 0, 247, 0, 294, 0, 247, 196] },
+  finesse: { bpm: 108, notes: [262, 294, 330, 0, 294, 330, 392, 330] },
 };
 
 let musicMode: string | null = null;
