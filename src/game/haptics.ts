@@ -1,5 +1,5 @@
 export type HapticKind = "move" | "rotate" | "lock" | "clear" | "tetris" | "over" | "select" | "win";
-export type HapticProfile = "full" | "light" | "off";
+export type HapticProfile = "full" | "light" | "lock" | "off";
 
 const FULL: Record<HapticKind, number | number[]> = {
   move: 5,
@@ -23,6 +23,17 @@ const LIGHT: Record<HapticKind, number | number[]> = {
   win: [10, 16, 22],
 };
 
+const LOCK: Record<HapticKind, number | number[]> = {
+  move: 0,
+  rotate: 0,
+  lock: 12,
+  clear: 14,
+  tetris: [12, 16, 24],
+  over: 24,
+  select: 0,
+  win: [10, 16, 22],
+};
+
 let profile: HapticProfile = "full";
 
 export function setHaptic(next: HapticProfile) {
@@ -34,7 +45,7 @@ export function haptic(kind: HapticKind) {
   if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
     return;
   }
-  const table = profile === "light" ? LIGHT : FULL;
+  const table = profile === "light" ? LIGHT : profile === "lock" ? LOCK : FULL;
   const pat = table[kind];
   if (!pat || pat === 0) return;
   try {

@@ -57,6 +57,7 @@ import {
   pickFromNext,
   predictCollision,
   pulseAction,
+  undoZen,
   type Sim,
 } from "@/game/sim";
 import { cellsOf, kickLabel } from "@/game/pieces";
@@ -113,6 +114,7 @@ type Ui = {
   padMode: PadMode;
   padSize: "compact" | "huge";
   marks: boolean;
+  holdRight: boolean;
   watching: boolean;
   streak: { count: number; last: string };
   missions: MissionBook;
@@ -140,6 +142,8 @@ type Ui = {
   danger: boolean;
   bag: PieceId[];
   canHold: boolean;
+  canUndo: boolean;
+  lockPop: number;
 };
 
 function forceCoach() {
@@ -219,6 +223,7 @@ export function TetrisApp() {
     padMode: saveRef.current.padMode,
     padSize: saveRef.current.padSize,
     marks: saveRef.current.marks,
+    holdRight: saveRef.current.holdRight,
     watching: false,
     streak: saveRef.current.streak,
     missions: saveRef.current.missions,
@@ -237,6 +242,8 @@ export function TetrisApp() {
     danger: false,
     bag: [],
     canHold: true,
+    canUndo: false,
+    lockPop: 0,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -576,8 +583,19 @@ export function TetrisApp() {
     }
     const live = sim.piece?.id ?? null;
     const danger = sim.phase === "playing" && inDanger(sim);
-    if (live !== u.live || danger !== u.danger || sim.canHold !== u.canHold) {
-      syncUi({ live, danger, bag: sim.bag.slice(), canHold: sim.canHold });
+    if (
+      live !== u.live ||
+      danger !== u.danger ||
+      sim.canHold !== u.canHold ||
+      !!sim.undo !== u.canUndo
+    ) {
+      syncUi({
+        live,
+        danger,
+        bag: sim.bag.slice(),
+        canHold: sim.canHold,
+        canUndo: !!sim.undo,
+      });
     }
 
     if (sim.mode === "finesse") {
@@ -649,7 +667,7 @@ export function TetrisApp() {
         }
       }
       if (sim.piece) pieceBorn.current = { x: sim.piece.x, keys: 0 };
-      syncUi();
+      syncUi({ lockPop: u.lockPop + 1 });
     }
     if (ev === "clear") {
       sfxClear();
@@ -1304,6 +1322,13 @@ export function TetrisApp() {
     syncUi({ marks: next });
   }
 
+  function toggleHoldRight() {
+    const next = !saveRef.current.holdRight;
+    saveRef.current = { ...saveRef.current, holdRight: next };
+    writeSave(saveRef.current);
+    syncUi({ holdRight: next });
+  }
+
   function onTheme(id: ThemeId) {
     const next = buyTheme(saveRef.current, id);
     if (!next) return;
@@ -1371,7 +1396,7 @@ export function TetrisApp() {
           <p className="hi">Best {ui.high.toLocaleString()}</p>
         </header>
 
-        <div className="stats">
+        <div className={`stats${ui.lockPop ? " is-lock" : ""}`}>
           <TickScore value={ui.score} />
           <Stat
             label={
@@ -1400,7 +1425,7 @@ export function TetrisApp() {
           />
         </div>
 
-        <div className="stage">
+        <div className={`stage${ui.holdRight ? " is-flip" : ""}`}>
           <aside className="rail">
             <p className="rail-label">Hold</p>
             <div
@@ -1474,7 +1499,11 @@ export function TetrisApp() {
                     startGame();
                   }}
                 >
-                  Play
+                  {ui.mode === "daily" &&
+                  saveRef.current.daily.date === utcDateKey() &&
+                  saveRef.current.daily.score > 0
+                    ? "Try again"
+                    : "Play"}
                 </button>
               </div>
             )}
@@ -1753,6 +1782,30 @@ export function TetrisApp() {
           onUse={usePower}
           pickOn={ui.picking}
         />
+        {ui.phase === "playing" && ui.mode === "zen" && ui.canUndo && (
+          <button
+            type="button"
+            className="text-btn undo-btn"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              const sim = simRef.current;
+              if (!sim || !undoZen(sim)) return;
+              sfxHold();
+              haptic("select");
+              syncUi({
+                canUndo: false,
+                score: sim.score,
+                lines: sim.lines,
+                hold: sim.hold,
+                next: sim.next,
+                bag: sim.bag.slice(),
+                live: sim.piece?.id ?? null,
+              });
+            }}
+          >
+            Undo last
+          </button>
+        )}
 
         <TouchPad
           onHold={(key, down) => {
@@ -1863,6 +1916,7 @@ export function TetrisApp() {
           padMode={ui.padMode}
           padSize={ui.padSize}
           marks={ui.marks}
+          holdRight={ui.holdRight}
           theme={ui.theme}
           themes={saveRef.current.themes}
           credits={ui.credits}
@@ -1873,6 +1927,7 @@ export function TetrisApp() {
           onPadMode={setPadMode}
           onPadSize={setPadSize}
           onMarks={toggleMarks}
+          onHoldRight={toggleHoldRight}
           musicVol={ui.musicVol}
           sfxVol={ui.sfxVol}
           onMix={setAudioMix}

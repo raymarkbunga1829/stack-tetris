@@ -7,7 +7,7 @@ import type { PadMode } from "./device";
 const KEY = "stack-tetris-v1";
 const SAVE_VERSION = 4;
 
-export type HapticProfile = "full" | "light" | "off";
+export type HapticProfile = "full" | "light" | "lock" | "off";
 
 export type ScoreRow = {
   mode: ModeId;
@@ -41,6 +41,7 @@ export type SaveData = {
   padMode: PadMode;
   padSize: "compact" | "huge";
   marks: boolean;
+  holdRight: boolean;
   mode: ModeId;
   missions: MissionBook;
   scores: ScoreRow[];
@@ -70,6 +71,7 @@ const DEFAULTS: SaveData = {
   padMode: "auto",
   padSize: "compact",
   marks: false,
+  holdRight: false,
   mode: "marathon",
   missions: emptyBook(),
   scores: [],
@@ -114,7 +116,10 @@ export function loadSave(): SaveData {
       receipts: Array.isArray(parsed.receipts) ? parsed.receipts : [],
       hardConfirm: parsed.hardConfirm === true,
       ghost: parsed.ghost !== false,
-      haptic: parsed.haptic === "light" || parsed.haptic === "off" ? parsed.haptic : "full",
+      haptic:
+        parsed.haptic === "light" || parsed.haptic === "off" || parsed.haptic === "lock"
+          ? parsed.haptic
+          : "full",
       theme: parsed.theme ?? "ink",
       themes: Array.isArray(parsed.themes) ? (parsed.themes as ThemeId[]) : ["ink"],
       onboarded: parsed.onboarded === true,
@@ -125,6 +130,7 @@ export function loadSave(): SaveData {
           : "auto",
       padSize: parsed.padSize === "huge" ? "huge" : "compact",
       marks: parsed.marks === true,
+      holdRight: parsed.holdRight === true,
       mode: parsed.mode ?? "marathon",
       missions: ensureMissions(parsed.missions),
       scores: Array.isArray(parsed.scores) ? parsed.scores : [],

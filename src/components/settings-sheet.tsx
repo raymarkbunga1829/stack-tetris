@@ -11,6 +11,7 @@ type Props = {
   padMode: PadMode;
   padSize: "compact" | "huge";
   marks: boolean;
+  holdRight: boolean;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
@@ -21,6 +22,7 @@ type Props = {
   onPadMode: (m: PadMode) => void;
   onPadSize: (s: "compact" | "huge") => void;
   onMarks: () => void;
+  onHoldRight: () => void;
   onTheme: (id: ThemeId) => void;
   musicVol: number;
   sfxVol: number;
@@ -35,6 +37,7 @@ export function SettingsSheet({
   padMode,
   padSize,
   marks,
+  holdRight,
   theme,
   themes,
   credits,
@@ -45,6 +48,7 @@ export function SettingsSheet({
   onPadMode,
   onPadSize,
   onMarks,
+  onHoldRight,
   onTheme,
   musicVol,
   sfxVol,
@@ -91,9 +95,9 @@ export function SettingsSheet({
         </label>
         <p className="shop-blurb">Haptics</p>
         <div className="shop-tabs">
-          {(["full", "light", "off"] as const).map((p) => (
+          {(["full", "light", "lock", "off"] as const).map((p) => (
             <button key={p} type="button" className={haptic === p ? "is-on" : ""} onClick={() => onHaptic(p)}>
-              {p}
+              {p === "lock" ? "Locks" : p}
             </button>
           ))}
         </div>
@@ -109,6 +113,10 @@ export function SettingsSheet({
         <button type="button" className={`set-row${marks ? " is-on" : ""}`} onClick={onMarks}>
           <span>Colorblind marks</span>
           <b>{marks ? "On" : "Off"}</b>
+        </button>
+        <button type="button" className={`set-row${holdRight ? " is-on" : ""}`} onClick={onHoldRight}>
+          <span>Hold on the right</span>
+          <b>{holdRight ? "On" : "Off"}</b>
         </button>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">

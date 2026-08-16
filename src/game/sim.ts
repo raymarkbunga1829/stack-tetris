@@ -1,6 +1,6 @@
 import { COIN_FOR_LINES, type PowerId } from "./shop";
 import { modeOf, mulberry32, type ModeId } from "./modes";
-import { takeSnap, REPLAY_CAP, type Snap } from "./replay";
+import { takeSnap, cloneBoard, REPLAY_CAP, type Snap } from "./replay";
 import { cellsOf, kicksFor } from "./pieces";
 import {
   ARR,
@@ -73,6 +73,21 @@ export type Sim = {
   perfects: number;
   lastPerfect: boolean;
   splits: number[];
+  lastDealt: PieceId | null;
+  undo: ZenUndo | null;
+};
+
+export type ZenUndo = {
+  board: Board;
+  piece: Piece;
+  hold: PieceId | null;
+  canHold: boolean;
+  bag: PieceId[];
+  next: PieceId[];
+  score: number;
+  lines: number;
+  combo: number;
+  b2b: boolean;
   lastDealt: PieceId | null;
 };
 
@@ -199,6 +214,7 @@ export function createSim(opts: NewGame = {}): Sim {
     lastPerfect: false,
     splits: [],
     lastDealt: null,
+    undo: null,
   };
   fillBag(sim);
   sim.next = sim.bag.slice(0, 5);
@@ -501,6 +517,21 @@ function hardDrop(sim: Sim): "ok" | "clearing" | "over" {
 function lockPiece(sim: Sim): "ok" | "clearing" | "over" {
   const p = sim.piece;
   if (!p) return "ok";
+  if (sim.mode === "zen") {
+    sim.undo = {
+      board: cloneBoard(sim.board),
+      piece: { ...p },
+      hold: sim.hold,
+      canHold: sim.canHold,
+      bag: sim.bag.slice(),
+      next: sim.next.slice(),
+      score: sim.score,
+      lines: sim.lines,
+      combo: sim.combo,
+      b2b: sim.b2b,
+      lastDealt: sim.lastDealt,
+    };
+  }
   for (const c of pieceCells(p)) {
     if (c.y < 0 || c.y >= ROWS) continue;
     sim.board[c.y]![c.x] = p.id;
@@ -825,6 +856,27 @@ function compactBoard(sim: Sim) {
 export function pauseToggle(sim: Sim) {
   if (sim.phase === "playing") sim.phase = "paused";
   else if (sim.phase === "paused") sim.phase = "playing";
+}
+
+export function undoZen(sim: Sim): boolean {
+  if (sim.mode !== "zen" || !sim.undo) return false;
+  const u = sim.undo;
+  sim.board = cloneBoard(u.board);
+  sim.hold = u.hold;
+  sim.canHold = true;
+  sim.bag = u.bag.slice();
+  sim.next = u.next.slice();
+  sim.score = u.score;
+  sim.lines = u.lines;
+  sim.combo = u.combo;
+  sim.b2b = u.b2b;
+  sim.lastDealt = u.lastDealt;
+  sim.clearRows = [];
+  sim.clearT = 0;
+  sim.phase = "playing";
+  sim.undo = null;
+  spawn(sim, u.piece.id);
+  return true;
 }
 
 export function visibleCells(sim: Sim): { x: number; y: number; id: PieceId }[] {

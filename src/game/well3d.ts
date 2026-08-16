@@ -617,11 +617,13 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
                   ))
           : 0.78;
         ghostMat.opacity = pulse;
-        const hex = theme.deep[sim.piece.id] ?? theme.fill[sim.piece.id];
+        const mine = theme.deep[sim.piece.id] ?? theme.fill[sim.piece.id];
+        const nxt = sim.next[0] ? theme.fill[sim.next[0]] : mine;
+        const tint = hex(mine).lerp(hex(nxt), 0.38).getStyle();
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, gy)) {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
-          place(ghosts, g++, c.x, row, 0.04, hex, 1, locking ? 1.15 : 1);
+          place(ghosts, g++, c.x, row, 0.04, tint, 1, locking ? 1.15 : 1);
         }
       }
     }
