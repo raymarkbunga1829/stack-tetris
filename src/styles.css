@@ -1096,14 +1096,19 @@
 }
 
 .cabinet.is-play .help,
+.cabinet.is-play .topbar,
 .cabinet.is-play:not(.is-paused) .modes,
 .cabinet.is-play:not(.is-paused) .missions,
-.cabinet.is-play:not(.is-paused) .foot,
-.cabinet.is-play:not(.is-paused) .topbar,
+.cabinet.is-play:not(.is-paused) .foot {
+  display: none;
+}
+
 .cabinet.is-paused .pad,
 .cabinet.is-paused .powers,
-.cabinet.is-paused .siege {
-  display: none;
+.cabinet.is-paused .siege,
+.cabinet.is-paused .missions {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .cabinet.is-play {
@@ -1112,20 +1117,38 @@
   padding-top: max(6px, env(safe-area-inset-top));
 }
 
-.cabinet.is-play.is-paused {
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
-}
-
 .cabinet.is-play.is-siege {
   grid-template-rows: auto minmax(0, 1fr) auto auto auto;
 }
 
-.cabinet.is-play.is-siege.is-paused {
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+.cabinet.is-paused .modes,
+.cabinet.is-paused .foot {
+  position: absolute;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 8;
 }
 
-.cabinet.is-paused {
-  grid-template-rows: auto minmax(0, 1fr);
+.cabinet.is-paused .foot {
+  bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.cabinet.is-paused .modes {
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 42px);
+  max-height: 34dvh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: none;
+  padding: 6px;
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--color-bg) 72%, transparent);
+}
+
+.cabinet.is-paused .modes button,
+.veil.is-pause,
+.veil.is-pause > *,
+.veil.is-pause .pause-card {
+  animation: none !important;
 }
 
 .cabinet.is-play .stats {
