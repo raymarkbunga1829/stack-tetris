@@ -69,7 +69,7 @@ import {
 } from "@/game/shop";
 import { CoachCard, nextCoach, type CoachStep } from "./coach-card";
 import { MiniPiece } from "./mini-piece";
-import { Mascots, mascotHold, type MascotAct } from "./mascots";
+import { Mascots, mascotHold, type MascotAct, type MascotWorld } from "./mascots";
 import { MissionRow } from "./mission-row";
 import { ModeStrip } from "./mode-strip";
 import { PowerBar } from "./power-bar";
@@ -224,10 +224,10 @@ export function TetrisApp() {
   uiRef.current = ui;
   const [buying, setBuying] = useState<string | null>(null);
   const [keysOn, setKeysOn] = useState(() => hasKeyboard());
-  const [crowd, setCrowd] = useState<MascotAct>("idle");
+  const [crowd, setCrowd] = useState<MascotAct>("nap");
   const crowdT = useRef(0);
-  const crowdRef = useRef<MascotAct>("idle");
-  const lookRef = useRef(0);
+  const crowdRef = useRef<MascotAct>("nap");
+  const worldRef = useRef<MascotWorld>({ look: 0, down: 0, duck: 0, asleep: true });
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -390,7 +390,8 @@ export function TetrisApp() {
     failT.current = 0;
     holdPeekT.current = 0;
     crowdT.current = 0;
-    setCrowd("idle");
+    pokeCrowd("wake");
+    worldRef.current.asleep = false;
     syncUi({
       phase: "playing",
       banner: null,
@@ -457,11 +458,19 @@ export function TetrisApp() {
     }
 
     const sim = simRef.current;
+    const playing = u.phase === "playing";
     if (sim?.piece) {
-      lookRef.current += ((sim.piece.x - 3.5) / 4.5 - lookRef.current) * 0.25;
+      worldRef.current.look += ((sim.piece.x - 3.5) / 4.5 - worldRef.current.look) * 0.25;
+      const rows = ghostY(sim) - sim.piece.y;
+      const wantDown = playing && rows <= 1 ? 1 : 0;
+      worldRef.current.down += (wantDown - worldRef.current.down) * 0.22;
     } else {
-      lookRef.current *= 0.92;
+      worldRef.current.look *= 0.92;
+      worldRef.current.down *= 0.88;
     }
+    const wantDuck = playing && held.down ? 1 : 0;
+    worldRef.current.duck += (wantDuck - worldRef.current.duck) * 0.28;
+    worldRef.current.asleep = u.phase === "title";
     if (!sim || u.phase === "title") return;
 
     if (sim.phase === "paused" || sim.phase === "over") {
@@ -521,9 +530,14 @@ export function TetrisApp() {
         else if (live && live.phase === "playing" && inDanger(live)) pokeCrowd("panic");
         else if (
           crowdRef.current === "stack" ||
-          crowdRef.current === "perfect" ||
+          crowdRef.current === "perfect"
+        ) {
+          pokeCrowd("bump");
+        } else if (
           crowdRef.current === "triple" ||
-          crowdRef.current === "tspin"
+          crowdRef.current === "tspin" ||
+          crowdRef.current === "bump" ||
+          crowdRef.current === "wake"
         ) {
           pokeCrowd("recover");
         } else {
@@ -1507,7 +1521,7 @@ export function TetrisApp() {
               <p className="gchip">{ui.gesture}</p>
             )}
           </div>
-          <Mascots act={crowd} lookRef={lookRef} />
+          <Mascots act={crowd} worldRef={worldRef} />
           </div>
 
           <aside className="rail">

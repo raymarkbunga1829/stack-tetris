@@ -166,6 +166,15 @@ export function sfxLock() {
   tone(90, 0.09, 0.01, "sine", 0.35);
   noiseBurst(0.06, 0, 0.12, 280, 0.6);
 }
+export function sfxLand(heavy = false) {
+  if (heavy) {
+    tone(86, 0.055, 0, "sine", 0.3);
+    noiseBurst(0.045, 0, 0.09, 180, 0.32);
+  } else {
+    tone(168, 0.035, 0, "triangle", 0.2);
+    noiseBurst(0.03, 0, 0.05, 360, 0.2);
+  }
+}
 export function sfxHold() {
   tone(400, 0.04, 0, "square", 0.3);
   tone(620, 0.05, 0.04, "square", 0.28);
