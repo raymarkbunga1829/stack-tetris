@@ -148,6 +148,7 @@ type Ui = {
   lockPop: number;
   lifting: boolean;
   pbPop: number;
+  coinTake: boolean;
 };
 
 function forceCoach() {
@@ -251,6 +252,7 @@ export function TetrisApp() {
     lockPop: 0,
     lifting: false,
     pbPop: 0,
+    coinTake: false,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -265,6 +267,7 @@ export function TetrisApp() {
   const lastMix = useRef({ music: 1, sfx: 1 });
   const attractUntil = useRef(0);
   const attractOn = useRef(false);
+  const quietT = useRef(0);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -420,7 +423,7 @@ export function TetrisApp() {
     const mode = nextMode ?? saveRef.current.mode;
     if (uiRef.current.phase === "title" && !uiRef.current.lifting) {
       syncUi({ lifting: true });
-      window.setTimeout(() => beginGame(mode), 300);
+      window.setTimeout(() => beginGame(mode), 480);
       return;
     }
     beginGame(mode);
@@ -448,6 +451,7 @@ export function TetrisApp() {
     finesseExtras.current = 0;
     pieceBorn.current = { x: sim.piece?.x ?? 3, keys: 0 };
     splitSeen.current = 0;
+    quietT.current = 0.48;
     syncUi({
       phase: "playing",
       banner: null,
@@ -476,6 +480,7 @@ export function TetrisApp() {
       failing: false,
       watching: false,
       lifting: false,
+      coinTake: false,
       live: sim.piece?.id ?? null,
       danger: false,
       bag: sim.bag.slice(),
@@ -570,6 +575,11 @@ export function TetrisApp() {
       } else if (!dying.current) {
         stepReplay(dt);
       }
+      return;
+    }
+
+    if (quietT.current > 0) {
+      quietT.current -= dt;
       return;
     }
 
@@ -858,6 +868,7 @@ export function TetrisApp() {
     syncUi({
       phase: "over",
       failing: false,
+      coinTake: true,
       streak: saveRef.current.streak,
       danger: false,
       live: null,
@@ -884,6 +895,9 @@ export function TetrisApp() {
       saveRef.current = { ...saveRef.current, tipSeen: true };
       writeSave(saveRef.current);
     }
+    window.setTimeout(() => {
+      if (uiRef.current.phase === "over") syncUi({ coinTake: false });
+    }, 720);
   }
 
   function stepReplay(dt: number) {
@@ -1452,7 +1466,10 @@ export function TetrisApp() {
     <main className="shell">
       <div
         className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}`}
-        style={{ ["--bezel" as string]: themeOf(ui.theme).frame }}
+        style={{
+          ["--bezel" as string]: themeOf(ui.theme).frame,
+          ["--accent" as string]: themeOf(ui.theme).flash,
+        }}
       >
         <header className="topbar">
           <h1 className="logo">Stack</h1>
@@ -1494,6 +1511,24 @@ export function TetrisApp() {
                 : String(ui.lines)
             }
           />
+          {ui.phase === "playing" && (
+            <button
+              type="button"
+              className="stat stat-pause"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                unlockAudio();
+                if (simRef.current) {
+                  pauseToggle(simRef.current);
+                  setMusicPaused(simRef.current.phase === "paused");
+                  syncUi({ phase: simRef.current.phase });
+                }
+              }}
+            >
+              <span className="stat-label">Game</span>
+              <span className="stat-value">Pause</span>
+            </button>
+          )}
         </div>
 
         <div className={`stage${ui.holdRight ? " is-flip" : ""}`}>
@@ -1643,7 +1678,13 @@ export function TetrisApp() {
                 </button>
               </div>
             )}
-            {ui.phase === "over" && !ui.failing && (
+            {ui.phase === "over" && !ui.failing && ui.coinTake && (
+              <div className="veil">
+                <p className="veil-kicker">Insert coin</p>
+                <p className="veil-title">Stack</p>
+              </div>
+            )}
+            {ui.phase === "over" && !ui.failing && !ui.coinTake && (
               <div className="veil">
                 <button
                   type="button"

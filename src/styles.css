@@ -457,7 +457,7 @@
 
 .pred-chip {
   position: absolute;
-  top: 36px;
+  top: 58px;
   left: 50%;
   z-index: 3;
   transform: translateX(-50%);
@@ -855,6 +855,10 @@
   pointer-events: none;
 }
 
+.pad-hold span {
+  display: block;
+}
+
 .pad-btn svg {
   width: 22px;
   height: 22px;
@@ -872,10 +876,10 @@
 }
 
 .pad-hard {
-  background: var(--color-fg);
+  background: color-mix(in oklab, var(--accent, var(--color-fg)) 78%, var(--color-fg));
   color: var(--color-bg);
-  border-color: var(--color-fg);
-  box-shadow: none;
+  border-color: var(--accent, var(--color-fg));
+  box-shadow: 0 0 14px color-mix(in oklab, var(--accent, var(--color-fg)) 28%, transparent);
   border-radius: 18px;
 }
 
@@ -963,6 +967,7 @@
 }
 
 .cabinet.is-play .stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -1836,6 +1841,13 @@ html.is-ios .help-android {
     animation: none !important;
     transition: none;
   }
+}
+
+.stat-pause {
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
 }
 
 .stat-hint {
