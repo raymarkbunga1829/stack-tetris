@@ -265,13 +265,18 @@
   padding: 0 4px 0;
   pointer-events: none;
   user-select: none;
+  overflow: visible;
+  z-index: 2;
 }
 
 .mascot-wrap {
   display: block;
-  width: 58px;
-  height: 58px;
+  width: 64px;
+  height: 64px;
   transform-origin: 50% 92%;
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-transform: translateZ(0);
 }
 
 .mascot {
@@ -281,6 +286,7 @@
   background-repeat: no-repeat;
   background-size: 200% 200%;
   background-position: 0 0;
+  transform: translateZ(0);
 }
 
 .mascot.soot {
@@ -291,302 +297,13 @@
   background-image: url("/mascots/lumen.png");
 }
 
-.mascots.is-idle .mascot-wrap.soot {
-  animation: mascot-breathe 3.1s ease-in-out infinite;
-}
-
-.mascots.is-idle .mascot-wrap.lumen {
-  animation: mascot-breathe 3.6s ease-in-out 0.45s infinite reverse;
-}
-
-.mascots.is-idle .mascot.soot {
-  animation: mascot-blink 3.4s steps(1) infinite;
-}
-
-.mascots.is-idle .mascot.lumen {
-  animation: mascot-blink 4.1s steps(1) 0.7s infinite;
-}
-
-.mascots.is-single .mascot-wrap.soot {
-  animation: mascot-nod 0.7s ease-out both;
-}
-
-.mascots.is-single .mascot-wrap.lumen {
-  animation: mascot-clap 0.7s ease-out both;
-}
-
-.mascots.is-single .mascot {
-  animation: mascot-wave 0.7s steps(1) both;
-}
-
-.mascots.is-double .mascot-wrap.soot {
-  animation: mascot-hop 0.78s ease-in-out both;
-}
-
-.mascots.is-double .mascot-wrap.lumen {
-  animation: mascot-hop 0.78s ease-in-out 0.06s both;
-}
-
-.mascots.is-double .mascot {
-  animation: mascot-grin 0.78s steps(1) both;
-}
-
-.mascots.is-triple .mascot-wrap.soot {
-  animation: mascot-spin-hop 1.05s cubic-bezier(0.22, 1.2, 0.36, 1) both;
-}
-
-.mascots.is-triple .mascot-wrap.lumen {
-  animation: mascot-spin-hop 1.05s cubic-bezier(0.22, 1.2, 0.36, 1) 0.08s both;
-}
-
-.mascots.is-triple .mascot {
-  animation: mascot-grin 1.05s steps(1) both;
-}
-
-.mascots.is-stack .mascot-wrap.soot {
-  animation: mascot-dance 1.4s ease-in-out both;
-}
-
-.mascots.is-stack .mascot-wrap.lumen {
-  animation: mascot-dance 1.4s ease-in-out 0.1s both;
-}
-
-.mascots.is-stack .mascot {
-  animation: mascot-party 1.4s steps(1) both;
-}
-
-.mascots.is-tspin .mascot-wrap.soot {
-  animation: mascot-wow 1.05s ease-out both;
-}
-
-.mascots.is-tspin .mascot-wrap.lumen {
-  animation: mascot-wow 1.05s ease-out 0.07s both;
-}
-
-.mascots.is-tspin .mascot {
-  animation: mascot-wave 1.05s steps(1) both;
-}
-
-.mascots.is-perfect .mascot-wrap {
-  animation: mascot-dance 1.4s ease-in-out both;
-}
-
-.mascots.is-perfect .mascot {
-  animation: mascot-party 1.4s steps(1) both;
-}
-
-.mascots.is-panic .mascot-wrap.soot {
-  animation: mascot-tremble 0.14s linear infinite;
-}
-
-.mascots.is-panic .mascot-wrap.lumen {
-  animation: mascot-tremble 0.16s linear infinite reverse;
-}
-
-.mascots.is-fail .mascot-wrap {
-  animation: mascot-slump 0.85s ease-in forwards;
-}
-
-@keyframes mascot-blink {
-  0%,
-  78% {
-    background-position: 0 0;
+@media (pointer: coarse) {
+  .pit {
+    grid-template-rows: minmax(0, 1fr) 68px;
   }
-  80%,
-  88% {
-    background-position: 100% 0;
-  }
-  90%,
-  100% {
-    background-position: 0 0;
-  }
-}
-
-@keyframes mascot-wave {
-  0%,
-  35% {
-    background-position: 0 100%;
-  }
-  36%,
-  100% {
-    background-position: 100% 100%;
-  }
-}
-
-@keyframes mascot-grin {
-  0%,
-  40% {
-    background-position: 100% 100%;
-  }
-  41%,
-  100% {
-    background-position: 0 100%;
-  }
-}
-
-@keyframes mascot-party {
-  0%,
-  20% {
-    background-position: 0 100%;
-  }
-  21%,
-  45% {
-    background-position: 100% 100%;
-  }
-  46%,
-  70% {
-    background-position: 0 100%;
-  }
-  71%,
-  100% {
-    background-position: 100% 100%;
-  }
-}
-
-@keyframes mascot-breathe {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-2deg) scale(1, 1);
-  }
-  35% {
-    transform: translateY(-3px) rotate(1.8deg) scale(1.03, 0.97);
-  }
-  68% {
-    transform: translateY(-1px) rotate(-1deg) scale(0.99, 1.02);
-  }
-}
-
-@keyframes mascot-nod {
-  0% {
-    transform: translateY(0) rotate(0deg);
-  }
-  35% {
-    transform: translateY(3px) rotate(-12deg);
-  }
-  70% {
-    transform: translateY(-4px) rotate(8deg);
-  }
-  100% {
-    transform: translateY(0) rotate(-2deg);
-  }
-}
-
-@keyframes mascot-clap {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  25% {
-    transform: translateY(-6px) scale(1.06, 0.94);
-  }
-  50% {
-    transform: translateY(0) scale(0.96, 1.05);
-  }
-  75% {
-    transform: translateY(-5px) scale(1.05, 0.95);
-  }
-}
-
-@keyframes mascot-hop {
-  0%,
-  100% {
-    transform: translateY(0) scale(1, 1);
-  }
-  18% {
-    transform: translateY(3px) scale(1.08, 0.88);
-  }
-  42% {
-    transform: translateY(-14px) scale(0.94, 1.08);
-  }
-  62% {
-    transform: translateY(2px) scale(1.06, 0.9);
-  }
-  80% {
-    transform: translateY(-6px) scale(0.98, 1.03);
-  }
-}
-
-@keyframes mascot-spin-hop {
-  0% {
-    transform: translateY(0) rotate(0deg) scale(1);
-  }
-  20% {
-    transform: translateY(2px) scale(1.1, 0.86);
-  }
-  48% {
-    transform: translateY(-18px) rotate(-18deg) scale(1.08);
-  }
-  72% {
-    transform: translateY(-8px) rotate(12deg);
-  }
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-}
-
-@keyframes mascot-dance {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  15% {
-    transform: translateY(-10px) rotate(-14deg) scale(1.08);
-  }
-  30% {
-    transform: translateY(0) rotate(10deg);
-  }
-  45% {
-    transform: translateY(-16px) rotate(16deg) scale(1.1);
-  }
-  60% {
-    transform: translateY(0) rotate(-8deg);
-  }
-  78% {
-    transform: translateY(-8px) rotate(8deg);
-  }
-}
-
-@keyframes mascot-wow {
-  0% {
-    transform: translateY(0) rotate(0) scale(1);
-  }
-  30% {
-    transform: translateY(-4px) rotate(-16deg) scale(1.12);
-  }
-  55% {
-    transform: translateY(-10px) rotate(10deg) scale(1.06);
-  }
-  100% {
-    transform: translateY(0) rotate(-2deg) scale(1);
-  }
-}
-
-@keyframes mascot-tremble {
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  25% {
-    transform: translate(-3px, 1px) rotate(-7deg);
-  }
-  75% {
-    transform: translate(3px, -1px) rotate(7deg);
-  }
-}
-
-@keyframes mascot-slump {
-  0% {
-    transform: translateY(0) rotate(0) scale(1);
-  }
-  100% {
-    transform: translateY(8px) rotate(-18deg) scale(0.92, 0.88);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mascot-wrap,
-  .mascot {
-    animation: none !important;
+  .mascot-wrap {
+    width: 70px;
+    height: 70px;
   }
 }
 
