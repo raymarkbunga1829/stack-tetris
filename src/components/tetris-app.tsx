@@ -34,6 +34,7 @@ import { applyMissions, type MissionBook } from "@/game/missions";
 import {
   dailySeed,
   formatClock,
+  sprintPace,
   modeOf,
   utcDateKey,
   type ModeId,
@@ -150,6 +151,7 @@ type Ui = {
   pbPop: number;
   coinTake: boolean;
   levelPop: number;
+  bagPop: number;
 };
 
 function forceCoach() {
@@ -255,6 +257,7 @@ export function TetrisApp() {
     pbPop: 0,
     coinTake: false,
     levelPop: 0,
+    bagPop: 0,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -270,6 +273,7 @@ export function TetrisApp() {
   const attractUntil = useRef(0);
   const attractOn = useRef(false);
   const quietT = useRef(0);
+  const bagN = useRef(0);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -453,6 +457,7 @@ export function TetrisApp() {
     finesseExtras.current = 0;
     pieceBorn.current = { x: sim.piece?.x ?? 3, keys: 0 };
     splitSeen.current = 0;
+    bagN.current = sim.bag.length;
     quietT.current = 0.48;
     syncUi({
       phase: "playing",
@@ -633,6 +638,10 @@ export function TetrisApp() {
     }
     const live = sim.piece?.id ?? null;
     const danger = sim.phase === "playing" && inDanger(sim);
+    if (sim.bag.length > bagN.current + 3) {
+      syncUi({ bagPop: u.bagPop + 1, bag: sim.bag.slice() });
+    }
+    bagN.current = sim.bag.length;
     if (
       live !== u.live ||
       danger !== u.danger ||
@@ -1033,7 +1042,7 @@ export function TetrisApp() {
       text.startsWith("STACK") || text.startsWith("T-SPIN") || text === "ALL CLEAR";
     const mid = text === "TRIPLE" || text === "DOUBLE";
     bannerKind.current = big ? "big" : mid ? "mid" : "plain";
-    bannerT.current = big ? 1.35 : mid ? 1.05 : 0.8;
+    bannerT.current = big ? 1.55 : mid ? 1.25 : 1;
     syncUi({ banner: text });
   }
 
@@ -1501,8 +1510,8 @@ export function TetrisApp() {
                 : (ui.lines % 10) / 10
             }
             hint={
-              ui.mode === "sprint" && ui.sprintBest != null
-                ? `PB ${formatClock(ui.sprintBest)}`
+              ui.mode === "sprint"
+                ? sprintPace(ui.clock, ui.lines, ui.sprintBest)
                 : undefined
             }
           />
@@ -1652,6 +1661,7 @@ export function TetrisApp() {
                   }}
                 >
                   ×
+                  <em>Home</em>
                 </button>
                 <p className="veil-kicker">Still here</p>
                 <p className="veil-title">Paused</p>
@@ -1706,6 +1716,7 @@ export function TetrisApp() {
                   }}
                 >
                   ×
+                  <em>Home</em>
                 </button>
                 <p className="veil-kicker">
                   {ui.won
@@ -1873,7 +1884,7 @@ export function TetrisApp() {
                 ))}
             </div>
             {ui.phase === "playing" && ui.bag.length > 0 && (
-              <div className="bag-strip" aria-label="Left in bag">
+              <div className={`bag-strip${ui.bagPop ? " is-fill" : ""}`} aria-label="Left in bag">
                 <b>{ui.bag.length}</b>
                 {ui.bag.map((id, i) => (
                   <i key={`${id}-${i}`} style={{ background: themeOf(ui.theme).fill[id] }} />
@@ -1923,6 +1934,7 @@ export function TetrisApp() {
             advanceCoach("hold");
           }}
           slam={ui.lockPop}
+          spent={ui.phase === "playing" && !ui.canHold}
           onUndo={
             ui.phase === "playing" && ui.mode === "zen" && ui.canUndo
               ? () => {

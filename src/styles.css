@@ -433,13 +433,26 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  min-height: 40px;
+  padding: 4px 0 6px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 12px;
   background: color-mix(in oklab, var(--color-bg) 55%, transparent);
   color: var(--color-fg);
-  font: 500 1.4rem/1 var(--font-sans);
+  font: 500 1.25rem/1 var(--font-sans);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.veil-x em {
+  font: 600 0.52rem/1 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-style: normal;
+  opacity: 0.7;
 }
 
 .daily-bag {
@@ -767,6 +780,25 @@
   text-align: center;
   font: 600 0.58rem/1 var(--font-mono);
   color: var(--color-muted);
+}
+
+.bag-strip.is-fill i {
+  animation: bag-fill 0.4s ease-out;
+}
+
+@keyframes bag-fill {
+  0% {
+    transform: scale(1.8);
+    opacity: 0.3;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.pad-hold.is-spent {
+  opacity: 0.38;
 }
 
 .cabinet.is-slam .pad-hard,
@@ -1886,6 +1918,8 @@ html.is-ios .help-android {
   cursor: pointer;
   text-align: left;
   color: inherit;
+  background: color-mix(in oklab, var(--color-raised) 55%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-fg) 8%, transparent);
 }
 
 .stat-hint {

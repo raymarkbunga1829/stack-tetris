@@ -157,6 +157,14 @@ export function formatClock(sec: number): string {
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
+export function sprintPace(clock: number, lines: number, pb: number | null): string | undefined {
+  if (pb == null) return undefined;
+  if (lines < 1) return `PB ${formatClock(pb)}`;
+  const d = clock - pb * (lines / 40);
+  const sign = d >= 0 ? "+" : "−";
+  return `${sign}${Math.abs(d).toFixed(1)}`;
+}
+
 export function peekDailyBag(n = 4): PieceId[] {
   const rng = mulberry32(dailySeed());
   const bag = PIECE_IDS.slice();
