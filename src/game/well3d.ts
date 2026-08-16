@@ -60,8 +60,8 @@ function cellPos(col: number, row: number, z = 0) {
 export type Well3d = {
   resize: () => void;
   draw: (sim: Sim | null, shake: number, theme: Theme, showGhost?: boolean, showMarks?: boolean) => void;
-  punch: (amount: number) => void;
-  nod: (amount: number) => void;
+  punch: (amount: number, force?: boolean) => void;
+  nod: (amount: number, force?: boolean) => void;
   setAsh: (board: import("./sim").Board | null) => void;
   setStain: (cells: { x: number; y: number }[] | null) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
@@ -889,13 +889,13 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     composer.render();
   }
 
-  function punchCam(amount: number) {
-    if (reduce) return;
+  function punchCam(amount: number, force = false) {
+    if (reduce && !force) return;
     punch = Math.min(1.25, punch + amount);
   }
 
-  function nod(amount: number) {
-    if (reduce) return;
+  function nod(amount: number, force = false) {
+    if (reduce && !force) return;
     nodT = Math.min(1.1, nodT + amount);
   }
 
@@ -959,11 +959,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   }
 
   function lockThump(cells: { x: number; y: number }[], _hexCol: string, slam = true) {
-    if (reduce) return;
     lockKeys.clear();
     for (const c of cells) lockKeys.add(`${c.x},${c.y}`);
-    lockPulse = slam ? 1 : 0.45;
-    if (slam) punchCam(0.22);
+    lockPulse = slam ? 1 : 0.28;
+    if (slam) punchCam(0.28, true);
   }
 
   function shatter(sim: Sim, theme: Theme) {
@@ -1005,8 +1004,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     toY: number,
     hexCol: string,
   ) {
-    if (reduce) return;
-    const steps = Math.min(6, Math.max(2, Math.floor((toY - piece.y) / 2)));
+    const steps = Math.min(8, Math.max(2, Math.floor((toY - piece.y) / 2) || 2));
     for (let s = 1; s <= steps; s++) {
       const y = piece.y + ((toY - piece.y) * s) / (steps + 1);
       for (const c of cellsOf(piece.id, piece.rot as 0 | 1 | 2 | 3, piece.x, Math.round(y))) {

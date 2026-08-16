@@ -765,28 +765,12 @@ export function TetrisApp() {
     }
     if (ev === "lock") {
       sfxLock();
-      const engine = well3dRef.current;
-      const hard = just.hard;
-      if (engine && falling) {
-        const destY = hard ? ghostAt : falling.y;
-        const cells = cellsOf(falling.id, falling.rot, falling.x, destY);
-        const col = themeOf(saveRef.current.theme).fill[falling.id];
-        if (hard) {
-          haptic("tetris");
-          engine.lockThump(cells, col, true);
-          engine.punch(0.34);
-          engine.nod(0.42);
-          if (ghostAt - falling.y >= 1) engine.hardStreak(falling, ghostAt, col);
-          sfxHard();
-          shakeRef.current = Math.max(shakeRef.current, 9);
-          syncUi({ lockPop: u.lockPop + 1 });
-        } else {
-          haptic("lock");
-          engine.lockThump(cells, col, false);
-          if (held.down) engine.softTrail(falling, col);
-        }
-      } else {
-        haptic("lock");
+      slamLock(just.hard, falling, just.hard ? ghostAt : falling?.y ?? 0);
+      if (held.down && falling && !just.hard) {
+        well3dRef.current?.softTrail(
+          falling,
+          themeOf(saveRef.current.theme).fill[falling.id],
+        );
       }
       if (sim.phase === "clearing" && sim.clearRows.length) {
         juiceClear(
@@ -1130,6 +1114,30 @@ export function TetrisApp() {
     replayI.current = (replayI.current + 1) % snaps.length;
   }
 
+  function slamLock(
+    hard: boolean,
+    falling: { id: PieceId; rot: 0 | 1 | 2 | 3; x: number; y: number } | null,
+    destY: number,
+  ) {
+    const engine = well3dRef.current;
+    if (!engine || !falling) return;
+    const cells = cellsOf(falling.id, falling.rot, falling.x, destY);
+    const col = themeOf(saveRef.current.theme).fill[falling.id];
+    if (hard) {
+      haptic("tetris");
+      engine.lockThump(cells, col, true);
+      engine.punch(0.4, true);
+      engine.nod(0.5, true);
+      engine.hardStreak(falling, destY, col);
+      sfxHard();
+      shakeRef.current = Math.max(shakeRef.current, 10);
+      syncUi({ lockPop: uiRef.current.lockPop + 1 });
+    } else {
+      haptic("lock");
+      engine.lockThump(cells, col, false);
+    }
+  }
+
   function pulseNow(p: Partial<Pad>) {
     const sim = simRef.current;
     const u = uiRef.current;
@@ -1141,6 +1149,8 @@ export function TetrisApp() {
     if (sim.mode === "finesse" && (p.left || p.right || p.cw || p.ccw)) {
       pieceBorn.current.keys += 1;
     }
+    const fallingPulse = sim.piece;
+    const ghostPulse = fallingPulse ? ghostY(sim) : 0;
     const ev = pulseAction(sim, p);
     if (ev === "move") {
       sfxMove();
@@ -1161,8 +1171,7 @@ export function TetrisApp() {
     }
     if (ev === "lock" || ev === "over") {
       sfxLock();
-      haptic("lock");
-      if (p.hard) sfxHard();
+      slamLock(!!p.hard, fallingPulse, p.hard ? ghostPulse : fallingPulse?.y ?? 0);
       const live = simRef.current;
       if (live && live.clearRows.length) {
         juiceClear(
