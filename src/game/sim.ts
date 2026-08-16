@@ -87,6 +87,7 @@ export type InputFrame = {
   justCcw: boolean;
   justHold: boolean;
   nudge: number;
+  das?: number;
 };
 
 export type StepEvent =
@@ -625,7 +626,7 @@ function handleShift(sim: Sim, input: InputFrame, dt: number) {
   }
   if (sim.dasDir !== dir) {
     sim.dasDir = dir;
-    sim.dasT = DAS;
+    sim.dasT = input.das ?? DAS;
     sim.arrT = 0;
     return;
   }
@@ -699,6 +700,8 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
 
   if (!grounded(sim, sim.piece)) {
     sim.lockT = 0;
+    const slid = input.justLeft || input.justRight || Math.abs(input.nudge) > 0;
+    if (slid) return "move";
     sim.gravityAcc += capped;
     let ev: StepEvent = "none";
     while (sim.piece && sim.gravityAcc >= g) {
@@ -833,4 +836,28 @@ export function visibleCells(sim: Sim): { x: number; y: number; id: PieceId }[] 
     }
   }
   return out;
+}
+
+export function pulseAction(
+  sim: Sim,
+  p: {
+    left?: boolean;
+    right?: boolean;
+    cw?: boolean;
+    ccw?: boolean;
+    hard?: boolean;
+    hold?: boolean;
+  },
+): StepEvent {
+  if (sim.phase !== "playing" || !sim.piece) return "none";
+  if (p.hold && holdPiece(sim)) return "hold";
+  if (p.cw && tryRotate(sim, 1)) return "rotate";
+  if (p.ccw && tryRotate(sim, -1)) return "rotate";
+  if (p.hard) {
+    const r = hardDrop(sim);
+    return r === "over" ? "over" : "lock";
+  }
+  if (p.left && tryShift(sim, -1)) return "move";
+  if (p.right && tryShift(sim, 1)) return "move";
+  return "none";
 }

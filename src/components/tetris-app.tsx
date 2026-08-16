@@ -28,7 +28,7 @@ import {
 import { haptic, setHaptic } from "@/game/haptics";
 import { hasKeyboard, isAndroid, isIOS, onKeyboard, showPad, type PadMode } from "@/game/device";
 import { createGestures, type GestureEmit, type GestureLabel } from "@/game/gestures";
-import { createInput, type InputApi } from "@/game/input";
+import { createInput, type InputApi, type Pad } from "@/game/input";
 import { applyMissions, type MissionBook } from "@/game/missions";
 import {
   dailySeed,
@@ -55,10 +55,11 @@ import {
   pauseToggle,
   pickFromNext,
   predictCollision,
+  pulseAction,
   type Sim,
 } from "@/game/sim";
 import { cellsOf, kickLabel } from "@/game/pieces";
-import { HIDDEN_ROWS, COLS, type Phase, type PieceId } from "@/game/types";
+import { HIDDEN_ROWS, COLS, DAS_TOUCH, DAS, type Phase, type PieceId } from "@/game/types";
 import {
   buyWithCredits,
   consumePower,
@@ -227,7 +228,15 @@ export function TetrisApp() {
   const [crowd, setCrowd] = useState<MascotAct>("nap");
   const crowdT = useRef(0);
   const crowdRef = useRef<MascotAct>("nap");
-  const worldRef = useRef<MascotWorld>({ look: 0, down: 0, duck: 0, asleep: true });
+  const worldRef = useRef<MascotWorld>({
+    look: 0,
+    down: 0,
+    duck: 0,
+    asleep: true,
+    shake: 0,
+    sleepT: 0,
+  });
+  const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -279,6 +288,7 @@ export function TetrisApp() {
 
     const input = createInput();
     inputRef.current = input;
+    input.setPulse((p) => pulseRef.current(p));
     const gestures = createGestures((ev) => applyGestureRef.current(ev));
     swipeRef.current = gestures;
 
@@ -460,10 +470,13 @@ export function TetrisApp() {
     const sim = simRef.current;
     const playing = u.phase === "playing";
     if (sim?.piece) {
-      worldRef.current.look += ((sim.piece.x - 3.5) / 4.5 - worldRef.current.look) * 0.25;
+      const gx = (sim.piece.x - 3.5) / 4.5;
+      worldRef.current.look += (gx - worldRef.current.look) * 0.25;
       const rows = ghostY(sim) - sim.piece.y;
-      const wantDown = playing && rows <= 1 ? 1 : 0;
-      worldRef.current.down += (wantDown - worldRef.current.down) * 0.22;
+      const ghostSee = Math.max(0, Math.min(1, rows / 12));
+      const lock = playing && rows <= 1 ? 1 : 0;
+      const wantDown = playing ? ghostSee * 0.55 + lock * 0.5 : 0;
+      worldRef.current.down += (wantDown - worldRef.current.down) * 0.2;
     } else {
       worldRef.current.look *= 0.92;
       worldRef.current.down *= 0.88;
@@ -471,6 +484,9 @@ export function TetrisApp() {
     const wantDuck = playing && held.down ? 1 : 0;
     worldRef.current.duck += (wantDuck - worldRef.current.duck) * 0.28;
     worldRef.current.asleep = u.phase === "title";
+    worldRef.current.shake = shakeRef.current / 8;
+    if (u.phase === "title") worldRef.current.sleepT += dt;
+    else worldRef.current.sleepT = Math.max(0, worldRef.current.sleepT - dt * 0.35);
     if (!sim || u.phase === "title") return;
 
     if (sim.phase === "paused" || sim.phase === "over") {
@@ -500,6 +516,7 @@ export function TetrisApp() {
       justCcw: just.ccw,
       justHold: just.hold,
       nudge: input.takeNudge(),
+      das: showPad(u.padMode) ? DAS_TOUCH : DAS,
     });
 
     if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 10);
@@ -786,8 +803,65 @@ export function TetrisApp() {
   function pokeCrowd(act: MascotAct) {
     crowdRef.current = act;
     setCrowd(act);
-    crowdT.current = mascotHold(act);
+    crowdT.current = mascotHold(act, worldRef.current.sleepT);
   }
+
+  function pulseNow(p: Partial<Pad>) {
+    const sim = simRef.current;
+    const u = uiRef.current;
+    if (p.hard && (u.phase === "title" || u.phase === "over")) {
+      startGame();
+      return;
+    }
+    if (!sim || sim.phase !== "playing") return;
+    const ev = pulseAction(sim, p);
+    if (ev === "move") {
+      sfxMove();
+      haptic("move");
+    }
+    if (ev === "rotate") {
+      sfxRotate();
+      haptic("rotate");
+      if (sim.lastKickIndex > 0) flashBanner(kickLabel(sim.lastKickIndex));
+    }
+    if (ev === "hold") {
+      sfxHold();
+      haptic("select");
+      payMissions({ hold: 1 });
+      well3dRef.current?.punch(0.12);
+      holdPeekT.current = 0.85;
+      syncUi({ holdPeek: sim.piece?.id ?? null });
+    }
+    if (ev === "lock" || ev === "over") {
+      sfxLock();
+      haptic("lock");
+      if (p.hard) sfxHard();
+      const live = simRef.current;
+      if (live && live.clearRows.length) {
+        juiceClear(
+          live.tSpin
+            ? "tspin"
+            : live.clearRows.length === 4
+              ? "stack"
+              : live.clearRows.length === 3
+                ? "triple"
+                : live.clearRows.length === 2
+                  ? "double"
+                  : "single",
+        );
+      }
+      if (ev === "over") {
+        dying.current = true;
+        well3dRef.current?.failBeat();
+        failT.current = 0.9;
+        pokeCrowd("fail");
+        syncUi({ failing: true });
+      } else {
+        syncUi();
+      }
+    }
+  }
+  pulseRef.current = pulseNow;
 
   function juiceClear(kind: "single" | "double" | "triple" | "stack" | "tspin") {
     const engine = well3dRef.current;

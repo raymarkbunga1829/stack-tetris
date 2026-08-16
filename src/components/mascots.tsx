@@ -21,9 +21,12 @@ export type MascotWorld = {
   down: number;
   duck: number;
   asleep: boolean;
+  shake: number;
+  sleepT: number;
 };
 
 type Who = "soot" | "lumen";
+const MASS: Record<Who, number> = { soot: 1.22, lumen: 0.84 };
 type Bit = "none" | "glance" | "scratch" | "hop" | "peer";
 
 type Pose = { x: number; y: number; r: number; sx: number; sy: number };
@@ -94,6 +97,7 @@ function stepHop(
   g: number,
   heavy: number,
 ) {
+  const mass = heavy;
   s.dust = Math.max(0, s.dust - dt * 2.8);
   s.dip = Math.max(0, s.dip - dt * 7.2);
   s.tilt *= Math.exp(-dt * 7);
@@ -121,12 +125,12 @@ function stepHop(
       s.rebound = -hit * (heavy > 1 ? 0.16 : 0.28);
       s.dust = Math.min(1, 0.45 + w * 0.7);
       s.dip = (2.2 + w * 4) * heavy;
-      s.tilt = (heavy > 1 ? -1 : 1) * (5 + w * 7);
+      s.tilt = (mass > 1 ? -1 : 1) * (5 + w * 7);
       if (hit > 90) {
-        other.v -= (heavy > 1 ? 55 : 40);
-        other.tilt += heavy > 1 ? 7 : -6;
-        other.squash = Math.max(other.squash, 0.14);
-        sfxLand(heavy > 1);
+        other.v -= 48 * mass;
+        other.tilt += mass > 1 ? 7 : -6;
+        other.squash = Math.max(other.squash, 0.1 + mass * 0.05);
+        sfxLand(mass);
       }
     } else {
       s.v = 0;
@@ -139,17 +143,18 @@ function kick(s: Spring, impulse: number) {
   s.v = Math.min(s.v, 0) + impulse;
 }
 
-function idleTarget(who: Who, t: number, recover: number, asleep: boolean): Pose {
+function idleTarget(who: Who, t: number, recover: number, asleep: boolean, sleepT: number): Pose {
   const ph = who === "soot" ? 0 : 1.37;
-  const heavy = who === "soot" ? 1 : 0.78;
+  const heavy = MASS[who];
   if (asleep) {
-    const breath = Math.sin(t * 0.85 + ph) * 0.45;
+    const debt = clamp(sleepT / 18);
+    const breath = Math.sin(t * (0.85 - debt * 0.25) + ph) * 0.45;
     return {
-      x: who === "soot" ? -2 : 2,
-      y: 5 + breath * -1.2,
-      r: who === "soot" ? -22 : 20,
-      sx: 1.06 + breath * 0.02,
-      sy: 0.9 - breath * 0.02,
+      x: who === "soot" ? -2 - debt : 2 + debt,
+      y: 5 + debt * 4.2 + breath * -1.2,
+      r: (who === "soot" ? -22 : 20) * (1 + debt * 0.35),
+      sx: 1.06 + debt * 0.06 + breath * 0.02,
+      sy: 0.9 - debt * 0.06 - breath * 0.02,
     };
   }
   const rec = clamp(recover / 1.15);
@@ -185,7 +190,7 @@ function bitOffset(who: Who, bit: Bit, t: number): Partial<Pose> {
   return {};
 }
 
-function reactSpin(who: Who, act: MascotAct, t: number): Partial<Pose> {
+function reactSpin(who: Who, act: MascotAct, t: number, sleepT = 0): Partial<Pose> {
   const side = who === "soot" ? -1 : 1;
   const late = who === "lumen" ? 0.05 : 0;
   const u = Math.max(0, t - late);
@@ -218,8 +223,10 @@ function reactSpin(who: Who, act: MascotAct, t: number): Partial<Pose> {
     return { x: down * side * 3, r: down * side * -16 };
   }
   if (act === "wake") {
-    const stretch = pulse(u, 0, 0.35);
-    const shake = pulse(u, 0.28, 0.7);
+    const debt = clamp(sleepT / 18);
+    const span = 0.35 + debt * 0.35;
+    const stretch = pulse(u, 0, span);
+    const shake = pulse(u, span * 0.7, 0.55 + debt * 0.4);
     return { y: stretch * -3, r: shake * side * 8, sx: 1 + stretch * 0.08, sy: 1 - stretch * 0.06 };
   }
   if (act === "bump") {
@@ -302,7 +309,14 @@ export function Mascots({
       if (act !== "idle" && act !== "recover") reactT += dt;
       recover.current = Math.max(0, recover.current - dt);
 
-      const worldIn = worldRef.current ?? { look: 0, down: 0, duck: 0, asleep: false };
+      const worldIn = worldRef.current ?? {
+        look: 0,
+        down: 0,
+        duck: 0,
+        asleep: false,
+        shake: 0,
+        sleepT: 0,
+      };
       const want = worldIn.look;
       eye.current += (want - eye.current) * (1 - Math.exp(-dt * 18));
       neck.current += (eye.current - neck.current) * (1 - Math.exp(-dt * 8));
@@ -330,7 +344,7 @@ export function Mascots({
       const once = (mask: number, when: boolean, who: Who, impulse: number) => {
         if (!when || fired.current & mask) return;
         fired.current |= mask;
-        kick(hop.current[who], impulse);
+        kick(hop.current[who], impulse / MASS[who]);
       };
       const u = reactT;
       once(1, act === "single" && u > 0.08, "soot", -210);
@@ -357,8 +371,8 @@ export function Mascots({
 
       const floor = act === "fail" ? 8 : 0;
       const g = act === "fail" ? 420 : 860;
-      stepHop(hop.current.soot, hop.current.lumen, dt, floor, g, 1.18);
-      stepHop(hop.current.lumen, hop.current.soot, dt, floor, g * 1.06, 0.86);
+      stepHop(hop.current.soot, hop.current.lumen, dt, floor, g * MASS.soot, MASS.soot);
+      stepHop(hop.current.lumen, hop.current.soot, dt, floor, g * MASS.lumen, MASS.lumen);
 
       const w = world.current;
       const watching = act === "idle" || act === "recover" || act === "panic" || act === "nap";
@@ -366,13 +380,15 @@ export function Mascots({
       const sit = (who: Who) => {
         let to =
           act === "idle" || act === "recover" || act === "nap"
-            ? idleTarget(who, w, recover.current, asleep)
-            : { ...rest(), ...reactSpin(who, act, reactT) };
+            ? idleTarget(who, w, recover.current, asleep, worldIn.sleepT)
+            : { ...rest(), ...reactSpin(who, act, reactT, worldIn.sleepT) };
         if (act === "idle" && !asleep) to = add(to, bitOffset(who, bit.current, bitT.current));
         const h = hop.current[who];
         const air = h.y < -1;
-        to.y += h.y + h.dip + duck * 5 + down * 1.4;
-        to.r += h.tilt + down * (who === "soot" ? 6 : -6);
+        const ride = worldIn.shake;
+        to.y += h.y + h.dip + duck * 5 + down * 1.4 + ride * 0.15;
+        to.r += h.tilt + down * (who === "soot" ? 6 : -6) + ride * (who === "soot" ? -2.4 : 2.4);
+        to.x += ride * (who === "soot" ? -0.55 : 0.55);
         to.sx *= 1 + h.squash * 0.2 - (air ? 0.04 : 0) + duck * 0.08;
         to.sy *= 1 - h.squash * 0.22 + (air ? 0.06 : 0) - duck * 0.12;
         if (watching && !asleep) {
@@ -497,12 +513,12 @@ export function Mascots({
   );
 }
 
-export function mascotHold(act: MascotAct): number {
+export function mascotHold(act: MascotAct, sleepT = 0): number {
   if (act === "stack" || act === "perfect") return 1.55;
   if (act === "triple" || act === "tspin") return 1.15;
   if (act === "fail") return 1.3;
   if (act === "recover") return 1.15;
-  if (act === "wake") return 0.72;
+  if (act === "wake") return 0.55 + clamp(sleepT / 18) * 0.75;
   if (act === "bump") return 0.58;
   if (act === "double") return 0.95;
   if (act === "panic") return 0.7;

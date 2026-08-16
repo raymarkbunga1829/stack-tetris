@@ -90,6 +90,8 @@ export function createInput() {
   let prev = blank();
   let inject = blank();
   let touch = blank();
+  let skipJust = blank();
+  let onPulse: ((p: Partial<Pad>) => void) | null = null;
   let nudgeAcc = 0;
   const powerQ: PowerId[] = [];
 
@@ -172,23 +174,33 @@ export function createInput() {
   function sample(): InputState {
     const held = poll();
     const just: Pad = {
-      left: held.left && !prev.left,
-      right: held.right && !prev.right,
-      down: held.down && !prev.down,
-      hard: held.hard && !prev.hard,
-      cw: held.cw && !prev.cw,
-      ccw: held.ccw && !prev.ccw,
-      hold: held.hold && !prev.hold,
-      pause: held.pause && !prev.pause,
-      confirm: held.confirm && !prev.confirm,
+      left: held.left && !prev.left && !skipJust.left,
+      right: held.right && !prev.right && !skipJust.right,
+      down: held.down && !prev.down && !skipJust.down,
+      hard: held.hard && !prev.hard && !skipJust.hard,
+      cw: held.cw && !prev.cw && !skipJust.cw,
+      ccw: held.ccw && !prev.ccw && !skipJust.ccw,
+      hold: held.hold && !prev.hold && !skipJust.hold,
+      pause: held.pause && !prev.pause && !skipJust.pause,
+      confirm: held.confirm && !prev.confirm && !skipJust.confirm,
     };
     prev = held;
     inject = blank();
+    skipJust = blank();
     return { held, just };
   }
 
   function tap(partial: Partial<Pad>) {
+    if (onPulse) {
+      onPulse(partial);
+      skipJust = { ...skipJust, ...partial, left: skipJust.left || !!partial.left, right: skipJust.right || !!partial.right, down: skipJust.down || !!partial.down, hard: skipJust.hard || !!partial.hard, cw: skipJust.cw || !!partial.cw, ccw: skipJust.ccw || !!partial.ccw, hold: skipJust.hold || !!partial.hold, pause: skipJust.pause || !!partial.pause, confirm: skipJust.confirm || !!partial.confirm };
+      return;
+    }
     inject = { ...inject, ...partial };
+  }
+
+  function setPulse(fn: ((p: Partial<Pad>) => void) | null) {
+    onPulse = fn;
   }
 
   function setTouch(partial: Partial<Pad>) {
@@ -220,7 +232,7 @@ export function createInput() {
     window.removeEventListener("blur", clearKeys);
   }
 
-  return { sample, tap, setTouch, nudge, takeNudge, takePower, setKeys, dispose };
+  return { sample, tap, setTouch, setPulse, nudge, takeNudge, takePower, setKeys, dispose };
 }
 
 export type InputApi = ReturnType<typeof createInput>;

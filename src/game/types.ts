@@ -13,6 +13,7 @@ export const PIECE_IDS: PieceId[] = ["I", "O", "T", "S", "Z", "J", "L"];
 export const LOCK_DELAY = 0.5;
 export const MAX_LOCK_RESETS = 15;
 export const DAS = 0.167;
+export const DAS_TOUCH = 0.1;
 export const ARR = 0.033;
 export const CLEAR_TIME = 0.32;
 export const LINES_PER_LEVEL = 10;

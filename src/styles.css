@@ -362,33 +362,33 @@
 }
 
 .soot-ant {
-  top: 4%;
-  left: 46%;
+  top: 2%;
+  left: 48%;
   width: 2px;
-  height: 16px;
+  height: 15px;
   border-radius: 2px;
-  background: linear-gradient(#3a3a44, #141418);
-  box-shadow: -5px 2px 0 -0.2px #2c2c34;
+  background: linear-gradient(#c9a227, #2a2a32);
+  box-shadow: -6px 3px 0 -0.2px #1a1a20;
 }
 
 .lumen-tuft {
-  right: 10%;
-  bottom: 22%;
-  width: 13px;
-  height: 9px;
+  right: 8%;
+  bottom: 20%;
+  width: 14px;
+  height: 10px;
   border-radius: 60% 40% 50% 50%;
-  background: radial-gradient(circle at 40% 40%, #f4ead4, #cbb892);
-  opacity: 0.92;
+  background: radial-gradient(circle at 40% 40%, #f7f1e4, #d4c4a0);
+  opacity: 0.9;
 }
 
 .mascot.soot,
 .mascot-head.soot {
-  background-image: url("/mascots/soot.png");
+  background-image: url("/mascots/nox.png");
 }
 
 .mascot.lumen,
 .mascot-head.lumen {
-  background-image: url("/mascots/lumen.png");
+  background-image: url("/mascots/gleam.png");
 }
 
 @media (pointer: coarse) {
