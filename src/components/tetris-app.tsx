@@ -1789,6 +1789,25 @@ export function TetrisApp() {
                 B2B
               </p>
             )}
+            {ui.phase === "playing" && (
+              <button
+                type="button"
+                className="well-pause"
+                aria-label="Pause"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  unlockAudio();
+                  if (simRef.current) {
+                    pauseToggle(simRef.current);
+                    setMusicPaused(simRef.current.phase === "paused");
+                    syncUi({ phase: simRef.current.phase });
+                  }
+                }}
+              >
+                Pause
+              </button>
+            )}
             {ui.coach && ui.phase === "playing" && (
               <CoachCard step={ui.coach} onSkip={finishCoach} />
             )}

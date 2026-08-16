@@ -981,16 +981,16 @@
 
 .well-pause {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 3;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in oklab, var(--color-fg) 18%, transparent);
+  top: 6px;
+  left: 8px;
+  z-index: 5;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in oklab, var(--color-fg) 22%, transparent);
   border-radius: 999px;
-  background: color-mix(in oklab, var(--color-bg) 72%, transparent);
+  background: color-mix(in oklab, var(--color-bg) 78%, transparent);
   color: var(--color-fg);
-  font: 600 0.65rem/1 var(--font-sans);
+  font: 600 0.72rem/1 var(--font-sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
