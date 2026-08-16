@@ -263,6 +263,11 @@ export function sfxHold() {
   pulse(262, 0.04, 0, 25, 0.34);
   pulse(392, 0.05, 0.04, 25, 0.32);
 }
+export function sfxOmen() {
+  stealLead(0.16);
+  pulse(1568, 0.12, 0, 12, 0.22);
+  pulse(2093, 0.18, 0.06, 12, 0.16);
+}
 export function sfxClear(n = 1) {
   if (n >= 4) {
     sfxTetris();

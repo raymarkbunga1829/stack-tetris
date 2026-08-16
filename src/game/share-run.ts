@@ -11,11 +11,13 @@ export type SharePayload = {
   clock: number;
   splits?: number[];
   frames?: Snap[];
+  epitaph?: string;
 };
 
 export async function shareRun(run: SharePayload): Promise<void> {
   const text = [
     `Stack · ${run.mode}`,
+    run.epitaph ? run.epitaph : "",
     `${run.score.toLocaleString()} · ${run.lines}L · x${run.combo}`,
     run.splits?.length
       ? run.splits.map((s, i) => `${(i + 1) * 10} ${formatClock(s)}`).join(" · ")
@@ -35,9 +37,14 @@ export async function shareRun(run: SharePayload): Promise<void> {
     ctx.fillStyle = "#8b8d96";
     ctx.font = "600 32px system-ui, sans-serif";
     ctx.fillText(run.mode.toUpperCase(), 120, 180);
+    if (run.epitaph) {
+      ctx.fillStyle = "#c8b070";
+      ctx.font = "600 40px system-ui, sans-serif";
+      ctx.fillText(run.epitaph, 120, 236);
+    }
     ctx.fillStyle = "#f2efe6";
     ctx.font = "700 96px system-ui, sans-serif";
-    ctx.fillText(run.score.toLocaleString(), 120, 300);
+    ctx.fillText(run.score.toLocaleString(), 120, run.epitaph ? 360 : 300);
     ctx.font = "600 36px system-ui, sans-serif";
     ctx.fillStyle = "#c8c6bf";
     ctx.fillText(`${run.lines} lines · x${run.combo} · ${formatClock(run.clock)}`, 120, 360);

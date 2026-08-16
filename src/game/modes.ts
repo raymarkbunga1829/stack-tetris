@@ -154,6 +154,13 @@ export function utcShift(days: number, from = utcDateKey()): string {
   return d.toISOString().slice(0, 10);
 }
 
+export function moonPhase(d = new Date()): number {
+  const known = Date.UTC(2000, 0, 6, 18, 14, 0);
+  const days = (d.getTime() - known) / 86400000;
+  const syn = 29.530588;
+  return (((days % syn) + syn) % syn) / syn;
+}
+
 export function hashSeed(text: string): number {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) {

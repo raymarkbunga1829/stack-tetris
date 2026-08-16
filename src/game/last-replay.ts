@@ -56,3 +56,44 @@ export function getLastAsh(): Board | null {
   }
   return null;
 }
+
+const STAIN = "stack-last-stain";
+let stain: { x: number; y: number }[] | null = null;
+let stainPeak = 99;
+
+export function setLastStain(cells: { x: number; y: number }[], peak: number) {
+  stain = cells;
+  stainPeak = peak;
+  try {
+    sessionStorage.setItem(STAIN, JSON.stringify({ cells, peak }));
+  } catch {
+    /* quota */
+  }
+}
+
+export function getLastStain(): { cells: { x: number; y: number }[]; peak: number } | null {
+  if (stain) return { cells: stain, peak: stainPeak };
+  try {
+    const raw = sessionStorage.getItem(STAIN);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { cells: { x: number; y: number }[]; peak: number };
+    if (parsed?.cells?.length) {
+      stain = parsed.cells;
+      stainPeak = parsed.peak;
+      return { cells: stain, peak: stainPeak };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+export function clearLastStain() {
+  stain = null;
+  stainPeak = 99;
+  try {
+    sessionStorage.removeItem(STAIN);
+  } catch {
+    /* ignore */
+  }
+}

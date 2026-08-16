@@ -80,6 +80,8 @@ export type Sim = {
   omenAt: number;
   locks: number;
   blessed: boolean;
+  omenFalse: boolean;
+  curseLeft: number;
 };
 
 export type ZenUndo = {
@@ -162,6 +164,15 @@ function fillBag(sim: Sim) {
 
 function takeNext(sim: Sim): PieceId {
   fillBag(sim);
+  if (sim.curseLeft > 0) {
+    sim.curseLeft -= 1;
+    const junk: PieceId[] = ["S", "Z", "O", "S", "Z"];
+    const id = junk[Math.floor(sim.rng() * junk.length)]!;
+    const i = sim.bag.indexOf(id);
+    if (i >= 0) sim.bag.splice(i, 1);
+    sim.next = sim.bag.slice(0, 5);
+    return id;
+  }
   const id = sim.bag.shift()!;
   sim.next = sim.bag.slice(0, 5);
   return id;
@@ -225,6 +236,8 @@ export function createSim(opts: NewGame = {}): Sim {
     omenAt: 7 + Math.floor(rng() * 6),
     locks: 0,
     blessed: false,
+    omenFalse: false,
+    curseLeft: 0,
   };
   fillBag(sim);
   sim.next = sim.bag.slice(0, 5);
@@ -341,7 +354,10 @@ function spawn(sim: Sim, id: PieceId): boolean {
     }
   }
   sim.piece = piece;
-  if (!sim.omenDone && sim.locks >= sim.omenAt) sim.omenOn = true;
+  if (!sim.omenDone && sim.locks >= sim.omenAt) {
+    sim.omenOn = true;
+    sim.omenFalse = sim.rng() < 1 / 7;
+  }
   sim.gravityAcc = 0;
   sim.lockT = 0;
   sim.lockResets = 0;
@@ -548,6 +564,7 @@ function lockPiece(sim: Sim): "ok" | "clearing" | "over" {
     sim.board[c.y]![c.x] = p.id;
   }
   const omenRows = sim.omenOn ? pieceCells(p).map((c) => c.y) : [];
+  const omenLie = sim.omenOn && sim.omenFalse;
   if (sim.omenOn) {
     sim.omenOn = false;
     sim.omenDone = true;
@@ -576,7 +593,10 @@ function lockPiece(sim: Sim): "ok" | "clearing" | "over" {
   sim.clearRows = full;
   sim.clearT = CLEAR_TIME;
   sim.phase = "clearing";
-  if (full.length === 4 && omenRows.some((y) => full.includes(y))) sim.blessed = true;
+  if (full.length === 4 && omenRows.some((y) => full.includes(y))) {
+    if (omenLie) sim.curseLeft = 2;
+    else sim.blessed = true;
+  }
   return "clearing";
 }
 

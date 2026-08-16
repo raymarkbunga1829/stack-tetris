@@ -63,6 +63,7 @@ export type Well3d = {
   punch: (amount: number) => void;
   nod: (amount: number) => void;
   setAsh: (board: import("./sim").Board | null) => void;
+  setStain: (cells: { x: number; y: number }[] | null) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
   shatter: (sim: Sim, theme: Theme) => void;
@@ -123,6 +124,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let nodT = 0;
   let ashBoard: import("./sim").Board | null = null;
   let ashT = 0;
+  let stainCells: { x: number; y: number }[] = [];
   let lastDraw = performance.now();
   const bloomBase = reduce ? 0.12 : mobile ? 0.32 : 0.48;
 
@@ -659,6 +661,13 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (solids.instanceColor) solids.instanceColor.needsUpdate = true;
 
     let g = 0;
+    if (stainCells.length) {
+      ghostMat.opacity = 0.2;
+      for (const c of stainCells) {
+        if (g >= MAX_GHOST - 12) break;
+        place(ghosts, g++, c.x, c.y, -0.08, "#2a2018", 1, 0.28);
+      }
+    }
     if (ashBoard && ashT > 0) {
       ashT = Math.max(0, ashT - dt * 0.14);
       ghostMat.opacity = 0.14 * ashT;
@@ -1177,6 +1186,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     setAsh: (board) => {
       ashBoard = board;
       ashT = board ? 1 : 0;
+    },
+    setStain: (cells) => {
+      stainCells = cells ?? [];
     },
     sparkRows,
     lockThump,

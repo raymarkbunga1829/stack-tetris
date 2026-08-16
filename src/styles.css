@@ -2067,6 +2067,14 @@ html.is-ios .help-android {
   text-transform: uppercase;
 }
 
+.moon-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: rgba(8, 10, 16, calc(1 - var(--moon, 1)));
+}
+
 .cabinet.is-takeover .well::after,
 .cabinet.is-cinema .well::after {
   content: "";

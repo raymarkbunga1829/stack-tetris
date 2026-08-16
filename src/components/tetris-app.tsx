@@ -11,6 +11,7 @@ import {
   sfxLevel,
   sfxLock,
   sfxMove,
+  sfxOmen,
   sfxOver,
   sfxPerfect,
   sfxPower,
@@ -35,11 +36,12 @@ import {
   dailySeed,
   formatClock,
   sprintPace,
+  moonPhase,
   modeOf,
   utcDateKey,
   type ModeId,
 } from "@/game/modes";
-import { getLastAsh, getLastReplay, setLastAsh, setLastReplay } from "@/game/last-replay";
+import { clearLastStain, getLastAsh, getLastReplay, getLastStain, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { nameRun } from "@/game/run-name";
 import { shareRun } from "@/game/share-run";
 import { REPLAY_STEP, type Snap } from "@/game/replay";
@@ -64,7 +66,7 @@ import {
   type Sim,
 } from "@/game/sim";
 import { cellsOf, kickLabel } from "@/game/pieces";
-import { HIDDEN_ROWS, COLS, DAS_TOUCH, DAS, type Phase, type PieceId } from "@/game/types";
+import { HIDDEN_ROWS, COLS, ROWS, DAS_TOUCH, DAS, type Phase, type PieceId } from "@/game/types";
 import {
   buyWithCredits,
   consumePower,
@@ -289,6 +291,7 @@ export function TetrisApp() {
   const bagN = useRef(0);
   const holdUsed = useRef(false);
   const lockN = useRef(0);
+  const sawOmen = useRef(false);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -473,10 +476,13 @@ export function TetrisApp() {
     pieceBorn.current = { x: sim.piece?.x ?? 3, keys: 0 };
     holdUsed.current = false;
     lockN.current = 0;
+    sawOmen.current = false;
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 1.55;
     well3dRef.current?.setAsh(getLastAsh());
+    const stain = getLastStain();
+    well3dRef.current?.setStain(stain?.cells ?? null);
     const intro =
       mode === "sprint"
         ? "40"
@@ -670,6 +676,10 @@ export function TetrisApp() {
       flashBanner(pb ? `${mark} PB` : String(mark));
       if (pb) syncUi({ pbPop: u.pbPop + 1 });
     }
+    if (sim.omenOn && !sawOmen.current) {
+      sawOmen.current = true;
+      sfxOmen();
+    }
     const live = sim.piece?.id ?? null;
     const danger = sim.phase === "playing" && inDanger(sim);
     if (live && live !== u.live && u.phase === "playing") {
@@ -800,6 +810,8 @@ export function TetrisApp() {
         sim.blessed = false;
         syncUi({ picking: true });
         flashBanner("Name it.");
+      } else if (sim.curseLeft === 2 && ev === "tetris") {
+        flashBanner("A lie.");
       } else if (!saveRef.current.niceSeen) {
         saveRef.current = { ...saveRef.current, niceSeen: true };
         writeSave(saveRef.current);
@@ -842,7 +854,23 @@ export function TetrisApp() {
 
     if (sim.score !== u.score || sim.level !== u.level || sim.lines !== u.lines) {
       if (sim.level > u.level) sfxLevel();
-      if (sim.lines > u.lines) payMissions({ lines: sim.lines - u.lines, level: sim.level });
+      if (sim.lines > u.lines) {
+        payMissions({ lines: sim.lines - u.lines, level: sim.level });
+        const stain = getLastStain();
+        if (stain) {
+          let top = 99;
+          for (let y = HIDDEN_ROWS; y < ROWS; y++) {
+            if (sim.board[y]!.some((c) => c)) {
+              top = y - HIDDEN_ROWS;
+              break;
+            }
+          }
+          if (top > stain.peak) {
+            clearLastStain();
+            well3dRef.current?.setStain(null);
+          }
+        }
+      }
       else payMissions({ level: sim.level });
       const pred = predictCollision(sim);
       syncUi({
@@ -929,7 +957,20 @@ export function TetrisApp() {
       replayT.current = 0;
       setLastReplay(sim.history);
     }
-    if (!sim.won) setLastAsh(sim.board);
+    if (!sim.won) {
+      setLastAsh(sim.board);
+      const cells: { x: number; y: number }[] = [];
+      let peak = 99;
+      for (let y = HIDDEN_ROWS; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          if (!sim.board[y]?.[x]) continue;
+          const row = y - HIDDEN_ROWS;
+          cells.push({ x, y: row });
+          if (row < peak) peak = row;
+        }
+      }
+      if (cells.length) setLastStain(cells, peak);
+    }
     const epitaph = nameRun({
       mode: sim.mode,
       score: sim.score,
@@ -1576,6 +1617,8 @@ export function TetrisApp() {
             ? themeOf(ui.theme).fill[ui.live]
             : themeOf(ui.theme).frame,
           ["--mode" as string]: modeOf(ui.mode).tint,
+          ["--moon" as string]:
+            ui.mode === "daily" ? String(0.45 + moonPhase() * 0.55) : "1",
         }}
       >
         <header className="topbar">
@@ -1689,9 +1732,18 @@ export function TetrisApp() {
             <canvas ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
             <div className={`marquee${ui.phase === "over" || ui.phase === "paused" ? " is-dark" : ""}`}>
-              <span>HI {ui.high.toLocaleString()}</span>
+              <span>
+                {ui.theme === "citrine"
+                  ? "Citrine"
+                  : ui.theme === "blood"
+                    ? "Blood Moon"
+                    : ui.theme === "quiet"
+                      ? "Quiet Glass"
+                      : `HI ${ui.high.toLocaleString()}`}
+              </span>
             </div>
             {ui.scan && <i className="scan" aria-hidden="true" />}
+            {ui.mode === "daily" && <i className="moon-wash" aria-hidden="true" />}
             <p className="carving" aria-hidden="true">
               {modeOf(ui.mode).carving}
             </p>
@@ -1922,6 +1974,7 @@ export function TetrisApp() {
                         clock: ui.recap!.clock,
                         splits: ui.mode === "sprint" ? ui.recap!.splits : undefined,
                         frames: getLastReplay() ?? replayRef.current ?? undefined,
+                        epitaph: ui.epitaph ?? undefined,
                       });
                     }}
                   >
