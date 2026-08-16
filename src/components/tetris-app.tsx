@@ -152,6 +152,7 @@ type Ui = {
   coinTake: boolean;
   levelPop: number;
   bagPop: number;
+  dropAsk: boolean;
 };
 
 function forceCoach() {
@@ -258,6 +259,7 @@ export function TetrisApp() {
     coinTake: false,
     levelPop: 0,
     bagPop: 0,
+    dropAsk: false,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -274,6 +276,8 @@ export function TetrisApp() {
   const attractOn = useRef(false);
   const quietT = useRef(0);
   const bagN = useRef(0);
+  const holdUsed = useRef(false);
+  const lockN = useRef(0);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -456,6 +460,9 @@ export function TetrisApp() {
     finesseN.current = 0;
     finesseExtras.current = 0;
     pieceBorn.current = { x: sim.piece?.x ?? 3, keys: 0 };
+    holdUsed.current = false;
+    lockN.current = 0;
+    bagN.current = sim.bag.length;
     splitSeen.current = 0;
     bagN.current = sim.bag.length;
     quietT.current = 0.48;
@@ -488,6 +495,7 @@ export function TetrisApp() {
       watching: false,
       lifting: false,
       coinTake: false,
+      dropAsk: false,
       live: sim.piece?.id ?? null,
       danger: false,
       bag: sim.bag.slice(),
@@ -726,6 +734,16 @@ export function TetrisApp() {
         }
       }
       if (sim.piece) pieceBorn.current = { x: sim.piece.x, keys: 0 };
+      lockN.current += 1;
+      if (
+        lockN.current >= 20 &&
+        !holdUsed.current &&
+        !saveRef.current.holdHinted
+      ) {
+        saveRef.current = { ...saveRef.current, holdHinted: true };
+        writeSave(saveRef.current);
+        flashBanner("Hold parks a piece.");
+      }
       syncUi({ lockPop: u.lockPop + 1 });
     }
     if (ev === "clear") {
@@ -1317,10 +1335,14 @@ export function TetrisApp() {
     const now = performance.now();
     if (now - hardArm.current < 480) {
       hardArm.current = 0;
+      syncUi({ dropAsk: false });
       return true;
     }
     hardArm.current = now;
-    flashBanner("Drop?");
+    syncUi({ dropAsk: true });
+    window.setTimeout(() => {
+      if (performance.now() - hardArm.current >= 470) syncUi({ dropAsk: false });
+    }, 500);
     return false;
   }
 
@@ -1481,6 +1503,9 @@ export function TetrisApp() {
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: themeOf(ui.theme).flash,
+          ["--piece" as string]: ui.live
+            ? themeOf(ui.theme).fill[ui.live]
+            : themeOf(ui.theme).frame,
         }}
       >
         <header className="topbar">
@@ -1512,6 +1537,15 @@ export function TetrisApp() {
             hint={
               ui.mode === "sprint"
                 ? sprintPace(ui.clock, ui.lines, ui.sprintBest)
+                : undefined
+            }
+            hot={
+              ui.mode === "blitz" && ui.timeLeft != null
+                ? ui.timeLeft <= 3
+                  ? "red"
+                  : ui.timeLeft <= 10
+                    ? "amber"
+                    : undefined
                 : undefined
             }
           />
@@ -1555,6 +1589,7 @@ export function TetrisApp() {
                 e.preventDefault();
                 unlockAudio();
                 inputRef.current?.tap({ hold: true });
+                holdUsed.current = true;
                 advanceCoach("hold");
               }}
             >
@@ -1758,7 +1793,7 @@ export function TetrisApp() {
                       </li>
                     )}
                     {ui.recap.extras != null && (
-                      <li>
+                      <li className={ui.recap.extras === 0 ? "is-clean" : "is-messy"}>
                         <span>Extra taps</span>
                         <b>{ui.recap.extras}</b>
                       </li>
@@ -1930,11 +1965,13 @@ export function TetrisApp() {
           }}
           onHoldPiece={() => {
             unlockAudio();
+            holdUsed.current = true;
             inputRef.current?.tap({ hold: true });
             advanceCoach("hold");
           }}
           slam={ui.lockPop}
           spent={ui.phase === "playing" && !ui.canHold}
+          dropAsk={ui.dropAsk}
           onUndo={
             ui.phase === "playing" && ui.mode === "zen" && ui.canUndo
               ? () => {
@@ -2068,14 +2105,16 @@ function Stat({
   value,
   fill,
   hint,
+  hot,
 }: {
   label: string;
   value: string;
   fill?: number;
   hint?: string;
+  hot?: "amber" | "red";
 }) {
   return (
-    <div className="stat">
+    <div className={`stat${hot ? ` is-${hot}` : ""}`}>
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value}</span>
       {hint && <span className="stat-hint">{hint}</span>}

@@ -11,6 +11,7 @@ type Props = {
   onUndo?: () => void;
   slam?: number;
   spent?: boolean;
+  dropAsk?: boolean;
 };
 
 function Icon({ d, label }: { d: string; label: string }) {
@@ -33,7 +34,7 @@ const ICO = {
   hold: "M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3V4H7zm7 0v16h3a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3z",
 };
 
-export function TouchPad({ onHold, onCw, onCcw, onHard, onHoldPiece, onUndo, slam = 0, spent = false }: Props) {
+export function TouchPad({ onHold, onCw, onCcw, onHard, onHoldPiece, onUndo, slam = 0, spent = false, dropAsk = false }: Props) {
   const [down, setDown] = useState<Partial<Record<HoldKey, boolean>>>({});
   const held = useRef<Set<HoldKey>>(new Set());
 
@@ -157,7 +158,7 @@ export function TouchPad({ onHold, onCw, onCcw, onHard, onHoldPiece, onUndo, sla
         <button
           type="button"
           key={slam}
-          className={`pad-btn pad-hard${slam ? " is-slam" : ""}`}
+          className={`pad-btn pad-hard${slam ? " is-slam" : ""}${dropAsk ? " is-ask" : ""}`}
           aria-label="Hard drop"
           onPointerDown={tap(onHard)}
         >

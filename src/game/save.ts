@@ -50,6 +50,7 @@ export type SaveData = {
   sprintBest: number | null;
   sprintSplits: number[];
   niceSeen: boolean;
+  holdHinted: boolean;
   scan: boolean;
   dailyBoard: { date: string; rows: ScoreRow[] };
   streak: { count: number; last: string };
@@ -83,6 +84,7 @@ const DEFAULTS: SaveData = {
   sprintBest: null,
   sprintSplits: [],
   niceSeen: false,
+  holdHinted: false,
   scan: false,
   dailyBoard: { date: "", rows: [] },
   streak: { count: 0, last: "" },
@@ -145,6 +147,7 @@ export function loadSave(): SaveData {
       sprintBest: typeof parsed.sprintBest === "number" ? parsed.sprintBest : null,
       sprintSplits: Array.isArray(parsed.sprintSplits) ? parsed.sprintSplits.filter((n): n is number => typeof n === "number") : [],
       niceSeen: parsed.niceSeen === true,
+      holdHinted: parsed.holdHinted === true,
       scan: parsed.scan === true,
       dailyBoard: parsed.dailyBoard ?? { date: "", rows: [] },
       streak: parsed.streak ?? { count: 0, last: "" },

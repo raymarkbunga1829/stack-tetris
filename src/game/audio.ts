@@ -61,7 +61,7 @@ function applyGains() {
   const t = bus.ctx.currentTime;
   bus.sfx.gain.setTargetAtTime(0.32 * sfxVol, t, 0.03);
   const bed = 0.18 * musicVol;
-  bus.music.gain.setTargetAtTime(musicPaused ? bed * 0.5 : bed, t, 0.05);
+  bus.music.gain.setTargetAtTime(musicPaused ? bed * 0.28 : bed, t, 0.08);
   bus.master.gain.setTargetAtTime(1, t, 0.02);
 }
 
