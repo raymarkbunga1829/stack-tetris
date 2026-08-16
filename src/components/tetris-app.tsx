@@ -69,6 +69,7 @@ import {
 } from "@/game/shop";
 import { CoachCard, nextCoach, type CoachStep } from "./coach-card";
 import { MiniPiece } from "./mini-piece";
+import { Mascots, mascotMood } from "./mascots";
 import { MissionRow } from "./mission-row";
 import { ModeStrip } from "./mode-strip";
 import { PowerBar } from "./power-bar";
@@ -1227,6 +1228,7 @@ export function TetrisApp() {
             </div>
           </aside>
 
+          <div className="pit">
           <div
             ref={wellRef}
             className="well"
@@ -1453,6 +1455,15 @@ export function TetrisApp() {
             {ui.gesture && ui.phase === "playing" && (
               <p className="gchip">{ui.gesture}</p>
             )}
+          </div>
+          <Mascots
+            mood={mascotMood({
+              failing: ui.failing,
+              combo: ui.combo,
+              banner: ui.banner,
+              lock: !!ui.pred?.lock,
+            })}
+          />
           </div>
 
           <aside className="rail">

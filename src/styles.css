@@ -159,6 +159,13 @@
   min-width: 0;
 }
 
+.pit {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 58px;
+  min-width: 0;
+  min-height: 0;
+}
+
 .rail {
   display: flex;
   flex-direction: column;
@@ -249,6 +256,94 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.mascots {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 6px 2px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mascot {
+  width: 56px;
+  height: 56px;
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  animation: mascot-idle 1.05s steps(1) infinite;
+}
+
+.mascot.soot {
+  background-image: url("/mascots/soot.png");
+}
+
+.mascot.lumen {
+  background-image: url("/mascots/lumen.png");
+}
+
+.mascots.is-cheer .mascot {
+  animation:
+    mascot-idle 0.42s steps(1) infinite,
+    mascot-hop 0.42s ease-in-out infinite;
+}
+
+.mascots.is-panic .mascot {
+  animation:
+    mascot-idle 0.18s steps(1) infinite,
+    mascot-shake 0.16s linear infinite;
+}
+
+@keyframes mascot-idle {
+  0%,
+  24% {
+    background-position: 0 0;
+  }
+  25%,
+  49% {
+    background-position: 100% 0;
+  }
+  50%,
+  74% {
+    background-position: 0 100%;
+  }
+  75%,
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes mascot-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes mascot-shake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-3px) rotate(-6deg);
+  }
+  75% {
+    transform: translateX(3px) rotate(6deg);
+  }
+}
+
+@media (max-height: 520px) {
+  .pit {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .mascots {
+    display: none;
+  }
 }
 
 .veil {
