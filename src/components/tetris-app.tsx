@@ -765,23 +765,28 @@ export function TetrisApp() {
     }
     if (ev === "lock") {
       sfxLock();
-      haptic("lock");
       const engine = well3dRef.current;
+      const hard = just.hard;
       if (engine && falling) {
-        engine.lockThump(
-          cellsOf(falling.id, falling.rot, falling.x, falling.y),
-          themeOf(saveRef.current.theme).fill[falling.id],
-        );
-        if (just.hard && ghostAt - falling.y >= 2) {
-          engine.hardStreak(falling, ghostAt, themeOf(saveRef.current.theme).fill[falling.id]);
+        const destY = hard ? ghostAt : falling.y;
+        const cells = cellsOf(falling.id, falling.rot, falling.x, destY);
+        const col = themeOf(saveRef.current.theme).fill[falling.id];
+        if (hard) {
+          haptic("tetris");
+          engine.lockThump(cells, col, true);
+          engine.punch(0.34);
+          engine.nod(0.42);
+          if (ghostAt - falling.y >= 1) engine.hardStreak(falling, ghostAt, col);
           sfxHard();
+          shakeRef.current = Math.max(shakeRef.current, 9);
+          syncUi({ lockPop: u.lockPop + 1 });
+        } else {
+          haptic("lock");
+          engine.lockThump(cells, col, false);
+          if (held.down) engine.softTrail(falling, col);
         }
-      }
-      if (held.down && falling && sim.piece && sim.piece.y > falling.y) {
-        well3dRef.current?.softTrail(
-          falling,
-          themeOf(saveRef.current.theme).fill[falling.id],
-        );
+      } else {
+        haptic("lock");
       }
       if (sim.phase === "clearing" && sim.clearRows.length) {
         juiceClear(
@@ -822,7 +827,6 @@ export function TetrisApp() {
         writeSave(saveRef.current);
         flashBanner("Hold parks a piece.");
       }
-      syncUi({ lockPop: u.lockPop + 1 });
     }
     if (ev === "clear") {
       haptic("clear");

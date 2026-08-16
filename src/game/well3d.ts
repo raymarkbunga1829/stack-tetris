@@ -65,7 +65,7 @@ export type Well3d = {
   setAsh: (board: import("./sim").Board | null) => void;
   setStain: (cells: { x: number; y: number }[] | null) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
-  lockThump: (cells: { x: number; y: number }[], hexCol: string) => void;
+  lockThump: (cells: { x: number; y: number }[], hexCol: string, slam?: boolean) => void;
   shatter: (sim: Sim, theme: Theme) => void;
   sweep: (kind: "stack" | "tspin" | "clear" | "single" | "double" | "triple") => void;
   hardStreak: (
@@ -958,12 +958,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sparkPts.visible = n > 0;
   }
 
-  function lockThump(cells: { x: number; y: number }[], _hexCol: string) {
+  function lockThump(cells: { x: number; y: number }[], _hexCol: string, slam = true) {
     if (reduce) return;
     lockKeys.clear();
     for (const c of cells) lockKeys.add(`${c.x},${c.y}`);
-    lockPulse = 1;
-    punchCam(0.18);
+    lockPulse = slam ? 1 : 0.45;
+    if (slam) punchCam(0.22);
   }
 
   function shatter(sim: Sim, theme: Theme) {
