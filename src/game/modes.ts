@@ -8,7 +8,8 @@ export type ModeId =
   | "zen"
   | "arcade"
   | "classic"
-  | "finesse";
+  | "finesse"
+  | "siege";
 
 export type ModeInfo = {
   id: ModeId;
@@ -131,6 +132,20 @@ export const MODES: ModeInfo[] = [
     look: "Twenty pieces. Extra taps stain the recap gold.",
     tint: "#6ee0e4",
     carving: "Twenty hands. No extra.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+    ghost: true,
+    kicks: true,
+    rng: "bag",
+  },
+  {
+    id: "siege",
+    name: "Siege",
+    blurb: "Eight wells. Send garbage. Steal badges.",
+    look: "Eight hunters. The last well standing.",
+    tint: "#ff6a8a",
+    carving: "Send the floor to someone else.",
     lines: null,
     seconds: null,
     startLevel: 1,

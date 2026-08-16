@@ -2211,3 +2211,62 @@ html.is-ios .help-android {
   pointer-events: none;
   background: linear-gradient(to bottom, rgba(180, 40, 40, 0.38), transparent);
 }
+
+.siege {
+  display: grid;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.siege-aim {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-raised);
+  color: var(--color-fg);
+  padding: 7px 10px;
+  font: 600 0.72rem/1 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.siege-aim span {
+  color: var(--color-muted);
+  font: 600 0.58rem/1 var(--font-sans);
+}
+
+.siege-list {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 28px;
+}
+
+.siege-list li {
+  position: relative;
+  border-radius: 5px;
+  background: color-mix(in oklab, var(--color-raised) 80%, #000);
+  overflow: hidden;
+}
+
+.siege-list i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--tint, #888);
+}
+
+.siege-list li.is-hunt {
+  box-shadow: 0 0 0 1px #e87870;
+}
+
+.siege-list li.is-dead {
+  opacity: 0.25;
+}

@@ -25,7 +25,8 @@ export function nameRun(opts: {
   if (mode === "finesse") return "Counted Breaths";
   if (mode === "arcade" && !won) return "Blind in the Cabinet";
   if (mode === "zen" && lines >= 40) return "The Long Sketch";
-  if (mode === "daily" && won) return "Today's Myth";
+  if (mode === "siege" && won) return "Last Well Standing";
+  if (mode === "siege") return "Buried by Eight";
   if (stacks >= 7) return "Seven Omens";
   if (stacks >= 3) return "Three Bells";
   if (combo >= 6) return "The Long Chain";

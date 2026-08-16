@@ -76,6 +76,19 @@ import {
   type Sku,
 } from "@/game/shop";
 import { CoachCard, nextCoach, type CoachStep } from "./coach-card";
+import { SiegeRail } from "./siege-rail";
+import {
+  createSiege,
+  cycleAim,
+  garbageFor,
+  injectGarbage,
+  sendGarbage,
+  siegeWon,
+  snapshotSiege,
+  takeIncoming,
+  tickSiege,
+  type Siege,
+} from "@/game/siege";
 import { MiniPiece } from "./mini-piece";
 import { MissionRow } from "./mission-row";
 import { ModeStrip } from "./mode-strip";
@@ -161,6 +174,7 @@ type Ui = {
   cinema: boolean;
   handoff: PieceId | null;
   epitaph: string | null;
+  siege: import("@/game/siege").SiegeSnap | null;
 };
 
 function forceCoach() {
@@ -273,6 +287,7 @@ export function TetrisApp() {
     cinema: false,
     handoff: null,
     epitaph: null,
+    siege: null,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -293,6 +308,7 @@ export function TetrisApp() {
   const lockN = useRef(0);
   const sawOmen = useRef(false);
   const uglySaid = useRef(false);
+  const siegeRef = useRef<Siege | null>(null);
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
 
@@ -479,6 +495,7 @@ export function TetrisApp() {
     lockN.current = 0;
     sawOmen.current = false;
     uglySaid.current = false;
+    siegeRef.current = mode === "siege" ? createSiege() : null;
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 1.55;
@@ -500,7 +517,9 @@ export function TetrisApp() {
                   ? "Still"
                   : mode === "arcade"
                     ? "Read"
-                    : "Go";
+                    : mode === "siege"
+                      ? "8"
+                      : "Go";
     window.setTimeout(() => {
       if (uiRef.current.phase === "playing") syncUi({ intro: null });
     }, 1600);
@@ -538,6 +557,7 @@ export function TetrisApp() {
       takeover: 0,
       cinema: false,
       epitaph: null,
+      siege: siegeRef.current ? snapshotSiege(siegeRef.current) : null,
       live: sim.piece?.id ?? null,
       danger: false,
       bag: sim.bag.slice(),
@@ -816,6 +836,7 @@ export function TetrisApp() {
       }
       fireChain(sim, false);
       if (sim.lastPerfect) juicePerfect();
+      fireSiege(sim);
       syncUi();
     }
     if (ev === "tetris" || ev === "tspin") {
@@ -838,6 +859,7 @@ export function TetrisApp() {
       fireChain(sim, ev === "tetris" || ev === "tspin");
       if (ev === "tetris") payMissions({ tetris: 1 });
       if (sim.lastPerfect) juicePerfect();
+      fireSiege(sim);
       syncUi();
     }
     if (ev === "win" || ev === "over") {
@@ -867,6 +889,21 @@ export function TetrisApp() {
     }
 
     if (sim.phase === "playing") setMusicTension(sim.mode === "classic" && inDanger(sim));
+    const siege = siegeRef.current;
+    if (siege && sim.mode === "siege" && sim.phase === "playing") {
+      tickSiege(siege, dt, inDanger(sim));
+      siege.dumpT += dt;
+      if (siege.dumpT >= 0.72 && siege.incoming > 0) {
+        siege.dumpT = 0;
+        const n = takeIncoming(siege, 1);
+        if (!injectGarbage(sim, n)) {
+          sim.phase = "over";
+          sim.won = false;
+          finishRun(sim);
+        }
+      }
+      syncUi({ siege: snapshotSiege(siege) });
+    }
 
     if (sim.score !== u.score || sim.level !== u.level || sim.lines !== u.lines) {
       if (sim.level > u.level) sfxLevel();
@@ -950,6 +987,41 @@ export function TetrisApp() {
     writeSave(saveRef.current);
     if (done[0]) flashBanner(`+${payout} CR`);
     syncUi({ missions: book, credits: saveRef.current.credits });
+  }
+
+  function fireSiege(sim: Sim) {
+    const siege = siegeRef.current;
+    if (!siege || sim.mode !== "siege") return;
+    const n = linesOfClear(sim.lastClear);
+    if (n <= 0 && !sim.lastPerfect) return;
+    const g = garbageFor(
+      n,
+      !!sim.lastClear?.startsWith("T-SPIN"),
+      sim.b2b,
+      Math.max(0, sim.combo),
+      sim.lastPerfect,
+      siege.badges,
+      siege.hunters,
+    );
+    if (g > 0) {
+      const kos = sendGarbage(siege, g);
+      if (kos) flashBanner(kos > 1 ? `${kos} KOs` : "KO");
+    }
+    if (siegeWon(siege)) {
+      sim.won = true;
+      sim.phase = "over";
+      finishRun(sim);
+    }
+    syncUi({ siege: snapshotSiege(siege) });
+  }
+
+  function linesOfClear(label: string | null): number {
+    if (!label) return 0;
+    if (label === "STACK" || label === "ALL CLEAR") return 4;
+    if (label === "TRIPLE" || label.includes("3")) return 3;
+    if (label === "DOUBLE" || label.includes("2")) return 2;
+    if (label === "SINGLE" || label === "T-SPIN") return 1;
+    return 0;
   }
 
   function finishRun(sim: Sim) {
@@ -1649,14 +1721,16 @@ export function TetrisApp() {
           <TickScore value={ui.score} />
           <Stat
             label={
-              ui.mode === "blitz" ? "Time" : ui.mode === "sprint" ? "Clock" : "Level"
+              ui.mode === "blitz" ? "Time" : ui.mode === "sprint" ? "Clock" : ui.mode === "siege" ? "KOs" : "Level"
             }
             value={
               ui.mode === "blitz"
                 ? formatClock(ui.timeLeft ?? 0)
                 : ui.mode === "sprint"
                   ? formatClock(ui.clock)
-                  : String(ui.level)
+                  : ui.mode === "siege"
+                    ? String(ui.siege?.kos ?? 0)
+                    : String(ui.level)
             }
             fill={
               ui.mode === "blitz" || ui.mode === "sprint"
@@ -1666,7 +1740,9 @@ export function TetrisApp() {
             hint={
               ui.mode === "sprint"
                 ? sprintPace(ui.clock, ui.lines, ui.sprintBest)
-                : undefined
+                : ui.mode === "siege" && ui.siege
+                  ? `${ui.siege.badges} badges`
+                  : undefined
             }
             hot={
               ui.mode === "blitz" && ui.timeLeft != null
@@ -2093,6 +2169,18 @@ export function TetrisApp() {
           onUse={usePower}
           pickOn={ui.picking}
         />
+        {ui.mode === "siege" && ui.siege && ui.phase === "playing" && (
+          <SiegeRail
+            snap={ui.siege}
+            onAim={() => {
+              const s = siegeRef.current;
+              if (!s) return;
+              cycleAim(s);
+              sfxSelect();
+              syncUi({ siege: snapshotSiege(s) });
+            }}
+          />
+        )}
         <TouchPad
           onHold={(key, down) => {
             unlockAudio();
