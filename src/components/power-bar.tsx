@@ -50,7 +50,7 @@ export function PowerBar({ inv, onUse, shieldOn, slowOn, pickOn }: Props) {
               if (n > 0 || (id === "pick" && pickOn)) onUse(id);
             }}
           >
-            <Icon size={16} strokeWidth={2} aria-hidden />
+            <Icon size={14} strokeWidth={2.2} aria-hidden />
             <span>{LABEL[id]}</span>
             <b>{n}</b>
           </button>
