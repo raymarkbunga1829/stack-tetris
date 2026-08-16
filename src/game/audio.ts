@@ -294,9 +294,10 @@ export function sfxHard() {
   noiseBurst(0.09, 0, 0.22, 500, 0.55, true);
 }
 export function sfxTetris() {
-  stealLead(0.55);
-  noiseBurst(0.1, 0, 0.18, 1400, 0.6, true);
-  arp([392, 523, 659, 784, 659, 784, 988, 1319], 0.06, "square", 0.5);
+  stealLead(0.7);
+  noiseBurst(0.14, 0, 0.22, 1200, 0.75, true);
+  arp([392, 523, 659, 784, 988, 784, 1047, 1319], 0.055, "square", 0.58);
+  slide(196, 98, 0.22, 0.02, "triangle", 0.22);
 }
 export function sfxLevel() {
   stealLead(0.28);
@@ -431,9 +432,23 @@ let musicNext = 0;
 let musicRaf = 0;
 let musicPaused = false;
 let musicTight = false;
+let sirenId = 0;
 
 export function setMusicTension(on: boolean) {
   musicTight = on;
+  if (sirenId) {
+    clearInterval(sirenId);
+    sirenId = 0;
+  }
+  if (!on || !bus || musicVol <= 0) return;
+  const honk = () => {
+    if (!musicTight || !bus) return;
+    const t = bus.ctx.currentTime;
+    hum(92, 0.32, t, 0.13, true);
+    hum(124, 0.26, t + 0.16, 0.1, true);
+  };
+  honk();
+  sirenId = window.setInterval(honk, 880);
 }
 
 function hum(freq: number, dur: number, when: number, vol = 0.22, bass = false) {
@@ -492,6 +507,10 @@ export function stopMusic() {
   musicMode = null;
   musicPaused = false;
   musicTight = false;
+  if (sirenId) {
+    clearInterval(sirenId);
+    sirenId = 0;
+  }
   if (musicRaf) cancelAnimationFrame(musicRaf);
   musicRaf = 0;
 }

@@ -6,8 +6,8 @@ const FULL: Record<HapticKind, number | number[]> = {
   rotate: 8,
   lock: 14,
   clear: 8,
-  tetris: [22, 30, 24, 48],
-  over: [28, 36, 48],
+  tetris: [8, 18, 10, 36, 16, 72],
+  over: [36, 28, 70, 36, 110],
   select: 10,
   win: [16, 20, 24, 20, 36],
 };
@@ -17,8 +17,8 @@ const LIGHT: Record<HapticKind, number | number[]> = {
   rotate: 6,
   lock: 10,
   clear: 6,
-  tetris: [16, 22, 36],
-  over: 24,
+  tetris: [10, 16, 28, 48],
+  over: [24, 20, 48],
   select: 8,
   win: [10, 16, 22],
 };
@@ -28,8 +28,8 @@ const LOCK: Record<HapticKind, number | number[]> = {
   rotate: 0,
   lock: 12,
   clear: 6,
-  tetris: [18, 26, 40],
-  over: 24,
+  tetris: [12, 20, 32, 56],
+  over: [28, 22, 56],
   select: 0,
   win: [10, 16, 22],
 };

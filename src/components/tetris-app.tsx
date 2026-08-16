@@ -153,6 +153,9 @@ type Ui = {
   levelPop: number;
   bagPop: number;
   dropAsk: boolean;
+  intro: string | null;
+  takeover: number;
+  cinema: boolean;
 };
 
 function forceCoach() {
@@ -260,6 +263,9 @@ export function TetrisApp() {
     levelPop: 0,
     bagPop: 0,
     dropAsk: false,
+    intro: null,
+    takeover: 0,
+    cinema: false,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -464,8 +470,18 @@ export function TetrisApp() {
     lockN.current = 0;
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
-    bagN.current = sim.bag.length;
-    quietT.current = 0.48;
+    quietT.current = 1.55;
+    const intro =
+      mode === "sprint"
+        ? "40"
+        : mode === "blitz"
+          ? "2:00"
+          : mode === "classic"
+            ? "NES"
+            : modeOf(mode).name.toUpperCase();
+    window.setTimeout(() => {
+      if (uiRef.current.phase === "playing") syncUi({ intro: null });
+    }, 1600);
     syncUi({
       phase: "playing",
       banner: null,
@@ -496,6 +512,9 @@ export function TetrisApp() {
       lifting: false,
       coinTake: false,
       dropAsk: false,
+      intro,
+      takeover: 0,
+      cinema: false,
       live: sim.piece?.id ?? null,
       danger: false,
       bag: sim.bag.slice(),
@@ -1018,12 +1037,19 @@ export function TetrisApp() {
     engine.sparkRows(sim.clearRows, tint);
     engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(kind);
-    if (kind === "stack" || kind === "tspin") engine.nod(0.55);
+    if (kind === "stack" || kind === "tspin") engine.nod(0.85);
     else if (kind === "triple") engine.nod(0.32);
     const n =
       kind === "stack" ? 4 : kind === "triple" ? 3 : kind === "double" ? 2 : kind === "tspin" ? 3 : 1;
     sfxClear(n);
     sfxShatter();
+    if (kind === "stack") {
+      shakeRef.current = 16;
+      syncUi({ takeover: 1 });
+      window.setTimeout(() => {
+        if (uiRef.current.takeover) syncUi({ takeover: 0 });
+      }, 430);
+    }
   }
 
   function juicePerfect() {
@@ -1032,6 +1058,10 @@ export function TetrisApp() {
     haptic("win");
     shakeRef.current = 14;
     flashBanner("ALL CLEAR");
+    syncUi({ cinema: true });
+    window.setTimeout(() => {
+      if (uiRef.current.phase === "playing") syncUi({ cinema: false });
+    }, 900);
   }
 
   function fireChain(sim: Sim, difficult: boolean) {
@@ -1499,7 +1529,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" ? " is-play" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: themeOf(ui.theme).flash,
@@ -1622,6 +1652,12 @@ export function TetrisApp() {
               <span>HI {ui.high.toLocaleString()}</span>
             </div>
             {ui.scan && <i className="scan" aria-hidden="true" />}
+            {ui.intro && ui.phase === "playing" && (
+              <div className="intro" aria-hidden="true">
+                <p>{modeOf(ui.mode).name}</p>
+                <b>{ui.intro}</b>
+              </div>
+            )}
             {ui.phase === "title" && !ui.watching && (
               <div className={`veil${ui.lifting ? " is-lift" : ""}`}>
                 <p className="veil-kicker">
@@ -1740,6 +1776,11 @@ export function TetrisApp() {
             )}
             {ui.phase === "over" && !ui.failing && !ui.coinTake && (
               <div className="veil">
+                {ui.recap && ui.recap.stacks > 0 && (
+                  <p className="stamp" aria-hidden="true">
+                    Stack
+                  </p>
+                )}
                 <button
                   type="button"
                   className="veil-x"
