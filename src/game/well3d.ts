@@ -199,9 +199,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const haze = new THREE.Mesh(
     new THREE.PlaneGeometry(10.2, 20.4),
     new THREE.MeshBasicMaterial({
-      color: 0x6a88b0,
+      color: 0x8aa4c8,
       transparent: true,
-      opacity: 0.045,
+      opacity: 0.08,
       depthWrite: false,
     }),
   );
@@ -218,8 +218,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     clearcoat: mobile ? 0.4 : 0.8,
     clearcoatRoughness: 0.15,
     envMapIntensity: 1.2,
-    emissive: 0x141414,
-    emissiveIntensity: 0.2,
+    emissive: 0x1c1c1c,
+    emissiveIntensity: 0.28,
   });
   const ghostMat = new THREE.MeshPhysicalMaterial({
     roughness: 0.32,
@@ -514,14 +514,14 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       lastBg = theme.pit;
       const bg =
         theme.id === "molten"
-          ? hex("#1a0c06")
+          ? hex("#24140c")
           : theme.id === "ice"
-            ? hex("#0c141c")
-            : hex(theme.pit).multiplyScalar(0.55);
+            ? hex("#141c26")
+            : hex(theme.pit).multiplyScalar(0.88);
       renderer.setClearColor(bg, 1);
       scene.background = bg;
-      pitMat.color.copy(hex(theme.well).multiplyScalar(theme.id === "molten" ? 0.7 : 0.55));
-      wallMat.color.copy(hex(theme.frame).multiplyScalar(0.45));
+      pitMat.color.copy(hex(theme.well).multiplyScalar(theme.id === "molten" ? 0.85 : 0.78));
+      wallMat.color.copy(hex(theme.frame).multiplyScalar(0.7));
     }
 
     frameCamera();
@@ -618,7 +618,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             0,
             theme.fill[id as PieceId],
             pop,
-            failT > 0 ? 0.45 + (1 - failT) * 0.3 : thump ? 1.45 : 1.12,
+            failT > 0 ? 0.45 + (1 - failT) * 0.3 : thump ? 1.5 : 1.28,
             squash,
           );
           if (showMarks) stamp(id as PieceId, x, row + below * settle + sink, 0.42);
@@ -1184,9 +1184,9 @@ function makeWellGrid() {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
   const m = new THREE.LineBasicMaterial({
-    color: 0x3a4a62,
+    color: 0x4a5c78,
     transparent: true,
-    opacity: 0.38,
+    opacity: 0.55,
   });
   return new THREE.LineSegments(g, m);
 }
@@ -1198,12 +1198,12 @@ function makePitTexture(): THREE.CanvasTexture {
   c.width = w;
   c.height = h;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#0a0b10";
+  ctx.fillStyle = "#141820";
   ctx.fillRect(0, 0, w, h);
   const wash = ctx.createLinearGradient(0, 0, 0, h);
-  wash.addColorStop(0, "#161920");
-  wash.addColorStop(0.4, "#0c0d12");
-  wash.addColorStop(1, "#07080c");
+  wash.addColorStop(0, "#2a3240");
+  wash.addColorStop(0.45, "#1a1e28");
+  wash.addColorStop(1, "#12161e");
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, w, h);
   const moon = ctx.createRadialGradient(w * 0.7, h * 0.2, 6, w * 0.7, h * 0.2, w * 0.4);
