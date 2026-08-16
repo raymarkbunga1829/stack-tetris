@@ -1654,7 +1654,7 @@ export function TetrisApp() {
             {ui.scan && <i className="scan" aria-hidden="true" />}
             {ui.intro && ui.phase === "playing" && (
               <div className="intro" aria-hidden="true">
-                <p>{modeOf(ui.mode).name}</p>
+                <p>{modeOf(ui.mode).look}</p>
                 <b>{ui.intro}</b>
               </div>
             )}

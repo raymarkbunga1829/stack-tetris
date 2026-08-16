@@ -57,9 +57,8 @@ export function ModeStrip({ mode, sprintBest, daily, streak, onPick }: Props) {
                 <i key={`${id}-${i}`} style={{ background: PIECE_FILL[id] }} />
               ))}
             </span>
-          ) : (
-            <span className="mode-blurb">{m.blurb}</span>
-          )}
+          ) : null}
+          <span className="mode-blurb">{mode === m.id ? m.look : m.blurb}</span>
         </button>
       ))}
     </div>

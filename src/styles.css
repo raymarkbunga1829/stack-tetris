@@ -1380,6 +1380,10 @@
   font: 500 0.68rem/1.3 var(--font-sans);
 }
 
+.modes button.is-on .mode-blurb {
+  color: color-mix(in oklab, var(--color-fg) 78%, var(--color-muted));
+}
+
 .missions {
   list-style: none;
   margin: 0;

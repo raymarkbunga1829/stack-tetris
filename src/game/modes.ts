@@ -14,6 +14,7 @@ export type ModeInfo = {
   id: ModeId;
   name: string;
   blurb: string;
+  look: string;
   lines: number | null;
   seconds: number | null;
   startLevel: number;
@@ -27,6 +28,7 @@ export const MODES: ModeInfo[] = [
     id: "marathon",
     name: "Marathon",
     blurb: "Landing ghost on. Endless until you top out.",
+    look: "A pale twin waits on the floor. The well never ends.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -38,6 +40,7 @@ export const MODES: ModeInfo[] = [
     id: "sprint",
     name: "Sprint 40",
     blurb: "Race to 40 lines. Ghost shows the drop.",
+    look: "Forty lines. Gold on the clock if you beat yourself.",
     lines: 40,
     seconds: null,
     startLevel: 1,
@@ -49,6 +52,7 @@ export const MODES: ModeInfo[] = [
     id: "blitz",
     name: "Blitz 2:00",
     blurb: "Two minutes from level 10. Ghost on.",
+    look: "Already falling hard. Amber at ten. Red at three.",
     lines: null,
     seconds: 120,
     startLevel: 10,
@@ -60,6 +64,7 @@ export const MODES: ModeInfo[] = [
     id: "daily",
     name: "Daily",
     blurb: "Today's shared bag. Ghost on.",
+    look: "The same seven as everyone alive today.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -71,6 +76,7 @@ export const MODES: ModeInfo[] = [
     id: "zen",
     name: "Zen",
     blurb: "No clock. No top-out. Ghost on.",
+    look: "No top-out. Undo a drop. The well is a sketchbook.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -82,6 +88,7 @@ export const MODES: ModeInfo[] = [
     id: "arcade",
     name: "Arcade",
     blurb: "No landing ghost. Read the stack yourself.",
+    look: "No ghost. Read the stack like a cabinet.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -93,6 +100,7 @@ export const MODES: ModeInfo[] = [
     id: "classic",
     name: "Classic",
     blurb: "NES bag. No wall kicks. Read the stack.",
+    look: "NES bag. No kicks. Green-black glass. The ghost is gone.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -104,6 +112,7 @@ export const MODES: ModeInfo[] = [
     id: "finesse",
     name: "Finesse",
     blurb: "Twenty pieces. Extra taps count.",
+    look: "Twenty pieces. Extra taps stain the recap gold.",
     lines: null,
     seconds: null,
     startLevel: 1,
