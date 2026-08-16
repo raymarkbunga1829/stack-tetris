@@ -70,7 +70,6 @@ import {
 } from "@/game/shop";
 import { CoachCard, nextCoach, type CoachStep } from "./coach-card";
 import { MiniPiece } from "./mini-piece";
-import { Mascots, mascotHold, type MascotAct, type MascotWorld } from "./mascots";
 import { MissionRow } from "./mission-row";
 import { ModeStrip } from "./mode-strip";
 import { PowerBar } from "./power-bar";
@@ -225,17 +224,6 @@ export function TetrisApp() {
   uiRef.current = ui;
   const [buying, setBuying] = useState<string | null>(null);
   const [keysOn, setKeysOn] = useState(() => hasKeyboard());
-  const [crowd, setCrowd] = useState<MascotAct>("nap");
-  const crowdT = useRef(0);
-  const crowdRef = useRef<MascotAct>("nap");
-  const worldRef = useRef<MascotWorld>({
-    look: 0,
-    down: 0,
-    duck: 0,
-    asleep: true,
-    shake: 0,
-    sleepT: 0,
-  });
   const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
 
   useEffect(() => onKeyboard(() => setKeysOn(true)), []);
@@ -399,9 +387,6 @@ export function TetrisApp() {
     dying.current = false;
     failT.current = 0;
     holdPeekT.current = 0;
-    crowdT.current = 0;
-    pokeCrowd("wake");
-    worldRef.current.asleep = false;
     syncUi({
       phase: "playing",
       banner: null,
@@ -468,25 +453,6 @@ export function TetrisApp() {
     }
 
     const sim = simRef.current;
-    const playing = u.phase === "playing";
-    if (sim?.piece) {
-      const gx = (sim.piece.x - 3.5) / 4.5;
-      worldRef.current.look += (gx - worldRef.current.look) * 0.25;
-      const rows = ghostY(sim) - sim.piece.y;
-      const ghostSee = Math.max(0, Math.min(1, rows / 12));
-      const lock = playing && rows <= 1 ? 1 : 0;
-      const wantDown = playing ? ghostSee * 0.55 + lock * 0.5 : 0;
-      worldRef.current.down += (wantDown - worldRef.current.down) * 0.2;
-    } else {
-      worldRef.current.look *= 0.92;
-      worldRef.current.down *= 0.88;
-    }
-    const wantDuck = playing && held.down ? 1 : 0;
-    worldRef.current.duck += (wantDuck - worldRef.current.duck) * 0.28;
-    worldRef.current.asleep = u.phase === "title";
-    worldRef.current.shake = shakeRef.current / 8;
-    if (u.phase === "title") worldRef.current.sleepT += dt;
-    else worldRef.current.sleepT = Math.max(0, worldRef.current.sleepT - dt * 0.35);
     if (!sim || u.phase === "title") return;
 
     if (sim.phase === "paused" || sim.phase === "over") {
@@ -534,42 +500,6 @@ export function TetrisApp() {
         failT.current = 0;
         finishRun(simRef.current);
       }
-    }
-    if (crowdT.current > 0) {
-      crowdT.current -= dt;
-      if (crowdT.current <= 0) {
-        crowdT.current = 0;
-        const live = simRef.current;
-        if (dying.current) {
-          crowdRef.current = "fail";
-          setCrowd("fail");
-        }
-        else if (live && live.phase === "playing" && inDanger(live)) pokeCrowd("panic");
-        else if (
-          crowdRef.current === "stack" ||
-          crowdRef.current === "perfect"
-        ) {
-          pokeCrowd("bump");
-        } else if (
-          crowdRef.current === "triple" ||
-          crowdRef.current === "tspin" ||
-          crowdRef.current === "bump" ||
-          crowdRef.current === "wake"
-        ) {
-          pokeCrowd("recover");
-        } else {
-          crowdRef.current = "idle";
-          setCrowd("idle");
-        }
-      }
-    } else if (
-      simRef.current &&
-      simRef.current.phase === "playing" &&
-      inDanger(simRef.current) &&
-      crowdRef.current !== "panic" &&
-      crowdRef.current !== "fail"
-    ) {
-      pokeCrowd("panic");
     }
     if (gestureT.current > 0) {
       gestureT.current -= dt;
@@ -663,7 +593,6 @@ export function TetrisApp() {
         haptic("over");
         well3dRef.current?.failBeat();
         failT.current = 0.9;
-        pokeCrowd("fail");
         syncUi({ failing: true });
       }
     }
@@ -800,12 +729,6 @@ export function TetrisApp() {
     replayI.current = (replayI.current + 1) % snaps.length;
   }
 
-  function pokeCrowd(act: MascotAct) {
-    crowdRef.current = act;
-    setCrowd(act);
-    crowdT.current = mascotHold(act, worldRef.current.sleepT);
-  }
-
   function pulseNow(p: Partial<Pad>) {
     const sim = simRef.current;
     const u = uiRef.current;
@@ -854,7 +777,6 @@ export function TetrisApp() {
         dying.current = true;
         well3dRef.current?.failBeat();
         failT.current = 0.9;
-        pokeCrowd("fail");
         syncUi({ failing: true });
       } else {
         syncUi();
@@ -884,7 +806,6 @@ export function TetrisApp() {
     engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(kind);
     sfxShatter();
-    pokeCrowd(kind);
     if (kind === "stack" || kind === "tspin" || kind === "triple") sfxSweep();
   }
 
@@ -894,7 +815,6 @@ export function TetrisApp() {
     haptic("win");
     shakeRef.current = 14;
     flashBanner("ALL CLEAR");
-    pokeCrowd("perfect");
   }
 
   function fireChain(sim: Sim, difficult: boolean) {
@@ -1367,7 +1287,6 @@ export function TetrisApp() {
             </div>
           </aside>
 
-          <div className="pit">
           <div
             ref={wellRef}
             className="well"
@@ -1594,8 +1513,6 @@ export function TetrisApp() {
             {ui.gesture && ui.phase === "playing" && (
               <p className="gchip">{ui.gesture}</p>
             )}
-          </div>
-          <Mascots act={crowd} worldRef={worldRef} />
           </div>
 
           <aside className="rail">
