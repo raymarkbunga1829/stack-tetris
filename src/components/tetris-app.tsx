@@ -1132,6 +1132,9 @@ export function TetrisApp() {
       sfxHard();
       shakeRef.current = Math.max(shakeRef.current, 10);
       syncUi({ lockPop: uiRef.current.lockPop + 1 });
+      window.setTimeout(() => {
+        if (uiRef.current.lockPop) syncUi({ lockPop: 0 });
+      }, 340);
     } else {
       haptic("lock");
       engine.lockThump(cells, col, false);
@@ -1292,7 +1295,7 @@ export function TetrisApp() {
     }
     well3dRef.current?.draw(
       view,
-      reduce ? 0 : shakeRef.current,
+      reduce ? Math.min(shakeRef.current, 6) : shakeRef.current,
       theme,
       uiRef.current.ghost && modeOf(uiRef.current.mode).ghost,
       uiRef.current.marks,

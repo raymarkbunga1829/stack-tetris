@@ -16,7 +16,8 @@ export const Route = createRootRoute({
         content:
           "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content",
       },
-      { title: APP_NAME },
+      { title: "Stack" },
+      { name: "stack-build", content: "slam-2" },
       {
         name: "description",
         content:

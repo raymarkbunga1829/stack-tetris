@@ -816,6 +816,24 @@
   animation: drop-slam 0.28s ease-out;
 }
 
+.cabinet.is-slam .well canvas {
+  animation: well-slam 0.32s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes well-slam {
+  0% {
+    transform: translateY(10px) scale(1.03);
+    filter: brightness(1.25);
+  }
+  40% {
+    transform: translateY(-3px) scale(0.99);
+  }
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+
 @keyframes drop-slam {
   0% {
     transform: scale(1.08);
