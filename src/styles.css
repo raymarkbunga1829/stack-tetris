@@ -2048,23 +2048,43 @@ html.is-ios .help-android {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 10px;
+  padding: 0 22px;
   pointer-events: none;
-  background: color-mix(in oklab, var(--mode, var(--color-bg)) 28%, transparent);
+  text-align: center;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 7, 10, 0.15) 0%,
+      rgba(6, 7, 10, 0.58) 38%,
+      rgba(6, 7, 10, 0.58) 62%,
+      rgba(6, 7, 10, 0.18) 100%
+    );
+}
+
+.intro em {
+  font: 600 0.68rem/1 var(--font-sans);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-style: normal;
+  color: color-mix(in oklab, var(--mode, var(--color-fg)) 70%, white);
 }
 
 .intro b {
-  font: 600 3.2rem/0.9 var(--font-display);
+  font: 600 4.4rem/0.85 var(--font-display);
   letter-spacing: -0.06em;
   color: var(--mode, var(--color-fg));
+  text-shadow: 0 8px 28px color-mix(in oklab, var(--mode, #000) 35%, transparent);
 }
 
 .intro p {
   margin: 0;
-  color: var(--color-muted);
-  font: 600 0.7rem/1 var(--font-sans);
-  letter-spacing: 0.16em;
+  max-width: 16rem;
+  color: color-mix(in oklab, var(--color-fg) 62%, transparent);
+  font: 500 0.72rem/1.35 var(--font-sans);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-wrap: balance;
 }
 
 .moon-wash {

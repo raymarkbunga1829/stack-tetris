@@ -490,7 +490,15 @@ export function TetrisApp() {
           ? "2:00"
           : mode === "classic"
             ? "NES"
-            : modeOf(mode).name.toUpperCase();
+            : mode === "finesse"
+              ? "20"
+              : mode === "daily"
+                ? utcDateKey().slice(5)
+                : mode === "zen"
+                  ? "Still"
+                  : mode === "arcade"
+                    ? "Read"
+                    : "Go";
     window.setTimeout(() => {
       if (uiRef.current.phase === "playing") syncUi({ intro: null });
     }, 1600);
@@ -532,8 +540,10 @@ export function TetrisApp() {
       danger: false,
       bag: sim.bag.slice(),
       canHold: true,
+      canUndo: false,
+      inv: saveRef.current.inv,
+      high: saveRef.current.high,
     });
-    flashBanner(mode === "daily" ? `Daily · ${utcDateKey().slice(5)}` : modeOf(mode).name);
   }
 
   function goHome() {
@@ -1744,13 +1754,16 @@ export function TetrisApp() {
             </div>
             {ui.scan && <i className="scan" aria-hidden="true" />}
             {ui.mode === "daily" && <i className="moon-wash" aria-hidden="true" />}
-            <p className="carving" aria-hidden="true">
-              {modeOf(ui.mode).carving}
-            </p>
+            {!ui.intro && (
+              <p className="carving" aria-hidden="true">
+                {modeOf(ui.mode).carving}
+              </p>
+            )}
             {ui.intro && ui.phase === "playing" && (
               <div className="intro" aria-hidden="true">
-                <p>{modeOf(ui.mode).look}</p>
+                <em>{modeOf(ui.mode).name}</em>
                 <b>{ui.intro}</b>
+                <p>{modeOf(ui.mode).carving}</p>
               </div>
             )}
             {ui.phase === "title" && !ui.watching && (
@@ -1983,7 +1996,7 @@ export function TetrisApp() {
                 )}
               </div>
             )}
-            {ui.phase === "playing" && ui.pred && modeOf(ui.mode).ghost && (
+            {ui.phase === "playing" && ui.pred && !ui.intro && modeOf(ui.mode).ghost && (
               <p className={`pred-chip${ui.pred.lock ? " is-lock" : ""}`}>
                 {ui.pred.lock ? "Lock" : ui.pred.kick ? "Kick ready" : `${ui.pred.rows} to lock`}
               </p>
