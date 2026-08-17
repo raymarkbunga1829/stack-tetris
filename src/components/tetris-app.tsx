@@ -1426,32 +1426,29 @@ export function TetrisApp() {
     });
     showCallout(spoken);
     noteStill(sim, spoken);
+    const beat = kind === "single" ? "double" : kind;
     engine.punch(
-      kind === "stack" ? 0.28 : kind === "tspin" ? 0.24 : kind === "triple" ? 0.16 : kind === "double" ? 0.1 : 0.06,
+      beat === "stack" ? 0.28 : beat === "tspin" ? 0.24 : beat === "triple" ? 0.16 : 0.1,
     );
     const tint =
-      kind === "stack"
+      beat === "stack"
         ? "#f7f4ee"
-        : kind === "tspin"
+        : beat === "tspin"
           ? "#c9d6ea"
-          : kind === "triple"
+          : beat === "triple"
             ? "#d4c4f0"
-            : kind === "double"
-              ? "#e8d4a0"
-              : "#a8b4c4";
-    if (kind !== "single") {
-      engine.sparkRows(sim.clearRows, tint);
-      engine.shatter(sim, themeOf(saveRef.current.theme));
-    }
-    engine.sweep(kind === "single" ? "clear" : kind);
-    if (kind === "stack" || kind === "tspin") engine.nod(0.42);
-    else if (kind === "triple") engine.nod(0.18);
+            : "#e8d4a0";
+    engine.sparkRows(sim.clearRows, tint);
+    engine.shatter(sim, themeOf(saveRef.current.theme));
+    engine.sweep(beat);
+    if (beat === "stack" || beat === "tspin") engine.nod(0.42);
+    else if (beat === "triple") engine.nod(0.18);
     sfxLine(spoken.rank);
-    if (kind === "triple" || kind === "stack" || kind === "tspin") sfxShatter();
-    if (kind === "stack" || kind === "tspin") {
-      shakeRef.current = kind === "stack" ? 8 : 6;
+    if (beat === "triple" || beat === "stack" || beat === "tspin") sfxShatter();
+    if (beat === "stack" || beat === "tspin") {
+      shakeRef.current = beat === "stack" ? 8 : 6;
       bangTint();
-    } else if (kind === "triple") {
+    } else if (beat === "triple") {
       shakeRef.current = 4;
     }
   }

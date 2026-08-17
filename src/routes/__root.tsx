@@ -16,7 +16,7 @@ export const Route = createRootRoute({
           "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content",
       },
       { title: "Stack" },
-      { name: "stack-build", content: "clr-2" },
+      { name: "stack-build", content: "clr-3" },
       {
         name: "description",
         content:
