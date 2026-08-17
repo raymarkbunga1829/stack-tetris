@@ -790,7 +790,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         if (m >= MAX_MEM) break;
         place(memory, m++, c.x, c.y, -0.08, "#2a2018", 1, 0.55);
       }
-      if (ashBoard && ashT > 0) {
+      if (ashBoard && ashT > 0 && sim?.phase === "over") {
         ashT = Math.max(0, ashT - dt * 0.14);
         for (let y = HIDDEN_ROWS; y < ROWS && m < MAX_MEM; y++) {
           const row = y - HIDDEN_ROWS;

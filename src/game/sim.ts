@@ -344,6 +344,7 @@ function zenRescue(sim: Sim) {
 function spawn(sim: Sim, id: PieceId): boolean {
   const piece: Piece = { id, rot: 0, x: 3, y: 0 };
   while (
+    piece.y < HIDDEN_ROWS &&
     cellsOf(piece.id, piece.rot, piece.x, piece.y).every((c) => c.y < HIDDEN_ROWS) &&
     fits(sim.board, { ...piece, y: piece.y + 1 })
   ) {
