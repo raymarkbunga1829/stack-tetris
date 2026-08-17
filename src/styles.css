@@ -532,7 +532,7 @@
 .pause-links .text-btn {
   flex: 1;
   min-width: 0;
-  min-height: 36px;
+  min-height: 40px;
 }
 
 .veil-x {
@@ -1291,8 +1291,7 @@
 }
 
 .mode-chips {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
   padding-bottom: 2px;
 }
@@ -1301,16 +1300,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  flex: 1 1 0;
   min-height: 40px;
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 0;
   border-radius: 999px;
   background: var(--color-raised);
   color: var(--color-muted);
-  font: 600 0.72rem/1 var(--font-sans);
+  font: 600 0.7rem/1 var(--font-sans);
   white-space: nowrap;
+}
+
+.mode-chips button:first-child {
+  flex: 1.45 1 0;
+}
+
+.mode-chips button.is-more {
+  flex: 0.85 1 0;
 }
 
 .mode-chips button span {
@@ -1321,8 +1329,15 @@
 .mode-chips button i {
   width: 8px;
   height: 8px;
+  flex: none;
   border-radius: 99px;
   background: var(--tint, var(--color-fg));
+}
+
+@media (max-width: 399px) {
+  .mode-chips button i {
+    display: none;
+  }
 }
 
 .mode-chips button.is-on {
@@ -2144,6 +2159,10 @@ html.is-ios .help-android {
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
+  .shell {
+    padding: 0;
+    place-items: stretch;
+  }
   .cabinet,
   .cabinet.is-play,
   .cabinet.is-play.is-siege,
@@ -2188,8 +2207,23 @@ html.is-ios .help-android {
     grid-column: 2;
   }
   .help,
+  .cabinet.is-keys .help-keys,
   .combo-meter {
     display: none;
+  }
+  .cabinet.is-keys,
+  .cabinet.is-play.is-keys,
+  .cabinet.is-paused.is-keys {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cabinet.is-keys .powers,
+  .cabinet.is-keys .siege,
+  .cabinet.is-keys .foot {
+    grid-column: 1;
+  }
+  .cabinet.is-keys .stage {
+    grid-column: 1;
+    grid-row: 2;
   }
 }
 
