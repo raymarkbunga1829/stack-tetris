@@ -8,6 +8,7 @@ export type Pad = {
   hard: boolean;
   cw: boolean;
   ccw: boolean;
+  flip: boolean;
   hold: boolean;
   pause: boolean;
   confirm: boolean;
@@ -25,6 +26,7 @@ const EMPTY: Pad = {
   hard: false,
   cw: false,
   ccw: false,
+  flip: false,
   hold: false,
   pause: false,
   confirm: false,
@@ -55,6 +57,7 @@ const GAME_CODES = new Set([
   "KeyZ",
   "KeyX",
   "KeyQ",
+  "KeyF",
   "KeyC",
   "Space",
   "ShiftLeft",
@@ -136,6 +139,7 @@ export function createInput() {
       p.cw = true;
     }
     if (keys.has("KeyZ") || keys.has("KeyQ") || keys.has("ControlLeft")) p.ccw = true;
+    if (keys.has("KeyF")) p.flip = true;
     if (keys.has("KeyC") || keys.has("KeyH") || keys.has("ShiftLeft") || keys.has("ShiftRight")) p.hold = true;
     if (keys.has("Escape") || keys.has("KeyP")) p.pause = true;
     if (keys.has("Enter") || keys.has("NumpadEnter")) p.confirm = true;
@@ -165,6 +169,7 @@ export function createInput() {
     p.hard = p.hard || inject.hard || touch.hard;
     p.cw = p.cw || inject.cw || touch.cw;
     p.ccw = p.ccw || inject.ccw || touch.ccw;
+    p.flip = p.flip || inject.flip || touch.flip;
     p.hold = p.hold || inject.hold || touch.hold;
     p.pause = p.pause || inject.pause || touch.pause;
     p.confirm = p.confirm || inject.confirm || touch.confirm;
@@ -180,6 +185,7 @@ export function createInput() {
       hard: held.hard && !prev.hard && !skipJust.hard,
       cw: held.cw && !prev.cw && !skipJust.cw,
       ccw: held.ccw && !prev.ccw && !skipJust.ccw,
+      flip: held.flip && !prev.flip && !skipJust.flip,
       hold: held.hold && !prev.hold && !skipJust.hold,
       pause: held.pause && !prev.pause && !skipJust.pause,
       confirm: held.confirm && !prev.confirm && !skipJust.confirm,
@@ -193,7 +199,7 @@ export function createInput() {
   function tap(partial: Partial<Pad>) {
     if (onPulse) {
       onPulse(partial);
-      skipJust = { ...skipJust, ...partial, left: skipJust.left || !!partial.left, right: skipJust.right || !!partial.right, down: skipJust.down || !!partial.down, hard: skipJust.hard || !!partial.hard, cw: skipJust.cw || !!partial.cw, ccw: skipJust.ccw || !!partial.ccw, hold: skipJust.hold || !!partial.hold, pause: skipJust.pause || !!partial.pause, confirm: skipJust.confirm || !!partial.confirm };
+      skipJust = { ...skipJust, ...partial, left: skipJust.left || !!partial.left, right: skipJust.right || !!partial.right, down: skipJust.down || !!partial.down, hard: skipJust.hard || !!partial.hard, cw: skipJust.cw || !!partial.cw, ccw: skipJust.ccw || !!partial.ccw, flip: skipJust.flip || !!partial.flip, hold: skipJust.hold || !!partial.hold, pause: skipJust.pause || !!partial.pause, confirm: skipJust.confirm || !!partial.confirm };
       return;
     }
     inject = { ...inject, ...partial };

@@ -430,6 +430,7 @@
 }
 
 .veil.is-pause {
+  z-index: 12;
   background: color-mix(in oklab, #07080c 38%, transparent);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -939,7 +940,7 @@
 }
 
 .pad-act {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.2fr);
   align-items: stretch;
 }
 
@@ -977,7 +978,8 @@
   pointer-events: none;
 }
 
-.pad-hold span {
+.pad-hold span,
+.pad-hard span {
   display: block;
 }
 
@@ -1165,8 +1167,8 @@
 }
 
 .cabinet.is-play .pwr {
-  min-height: 28px;
-  padding: 2px 2px 1px;
+  min-height: 40px;
+  padding: 4px 2px 3px;
 }
 
 .well-pause {
@@ -1222,6 +1224,15 @@
 .text-btn:hover,
 .text-btn:focus-visible {
   color: var(--color-fg);
+}
+
+.text-btn.install {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.score-list .shop-blurb {
+  white-space: nowrap;
 }
 
 .help {
@@ -1338,11 +1349,11 @@
 .shop-veil {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: 24;
   display: grid;
   place-items: end stretch;
   padding: 10px;
-  background: color-mix(in oklab, var(--color-bg) 55%, transparent);
+  background: color-mix(in oklab, var(--color-bg) 86%, #000);
 }
 
 .shop {
@@ -1783,11 +1794,11 @@ html.is-ios .help-android {
 
 @media (min-width: 1024px) and (min-height: 700px) {
   .cabinet {
-    width: min(980px, calc(100vw - 28px));
-    height: min(860px, calc(100dvh - 24px));
-    grid-template-columns: minmax(0, 1fr) 260px;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    gap: 10px 14px;
+    width: min(1100px, calc(100vw - 28px));
+    height: min(900px, calc(100dvh - 24px));
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    gap: 10px 16px;
   }
   .topbar,
   .stats {
@@ -1795,12 +1806,23 @@ html.is-ios .help-android {
   }
   .stage {
     grid-column: 1;
-    grid-row: 3 / 5;
+    grid-row: 3 / 6;
+    min-height: 0;
+    align-self: stretch;
+  }
+  .well {
+    height: 100%;
     min-height: 0;
   }
-  .powers {
+  .modes {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 3;
+    align-content: start;
+    overflow: auto;
+    min-height: 0;
+  }
+  .missions {
+    display: none;
   }
   .pad {
     grid-column: 2;
@@ -1812,14 +1834,79 @@ html.is-ios .help-android {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .pad-act {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .powers {
+    grid-column: 2;
+    grid-row: 4;
   }
   .foot {
     grid-column: 2;
+    grid-row: 5;
   }
   .help {
     grid-column: 1 / -1;
     display: block;
+  }
+  .cabinet.is-play {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .cabinet.is-play .stats {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .cabinet.is-play .stage {
+    grid-column: 1;
+    grid-row: 2 / 4;
+  }
+  .cabinet.is-play .pad {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .cabinet.is-play .powers {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .cabinet.is-play.is-keys {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: min(760px, calc(100vw - 28px));
+  }
+  .cabinet.is-play.is-keys .stage {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .cabinet.is-play.is-keys .powers {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .cabinet.is-paused {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+  .cabinet.is-paused .modes,
+  .cabinet.is-paused .foot {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    max-height: none;
+    z-index: 2;
+    background: none;
+    padding: 0;
+  }
+  .cabinet.is-paused .stage {
+    grid-column: 1;
+    grid-row: 2 / 5;
+  }
+  .cabinet.is-paused .modes {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .cabinet.is-paused .foot {
+    grid-column: 2;
+    grid-row: 4;
   }
 }
 
@@ -1843,27 +1930,15 @@ html.is-ios .help-android {
 }
 
 @media (min-width: 1024px) {
-  .cabinet.is-keys {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .cabinet.is-keys .stage {
-    grid-column: 1;
-    grid-row: 3;
-  }
-  .cabinet.is-keys .powers {
-    grid-column: 1;
-    grid-row: 4;
-  }
-  .cabinet.is-keys .foot {
-    grid-column: 1;
+  .cabinet.is-keys:not(.is-play):not(.is-paused) {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
   }
 }
 
 @media (min-width: 1024px) and (min-height: 700px) {
-  .cabinet.is-keys {
-    width: min(720px, calc(100vw - 28px));
-    height: min(920px, calc(100dvh - 24px));
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  .cabinet.is-keys:not(.is-play):not(.is-paused) {
+    width: min(1100px, calc(100vw - 28px));
+    height: min(900px, calc(100dvh - 24px));
   }
 }
 

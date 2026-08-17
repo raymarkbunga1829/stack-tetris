@@ -28,7 +28,7 @@ import {
   unlockAudio,
 } from "@/game/audio";
 import { haptic, setHaptic } from "@/game/haptics";
-import { hasKeyboard, isAndroid, isIOS, onKeyboard, showPad, type PadMode } from "@/game/device";
+import { isAndroid, isIOS, onKeyboard, showPad, type PadMode } from "@/game/device";
 import { createGestures, type GestureEmit, type GestureLabel } from "@/game/gestures";
 import { createInput, type InputApi, type Pad } from "@/game/input";
 import { applyMissions, type MissionBook } from "@/game/missions";
@@ -38,6 +38,7 @@ import {
   sprintPace,
   moonPhase,
   modeOf,
+  powersAllowed,
   utcDateKey,
   type ModeId,
 } from "@/game/modes";
@@ -134,6 +135,7 @@ type Ui = {
   marks: boolean;
   holdRight: boolean;
   scan: boolean;
+  swipeDrop: boolean;
   watching: boolean;
   streak: { count: number; last: string };
   missions: MissionBook;
@@ -188,6 +190,54 @@ function isStandalone(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     nav.standalone === true
+  );
+}
+
+function InstallButton() {
+  const [promptEvent, setPromptEvent] = useState<{ prompt: () => Promise<void> } | null>(null);
+
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      const ev = e as Event & { prompt: () => Promise<void> };
+      setPromptEvent(ev);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+  }, []);
+
+  if (isIOS()) {
+    return (
+      <a className="text-btn install" href="?install=1&platform=ios">
+        Add to Home Screen
+      </a>
+    );
+  }
+
+  if (promptEvent) {
+    return (
+      <button
+        type="button"
+        className="text-btn install"
+        onClick={() => {
+          void promptEvent.prompt();
+        }}
+      >
+        Install app
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="text-btn install"
+      onClick={() => {
+        window.alert("Use your browser menu → Install app / Add to Home screen.");
+      }}
+    >
+      Install app
+    </button>
   );
 }
 
@@ -256,6 +306,7 @@ export function TetrisApp() {
     marks: saveRef.current.marks,
     holdRight: saveRef.current.holdRight,
     scan: saveRef.current.scan,
+    swipeDrop: saveRef.current.swipeDrop,
     watching: false,
     streak: saveRef.current.streak,
     missions: saveRef.current.missions,
@@ -292,7 +343,7 @@ export function TetrisApp() {
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const [buying, setBuying] = useState<string | null>(null);
-  const [keysOn, setKeysOn] = useState(() => hasKeyboard());
+  const [viewW, setViewW] = useState(() => (typeof window === "undefined" ? 390 : window.innerWidth));
   const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
   const finesseKeys = useRef(0);
   const finesseN = useRef(0);
@@ -310,14 +361,12 @@ export function TetrisApp() {
   const uglySaid = useRef(false);
   const siegeRef = useRef<Siege | null>(null);
 
-  useEffect(() => onKeyboard(() => setKeysOn(true)), []);
-
+  useEffect(() => onKeyboard(() => setViewW(window.innerWidth)), []);
   useEffect(() => {
-    if (ui.phase !== "title" || ui.watching || ui.lifting || ui.settings || ui.shop) return;
-    if (!getLastReplay()) return;
-    const t = window.setTimeout(() => watchLast(true), 1600);
-    return () => clearTimeout(t);
-  }, [ui.phase, ui.watching, ui.lifting, ui.settings, ui.shop]);
+    const on = () => setViewW(window.innerWidth);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("is-android", isAndroid());
@@ -368,7 +417,9 @@ export function TetrisApp() {
     const input = createInput();
     inputRef.current = input;
     input.setPulse((p) => pulseRef.current(p));
-    const gestures = createGestures((ev) => applyGestureRef.current(ev));
+    const gestures = createGestures((ev) => applyGestureRef.current(ev), {
+      swipeDrop: () => saveRef.current.swipeDrop,
+    });
     swipeRef.current = gestures;
 
     try {
@@ -462,6 +513,11 @@ export function TetrisApp() {
 
   function startGame(nextMode?: ModeId) {
     const mode = nextMode ?? saveRef.current.mode;
+    if (uiRef.current.phase === "playing" && quietT.current > 0) {
+      quietT.current = 0;
+      syncUi({ intro: null });
+      return;
+    }
     if (uiRef.current.phase === "title" && !uiRef.current.lifting) {
       syncUi({ lifting: true });
       window.setTimeout(() => beginGame(mode), 480);
@@ -498,7 +554,7 @@ export function TetrisApp() {
     siegeRef.current = mode === "siege" ? createSiege() : null;
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
-    quietT.current = 1.55;
+    quietT.current = 0.4;
     well3dRef.current?.setAsh(getLastAsh());
     const stain = getLastStain();
     well3dRef.current?.setStain(stain?.cells ?? null);
@@ -662,8 +718,22 @@ export function TetrisApp() {
     }
 
     if (quietT.current > 0) {
-      quietT.current -= dt;
-      return;
+      if (
+        just.left ||
+        just.right ||
+        just.down ||
+        just.cw ||
+        just.ccw ||
+        just.flip ||
+        just.hold ||
+        just.hard
+      ) {
+        quietT.current = 0;
+        if (u.intro) syncUi({ intro: null });
+      } else {
+        quietT.current -= dt;
+        return;
+      }
     }
 
     const falling = sim.piece;
@@ -678,6 +748,11 @@ export function TetrisApp() {
       justCw: just.cw,
       justCcw: just.ccw,
       justHold: just.hold,
+      justFlip: just.flip,
+      heldCw: held.cw,
+      heldCcw: held.ccw,
+      heldHold: held.hold,
+      heldFlip: held.flip,
       nudge: input.takeNudge(),
       das: showPad(u.padMode) ? DAS_TOUCH : DAS,
     });
@@ -1153,7 +1228,11 @@ export function TetrisApp() {
       return;
     }
     if (!sim || sim.phase !== "playing") return;
-    if (sim.mode === "finesse" && (p.left || p.right || p.cw || p.ccw)) {
+    if (quietT.current > 0) {
+      quietT.current = 0;
+      if (u.intro) syncUi({ intro: null });
+    }
+    if (sim.mode === "finesse" && (p.left || p.right || p.cw || p.ccw || p.flip)) {
       pieceBorn.current.keys += 1;
     }
     const fallingPulse = sim.piece;
@@ -1372,6 +1451,7 @@ export function TetrisApp() {
     unlockAudio();
     const sim = simRef.current;
     if (!sim || (sim.phase !== "playing" && sim.phase !== "clearing")) return;
+    if (!powersAllowed(sim.mode)) return;
     if (id === "pick") {
       if (uiRef.current.picking) {
         syncUi({ picking: false });
@@ -1539,7 +1619,10 @@ export function TetrisApp() {
       dragPiece(sim, hit.col + grabRef.current, sim.piece.y);
       return;
     }
-    if (action.name === "soft") return;
+    if (action.name === "soft") {
+      if (saveRef.current.swipeDrop) input.setTouch({ down: action.down });
+      return;
+    }
     else if (action.name === "hard") input.tap({ hard: true });
     else if (action.name === "rotate") {
       input.tap(action.dir === 1 ? { cw: true } : { ccw: true });
@@ -1656,6 +1739,13 @@ export function TetrisApp() {
     syncUi({ scan: next });
   }
 
+  function toggleSwipeDrop() {
+    const next = !saveRef.current.swipeDrop;
+    saveRef.current = { ...saveRef.current, swipeDrop: next };
+    writeSave(saveRef.current);
+    syncUi({ swipeDrop: next });
+  }
+
   function onTheme(id: ThemeId) {
     const next = buyTheme(saveRef.current, id);
     if (!next) return;
@@ -1717,7 +1807,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${viewW < 720 ? " is-narrow" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -2192,6 +2282,7 @@ export function TetrisApp() {
           </aside>
         </div>
 
+        {powersAllowed(ui.mode) && (
         <PowerBar
           inv={ui.inv}
           shieldOn={ui.shield}
@@ -2199,6 +2290,7 @@ export function TetrisApp() {
           onUse={usePower}
           pickOn={ui.picking}
         />
+        )}
         {ui.mode === "siege" && ui.siege && ui.phase === "playing" && (
           <SiegeRail
             snap={ui.siege}
@@ -2229,6 +2321,11 @@ export function TetrisApp() {
             unlockAudio();
             inputRef.current?.tap({ ccw: true });
             advanceCoach("ccw");
+          }}
+          onFlip={() => {
+            unlockAudio();
+            inputRef.current?.tap({ flip: true });
+            advanceCoach("cw");
           }}
           onHard={() => {
             unlockAudio();
@@ -2308,20 +2405,19 @@ export function TetrisApp() {
             </button>
           )}
           {!ui.standalone && ui.phase !== "playing" && ui.phase !== "clearing" && (
-            <a className="text-btn install" href="?install=1&platform=ios">
-              Add to Home Screen
-            </a>
+            <InstallButton />
           )}
         </footer>
         <p className="help help-keys">
-          ← → move · ↑ / X / W rotate · Z / Q flip · ↓ soft · Space hard · C / Shift hold · P pause · 1–5 powers
+          ← → move · ↑ / X / W rotate · Z / Q flip · F 180 · ↓ soft · Space hard · C / Shift hold · P pause · 1–5 powers
         </p>
         <p className="help help-touch">
           Drag left or right · tap to rotate · Hold parks a piece · Drop slams it
         </p>
         <p className="help help-android">
-          Android · one finger: slide left/right on the stack · tap to rotate ·
-          ↓ soft · white Drop slams · Hold parks · don’t swipe down, that isn’t drop
+          {ui.swipeDrop
+            ? "Android · slide left/right · tap to rotate · swipe down soft · flick down or Drop slams · Hold parks"
+            : "Android · one finger: slide left/right on the stack · tap to rotate · ↓ soft · white Drop slams · Hold parks · don’t swipe down, that isn’t drop"}
         </p>
         <p className="help help-ios">
           iPhone · slide left/right on the stack · tap to turn · arrows move ·
@@ -2345,6 +2441,7 @@ export function TetrisApp() {
           marks={ui.marks}
           holdRight={ui.holdRight}
           scan={ui.scan}
+          swipeDrop={ui.swipeDrop}
           theme={ui.theme}
           themes={saveRef.current.themes}
           credits={ui.credits}
@@ -2357,6 +2454,7 @@ export function TetrisApp() {
           onMarks={toggleMarks}
           onHoldRight={toggleHoldRight}
           onScan={toggleScan}
+          onSwipeDrop={toggleSwipeDrop}
           onTheme={onTheme}
           onPreview={previewTheme}
           musicVol={ui.musicVol}

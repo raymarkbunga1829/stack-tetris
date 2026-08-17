@@ -56,8 +56,8 @@ export function BoardSheet({ open, scores, dailyRows, dailyDate, onClose }: Prop
         </div>
         <ul className="score-list">
           {list.length === 0 && (
-            <li className="shop-blurb">
-              {tab === "daily" ? "No Daily runs today. Play Daily to post." : "No runs yet."}
+            <li className="shop-blurb empty-runs">
+              {tab === "daily" ? "No Daily runs today." : "No runs yet."}
             </li>
           )}
           {list.map((s, i) => (

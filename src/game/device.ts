@@ -46,6 +46,8 @@ export function hasKeyboard(): boolean {
 export function showPad(mode: PadMode): boolean {
   if (mode === "on") return true;
   if (mode === "off") return false;
+  if (isCoarsePointer()) return true;
+  if (typeof window !== "undefined" && window.innerWidth < 720) return true;
   return !hasKeyboard();
 }
 

@@ -82,6 +82,7 @@ export type Sim = {
   blessed: boolean;
   omenFalse: boolean;
   curseLeft: number;
+  irsReady: boolean;
 };
 
 export type ZenUndo = {
@@ -108,6 +109,11 @@ export type InputFrame = {
   justCw: boolean;
   justCcw: boolean;
   justHold: boolean;
+  justFlip: boolean;
+  heldCw: boolean;
+  heldCcw: boolean;
+  heldHold: boolean;
+  heldFlip: boolean;
   nudge: number;
   das?: number;
 };
@@ -238,6 +244,7 @@ export function createSim(opts: NewGame = {}): Sim {
     blessed: false,
     omenFalse: false,
     curseLeft: 0,
+    irsReady: true,
   };
   fillBag(sim);
   sim.next = sim.bag.slice(0, 5);
@@ -354,6 +361,7 @@ function spawn(sim: Sim, id: PieceId): boolean {
     }
   }
   sim.piece = piece;
+  sim.irsReady = true;
   if (!sim.omenDone && sim.locks >= sim.omenAt) {
     sim.omenOn = true;
     sim.omenFalse = sim.rng() < 1 / 7;
@@ -506,7 +514,7 @@ function kickTable(sim: Sim, id: PieceId, from: Rot, to: Rot) {
   return kicksFor(id, from, to);
 }
 
-function tryRotate(sim: Sim, dir: 1 | -1): boolean {
+function tryRotate(sim: Sim, dir: 1 | -1 | 2): boolean {
   const p = sim.piece;
   if (!p) return false;
   const to = ((((p.rot + dir) % 4) + 4) % 4) as Rot;
@@ -748,7 +756,19 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
 
   if (!sim.piece) return "none";
 
+  if (sim.irsReady) {
+    sim.irsReady = false;
+    const primed = applyInitialActions(sim, {
+      hold: input.heldHold,
+      cw: input.heldCw,
+      ccw: input.heldCcw,
+      flip: input.justFlip || input.heldFlip,
+    });
+    if (primed !== "none") return primed;
+  }
+
   if (input.justHold && holdPiece(sim)) return "hold";
+  if (input.justFlip && tryRotate(sim, 2)) return "rotate";
   if (input.justCw && tryRotate(sim, 1)) return "rotate";
   if (input.justCcw && tryRotate(sim, -1)) return "rotate";
   if (input.justHard) {
@@ -928,6 +948,18 @@ export function visibleCells(sim: Sim): { x: number; y: number; id: PieceId }[] 
   return out;
 }
 
+export function applyInitialActions(
+  sim: Sim,
+  p: { hold?: boolean; cw?: boolean; ccw?: boolean; flip?: boolean },
+): StepEvent {
+  if (sim.phase !== "playing" || !sim.piece) return "none";
+  if (p.hold && holdPiece(sim)) return "hold";
+  if (p.flip && tryRotate(sim, 2)) return "rotate";
+  if (p.cw && tryRotate(sim, 1)) return "rotate";
+  if (p.ccw && tryRotate(sim, -1)) return "rotate";
+  return "none";
+}
+
 export function pulseAction(
   sim: Sim,
   p: {
@@ -935,12 +967,14 @@ export function pulseAction(
     right?: boolean;
     cw?: boolean;
     ccw?: boolean;
+    flip?: boolean;
     hard?: boolean;
     hold?: boolean;
   },
 ): StepEvent {
   if (sim.phase !== "playing" || !sim.piece) return "none";
   if (p.hold && holdPiece(sim)) return "hold";
+  if (p.flip && tryRotate(sim, 2)) return "rotate";
   if (p.cw && tryRotate(sim, 1)) return "rotate";
   if (p.ccw && tryRotate(sim, -1)) return "rotate";
   if (p.hard) {

@@ -76,7 +76,7 @@ function viewOf(s: Stroke): StrokeView {
   };
 }
 
-export function createGestures(emit: (ev: GestureEmit) => void) {
+export function createGestures(emit: (ev: GestureEmit) => void, opts?: { swipeDrop?: () => boolean }) {
   const strokes = new Map<number, Stroke>();
   const longs = new Map<number, number>();
   let last: { x: number; y: number } | null = null;
@@ -163,6 +163,21 @@ export function createGestures(emit: (ev: GestureEmit) => void) {
     }
 
     if (cancelled || s.longFired) return;
+
+    const swipeDrop = opts?.swipeDrop?.() === true;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (swipeDrop && absY > 36 && absY > absX * 1.15) {
+      const speed = absY / Math.max(dt, 16);
+      if (dy > 0 && speed > 0.85) {
+        emit({ action: { name: "hard" }, label: "flick" });
+        return;
+      }
+      if (dy > 0) {
+        emit({ action: { name: "soft", down: true }, label: "soft" });
+        return;
+      }
+    }
 
     const short = dt <= TAP_MAX_MS + 80 && Math.hypot(dx, dy) < 56;
     if (!s.moved || short) {
