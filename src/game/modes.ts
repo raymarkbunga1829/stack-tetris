@@ -159,29 +159,41 @@ export function modeOf(id: ModeId): ModeInfo {
   return MODES.find((m) => m.id === id) ?? MODES[0]!;
 }
 
-export function localDateKey(d = new Date()): string {
-  const tz =
-    (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
-    "Asia/Manila";
-  try {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(d);
-  } catch {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Manila",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(d);
-  }
+export const MANILA_TZ = "Asia/Manila";
+
+export function manilaDateKey(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: MANILA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
+/** Shared Daily day. Always Asia/Manila — not device TZ, not silent UTC. */
 export function utcDateKey(d = new Date()): string {
-  return localDateKey(d);
+  return manilaDateKey(d);
+}
+
+export function localDateKey(d = new Date()): string {
+  return manilaDateKey(d);
+}
+
+export function formatManilaDate(key: string): string {
+  const parts = key.split("-");
+  const m = Number(parts[1] ?? 1);
+  const day = Number(parts[2] ?? 1);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[Math.max(0, m - 1)]} ${day}`;
+}
+
+export function streakLive(
+  streak: { count: number; last: string } | undefined,
+  today = manilaDateKey(),
+): number {
+  if (!streak || streak.count < 1) return 0;
+  if (streak.last === today || streak.last === utcShift(-1, today)) return streak.count;
+  return 0;
 }
 
 export function powersAllowed(id: ModeId): boolean {
@@ -249,8 +261,8 @@ export function sprintPace(clock: number, lines: number, pb: number | null): str
   return `${sign}${Math.abs(d).toFixed(1)}`;
 }
 
-export function peekDailyBag(n = 4): PieceId[] {
-  const rng = mulberry32(dailySeed());
+export function peekDailyBag(n = 4, date = manilaDateKey()): PieceId[] {
+  const rng = mulberry32(dailySeed(date));
   const bag = PIECE_IDS.slice();
   for (let i = bag.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));

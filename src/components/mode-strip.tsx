@@ -1,4 +1,4 @@
-import { formatElapsed, MODES, peekDailyBag, utcDateKey, type ModeId } from "@/game/modes";
+import { formatElapsed, formatManilaDate, manilaDateKey, MODES, peekDailyBag, streakLive, type ModeId } from "@/game/modes";
 import { PIECE_FILL } from "@/game/pieces";
 
 type Props = {
@@ -21,13 +21,14 @@ function rule(
   if (m.seconds) return `${Math.round(m.seconds / 60)}:00 · Lv ${m.startLevel}`;
   if (m.lines) return `${m.lines} lines`;
   if (m.id === "daily") {
-    if (streak && streak.count > 1 && streak.last === utcDateKey()) {
-      return `${streak.count} day streak`;
+    const today = manilaDateKey();
+    const days = streakLive(streak, today);
+    const stamp = formatManilaDate(today);
+    if (days > 1) return `${stamp} · ${days} days`;
+    if (daily && daily.date === today && daily.score > 0) {
+      return `${stamp} · ${daily.score.toLocaleString()}`;
     }
-    if (daily && daily.date === utcDateKey() && daily.score > 0) {
-      return `Today ${daily.score.toLocaleString()}`;
-    }
-    return utcDateKey().slice(5);
+    return stamp;
   }
   if (m.id === "finesse") return "20 pieces";
   if (m.id === "zen") return "No fail";
@@ -47,12 +48,16 @@ export function ModeChips({
   mode,
   onPick,
   onMore,
+  streak,
 }: {
   mode: ModeId;
   onPick: (id: ModeId) => void;
   onMore: () => void;
+  streak?: { count: number; last: string };
 }) {
   const featured = TITLE_MODES.includes(mode);
+  const today = manilaDateKey();
+  const days = streakLive(streak, today);
   return (
     <div className="mode-chips" role="tablist" aria-label="Game mode">
       {MODES.filter((m) => TITLE_MODES.includes(m.id)).map((m) => (
@@ -68,6 +73,12 @@ export function ModeChips({
         >
           <i aria-hidden="true" />
           <span>{CHIP_NAME[m.id] ?? m.name}</span>
+          {m.id === "daily" && (
+            <small className="chip-date">
+              {formatManilaDate(today)}
+              {days > 1 ? ` · ${days}` : ""}
+            </small>
+          )}
         </button>
       ))}
       <button
@@ -91,7 +102,7 @@ function modeOfName(id: ModeId) {
 
 export function ModeStrip({ mode, sprintBest, daily, streak, onPick }: Props) {
   const dailyBag = peekDailyBag(4);
-  const played = !!(daily && daily.date === utcDateKey() && daily.score > 0);
+  const played = !!(daily && daily.date === manilaDateKey() && daily.score > 0);
   return (
     <div className="modes" role="tablist" aria-label="Game mode">
       {MODES.map((m) => (

@@ -76,7 +76,7 @@ export function setLastStain(cells: { x: number; y: number }[], peak: number) {
   try {
     sessionStorage.setItem(STAIN, JSON.stringify({ cells, peak }));
   } catch {
-    /* quota */
+    /* ignore */
   }
 }
 
@@ -105,4 +105,49 @@ export function clearLastStain() {
   } catch {
     /* ignore */
   }
+}
+
+const DAILY_NOW = "stack-daily-replay";
+const DAILY_WAS = "stack-daily-replay-prev";
+
+type DatedSnaps = { date: string; snaps: Snap[] };
+
+function readDated(key: string): DatedSnaps | null {
+  try {
+    const raw = sessionStorage.getItem(key) ?? localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as DatedSnaps;
+    if (parsed?.date && Array.isArray(parsed.snaps) && parsed.snaps.length > 1) return parsed;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function writeDated(key: string, value: DatedSnaps) {
+  const raw = JSON.stringify(value);
+  try {
+    sessionStorage.setItem(key, raw);
+  } catch {
+    /* quota */
+  }
+  try {
+    localStorage.setItem(key, raw);
+  } catch {
+    /* quota */
+  }
+}
+
+export function setDailyReplay(date: string, snaps: Snap[]) {
+  const cur = readDated(DAILY_NOW);
+  if (cur && cur.date !== date) writeDated(DAILY_WAS, cur);
+  writeDated(DAILY_NOW, { date, snaps: snaps.slice(-CAP) });
+}
+
+export function getDailyReplay(date: string): Snap[] | null {
+  const cur = readDated(DAILY_NOW);
+  if (cur?.date === date) return cur.snaps;
+  const was = readDated(DAILY_WAS);
+  if (was?.date === date) return was.snaps;
+  return null;
 }
