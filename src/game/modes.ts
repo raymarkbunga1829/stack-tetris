@@ -231,9 +231,19 @@ export function formatClock(sec: number): string {
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
+/** Elapsed time with tenths. Use for Sprint clocks — ceil would pad a 40.1s run to 0:41. */
+export function formatElapsed(sec: number): string {
+  const t = Math.max(0, sec);
+  const m = Math.floor(t / 60);
+  const r = t - m * 60;
+  const whole = Math.floor(r);
+  const tenth = Math.floor((r - whole) * 10 + 1e-6);
+  return `${m}:${whole.toString().padStart(2, "0")}.${tenth}`;
+}
+
 export function sprintPace(clock: number, lines: number, pb: number | null): string | undefined {
   if (pb == null) return undefined;
-  if (lines < 1) return `PB ${formatClock(pb)}`;
+  if (lines < 1) return `PB ${formatElapsed(pb)}`;
   const d = clock - pb * (lines / 40);
   const sign = d >= 0 ? "+" : "−";
   return `${sign}${Math.abs(d).toFixed(1)}`;

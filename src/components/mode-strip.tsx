@@ -1,4 +1,4 @@
-import { formatClock, MODES, peekDailyBag, utcDateKey, type ModeId } from "@/game/modes";
+import { formatElapsed, MODES, peekDailyBag, utcDateKey, type ModeId } from "@/game/modes";
 import { PIECE_FILL } from "@/game/pieces";
 
 type Props = {
@@ -15,7 +15,7 @@ function rule(
   daily?: { date: string; score: number },
   streak?: { count: number; last: string },
 ): string {
-  if (m.id === "sprint" && sprintBest != null) return `PB ${formatClock(sprintBest)}`;
+  if (m.id === "sprint" && sprintBest != null) return `PB ${formatElapsed(sprintBest)}`;
   if (m.id === "arcade") return "No ghost";
   if (m.id === "classic") return "NES · no kicks";
   if (m.seconds) return `${Math.round(m.seconds / 60)}:00 · Lv ${m.startLevel}`;
@@ -35,10 +35,27 @@ function rule(
   return "Ghost on";
 }
 
-export function ModeChips({ mode, onPick }: { mode: ModeId; onPick: (id: ModeId) => void }) {
+const TITLE_MODES: ModeId[] = ["marathon", "sprint", "blitz", "daily"];
+const CHIP_NAME: Partial<Record<ModeId, string>> = {
+  marathon: "Marathon",
+  sprint: "Sprint",
+  blitz: "Blitz",
+  daily: "Daily",
+};
+
+export function ModeChips({
+  mode,
+  onPick,
+  onMore,
+}: {
+  mode: ModeId;
+  onPick: (id: ModeId) => void;
+  onMore: () => void;
+}) {
+  const featured = TITLE_MODES.includes(mode);
   return (
     <div className="mode-chips" role="tablist" aria-label="Game mode">
-      {MODES.map((m) => (
+      {MODES.filter((m) => TITLE_MODES.includes(m.id)).map((m) => (
         <button
           key={m.id}
           type="button"
@@ -50,11 +67,26 @@ export function ModeChips({ mode, onPick }: { mode: ModeId; onPick: (id: ModeId)
           onClick={() => onPick(m.id)}
         >
           <i aria-hidden="true" />
-          <span>{m.name}</span>
+          <span>{CHIP_NAME[m.id] ?? m.name}</span>
         </button>
       ))}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={!featured}
+        className={`is-more${!featured ? " is-on" : ""}`}
+        data-qa="mode-more"
+        onClick={onMore}
+      >
+        <i aria-hidden="true" />
+        <span>{featured ? "More" : modeOfName(mode)}</span>
+      </button>
     </div>
   );
+}
+
+function modeOfName(id: ModeId) {
+  return MODES.find((m) => m.id === id)?.name ?? "More";
 }
 
 export function ModeStrip({ mode, sprintBest, daily, streak, onPick }: Props) {

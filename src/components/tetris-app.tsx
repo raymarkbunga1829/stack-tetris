@@ -35,9 +35,11 @@ import { applyMissions, type MissionBook } from "@/game/missions";
 import {
   dailySeed,
   formatClock,
+  formatElapsed,
   moonPhase,
   modeOf,
   powersAllowed,
+  sprintPace,
   utcDateKey,
   type ModeId,
 } from "@/game/modes";
@@ -654,15 +656,23 @@ export function TetrisApp() {
   }
 
   function watchLast(auto = false) {
-    const snaps = getLastReplay();
+    const snaps = getLastReplay() ?? replayRef.current;
     if (!snaps) return;
     replayRef.current = snaps;
     replayI.current = 0;
     replayT.current = 0;
     attractOn.current = auto;
     attractUntil.current = auto ? performance.now() + 20000 : 0;
+    dying.current = false;
     if (!simRef.current) simRef.current = createSim({ mode: uiRef.current.mode });
-    syncUi({ watching: true });
+    else simRef.current.phase = "title";
+    syncUi({
+      phase: "title",
+      watching: true,
+      failing: false,
+      danger: false,
+      live: null,
+    });
   }
 
   function tick(dt: number) {
@@ -1450,6 +1460,7 @@ export function TetrisApp() {
     unlockAudio();
     if (simRef.current?.phase === "playing") {
       simRef.current.phase = "paused";
+      setMusicPaused(true);
       syncUi({ phase: "paused", shop: true });
     } else {
       syncUi({ shop: true });
@@ -1700,6 +1711,7 @@ export function TetrisApp() {
     unlockAudio();
     if (simRef.current?.phase === "playing") {
       simRef.current.phase = "paused";
+      setMusicPaused(true);
       syncUi({ phase: "paused", board: true });
     } else syncUi({ board: true });
   }
@@ -1863,7 +1875,7 @@ export function TetrisApp() {
               {ui.mode === "blitz"
                 ? formatClock(ui.timeLeft ?? 0)
                 : ui.mode === "sprint"
-                  ? formatClock(ui.clock)
+                  ? formatElapsed(ui.clock)
                   : ui.mode === "siege"
                     ? `${ui.siege?.kos ?? 0} KO`
                     : `Lv ${ui.level}`}
@@ -1872,7 +1884,9 @@ export function TetrisApp() {
               {ui.mode === "sprint" ? `${Math.max(0, 40 - ui.lines)} left` : `${ui.lines} L`}
             </span>
             <em>{modeOf(ui.mode).name}</em>
-            <small>Best {ui.high.toLocaleString()}</small>
+            {ui.mode === "sprint" && sprintPace(ui.clock, ui.lines, ui.sprintBest) ? (
+              <small>{sprintPace(ui.clock, ui.lines, ui.sprintBest)}</small>
+            ) : null}
             {ui.phase === "playing" ? (
               <button
                 type="button"
@@ -2068,6 +2082,45 @@ export function TetrisApp() {
                   >
                     Home
                   </button>
+                  <div className="pause-links">
+                    <button
+                      type="button"
+                      className="text-btn"
+                      data-qa="pause-store"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openShop();
+                      }}
+                    >
+                      Store
+                    </button>
+                    <button
+                      type="button"
+                      className="text-btn"
+                      data-qa="pause-settings"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openSettings();
+                      }}
+                    >
+                      Settings
+                    </button>
+                    <button
+                      type="button"
+                      className="text-btn"
+                      data-qa="pause-modes"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        unlockAudio();
+                        syncUi({ modesOpen: true });
+                      }}
+                    >
+                      Modes
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -2101,7 +2154,7 @@ export function TetrisApp() {
                   {ui.epitaph ??
                     (ui.won
                       ? ui.mode === "sprint"
-                        ? formatClock(ui.clock)
+                        ? formatElapsed(ui.clock)
                         : "Time"
                       : ui.score >= ui.high && ui.score > 0
                         ? "New best"
@@ -2127,7 +2180,7 @@ export function TetrisApp() {
                       <span>{ui.mode === "sprint" ? "Time" : "Stacks"}</span>
                       <b>
                         {ui.mode === "sprint"
-                          ? formatClock(ui.recap.clock)
+                          ? formatElapsed(ui.recap.clock)
                           : ui.recap.stacks}
                       </b>
                     </li>
@@ -2150,7 +2203,7 @@ export function TetrisApp() {
                     {ui.recap.splits.map((s, i) => (
                       <li key={i}>
                         <span>{(i + 1) * 10}</span>
-                        <b>{formatClock(s)}</b>
+                        <b>{formatElapsed(s)}</b>
                       </li>
                     ))}
                   </ul>
@@ -2187,6 +2240,21 @@ export function TetrisApp() {
                     }}
                   >
                     Share clip
+                  </button>
+                )}
+                {(getLastReplay() || replayRef.current) && (
+                  <button
+                    type="button"
+                    className="text-btn"
+                    data-qa="watch-last-over"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      unlockAudio();
+                      watchLast();
+                    }}
+                  >
+                    Watch last
                   </button>
                 )}
               </div>
@@ -2359,7 +2427,14 @@ export function TetrisApp() {
         />
 
         {(ui.phase === "title" || ui.phase === "over") && (
-          <ModeChips mode={ui.mode} onPick={pickMode} />
+          <ModeChips
+            mode={ui.mode}
+            onPick={pickMode}
+            onMore={() => {
+              unlockAudio();
+              syncUi({ modesOpen: true });
+            }}
+          />
         )}
 
         <footer className="foot">
