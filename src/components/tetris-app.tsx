@@ -1439,9 +1439,11 @@ export function TetrisApp() {
             : kind === "double"
               ? "#e8d4a0"
               : "#a8b4c4";
-    engine.sparkRows(sim.clearRows, tint);
-    if (kind !== "single") engine.shatter(sim, themeOf(saveRef.current.theme));
-    engine.sweep(kind);
+    if (kind !== "single") {
+      engine.sparkRows(sim.clearRows, tint);
+      engine.shatter(sim, themeOf(saveRef.current.theme));
+    }
+    engine.sweep(kind === "single" ? "clear" : kind);
     if (kind === "stack" || kind === "tspin") engine.nod(0.42);
     else if (kind === "triple") engine.nod(0.18);
     sfxLine(spoken.rank);
