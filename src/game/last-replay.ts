@@ -57,6 +57,15 @@ export function getLastAsh(): Board | null {
   return null;
 }
 
+export function clearLastAsh() {
+  ash = null;
+  try {
+    sessionStorage.removeItem(ASH);
+  } catch {
+    /* ignore */
+  }
+}
+
 const STAIN = "stack-last-stain";
 let stain: { x: number; y: number }[] | null = null;
 let stainPeak = 99;

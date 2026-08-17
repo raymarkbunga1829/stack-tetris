@@ -43,7 +43,7 @@ import {
   utcDateKey,
   type ModeId,
 } from "@/game/modes";
-import { clearLastStain, getLastAsh, getLastReplay, getLastStain, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
+import { clearLastAsh, clearLastStain, getLastAsh, getLastReplay, getLastStain, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { nameRun } from "@/game/run-name";
 import { shareRun } from "@/game/share-run";
 import { REPLAY_STEP, type Snap } from "@/game/replay";
@@ -152,6 +152,7 @@ type Ui = {
   b2bPop: number;
   sprintBest: number | null;
   recap: {
+    mode: ModeId;
     lines: number;
     combo: number;
     tspins: number;
@@ -171,6 +172,7 @@ type Ui = {
   canHold: boolean;
   canUndo: boolean;
   lockPop: number;
+  tintPop: number;
   lifting: boolean;
   pbPop: number;
   coinTake: boolean;
@@ -338,6 +340,7 @@ export function TetrisApp() {
     canHold: true,
     canUndo: false,
     lockPop: 0,
+    tintPop: 0,
     lifting: false,
     pbPop: 0,
     coinTake: false,
@@ -531,6 +534,13 @@ export function TetrisApp() {
     }));
   }
 
+  function wipePit() {
+    well3dRef.current?.setAsh(null);
+    well3dRef.current?.setStain(null);
+    clearLastAsh();
+    clearLastStain();
+  }
+
   function startGame(nextMode?: ModeId) {
     const mode = nextMode ?? saveRef.current.mode;
     if (uiRef.current.phase === "playing" && quietT.current > 0) {
@@ -575,10 +585,8 @@ export function TetrisApp() {
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 0.4;
-    well3dRef.current?.setAsh(getLastAsh());
+    wipePit();
     well3dRef.current?.setClear(saveRef.current.clearWell || mode === "sprint" || mode === "daily");
-    const stain = getLastStain();
-    well3dRef.current?.setStain(stain?.cells ?? null);
     const intro =
       mode === "sprint"
         ? "40"
@@ -651,6 +659,7 @@ export function TetrisApp() {
     setMusicPaused(false);
     dying.current = false;
     failT.current = 0;
+    wipePit();
     if (simRef.current) simRef.current.phase = "title";
     syncUi({
       phase: "title",
@@ -658,6 +667,10 @@ export function TetrisApp() {
       failing: false,
       danger: false,
       live: null,
+      recap: null,
+      epitaph: null,
+      coinTake: false,
+      intro: null,
     });
   }
 
@@ -670,6 +683,7 @@ export function TetrisApp() {
     attractOn.current = auto;
     attractUntil.current = auto ? performance.now() + 20000 : 0;
     dying.current = false;
+    wipePit();
     if (!simRef.current) simRef.current = createSim({ mode: uiRef.current.mode });
     else simRef.current.phase = "title";
     syncUi({
@@ -925,6 +939,7 @@ export function TetrisApp() {
     if (ev === "clear") {
       haptic("clear");
       shakeRef.current = 5;
+      bangTint();
       if (!saveRef.current.niceSeen) {
         saveRef.current = { ...saveRef.current, niceSeen: true };
         writeSave(saveRef.current);
@@ -941,6 +956,7 @@ export function TetrisApp() {
       haptic("tetris");
       shakeRef.current = ev === "tetris" ? 12 : 8;
       well3dRef.current?.punch(ev === "tetris" ? 0.35 : 0.25);
+      bangTint();
       if (sim.blessed && ev === "tetris") {
         sim.blessed = false;
         syncUi({ picking: true });
@@ -1147,6 +1163,7 @@ export function TetrisApp() {
     }
     if (!sim.won) {
       setLastAsh(sim.board);
+      well3dRef.current?.setAsh(sim.board);
       const cells: { x: number; y: number }[] = [];
       let peak = 99;
       for (let y = HIDDEN_ROWS; y < ROWS; y++) {
@@ -1194,6 +1211,7 @@ export function TetrisApp() {
       epitaph,
       sprintBest: saveRef.current.sprintBest,
       recap: {
+        mode: sim.mode,
         lines: sim.lines,
         combo: sim.maxCombo,
         tspins: sim.tspins,
@@ -1224,6 +1242,13 @@ export function TetrisApp() {
     if (replayT.current < REPLAY_STEP) return;
     replayT.current = 0;
     replayI.current = (replayI.current + 1) % snaps.length;
+  }
+
+  function bangTint() {
+    syncUi({ tintPop: uiRef.current.tintPop + 1 });
+    window.setTimeout(() => {
+      if (uiRef.current.tintPop) syncUi({ tintPop: 0 });
+    }, 280);
   }
 
   function slamLock(
@@ -1705,6 +1730,28 @@ export function TetrisApp() {
     );
     sfxSelect();
     haptic("select");
+    if (uiRef.current.phase === "over" || uiRef.current.phase === "paused") {
+      stopMusic();
+      setMusicPaused(false);
+      wipePit();
+      if (simRef.current) simRef.current.phase = "title";
+      syncUi({
+        mode: id,
+        modesOpen: false,
+        phase: "title",
+        recap: null,
+        epitaph: null,
+        watching: false,
+        failing: false,
+        coinTake: false,
+        score: 0,
+        lines: 0,
+        clock: 0,
+        live: null,
+        intro: null,
+      });
+      return;
+    }
     syncUi({ mode: id, modesOpen: false });
   }
 
@@ -1863,7 +1910,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${viewW < 720 ? " is-narrow" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${viewW < 720 ? " is-narrow" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -2196,11 +2243,11 @@ export function TetrisApp() {
                         <b>{ui.recap.tspins}</b>
                       </li>
                     )}
-                    {(ui.recap.stacks > 0 || ui.mode === "sprint") && (
+                    {(ui.recap.stacks > 0 || ui.recap.mode === "sprint") && (
                       <li>
-                        <span>{ui.mode === "sprint" ? "Time" : "Stacks"}</span>
+                        <span>{ui.recap.mode === "sprint" ? "Time" : "Stacks"}</span>
                         <b>
-                          {ui.mode === "sprint"
+                          {ui.recap.mode === "sprint"
                             ? formatElapsed(ui.recap.clock)
                             : ui.recap.stacks}
                         </b>
@@ -2220,7 +2267,7 @@ export function TetrisApp() {
                     )}
                   </ul>
                 )}
-                {ui.mode === "sprint" && ui.recap && ui.recap.splits.length > 0 && (
+                {ui.recap?.mode === "sprint" && ui.recap.splits.length > 0 && (
                   <ul className="splits">
                     {ui.recap.splits.map((s, i) => (
                       <li key={i}>
