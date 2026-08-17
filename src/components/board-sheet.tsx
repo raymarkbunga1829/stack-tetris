@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { formatElapsed, MODES, utcDateKey, type ModeId } from "@/game/modes";
+import { formatElapsed, formatManilaDate, manilaDateKey, MODES, type ModeId } from "@/game/modes";
 import type { ScoreRow } from "@/game/save";
 
 type Props = {
@@ -8,24 +8,42 @@ type Props = {
   scores: ScoreRow[];
   dailyRows: ScoreRow[];
   dailyDate: string;
+  yesterdayRows: ScoreRow[];
+  yesterdayDate: string;
+  onWatchYesterday?: () => void;
+  canWatchYesterday?: boolean;
   onClose: () => void;
 };
 
-export function BoardSheet({ open, scores, dailyRows, dailyDate, onClose }: Props) {
-  const [tab, setTab] = useState<"all" | "daily">("all");
+export function BoardSheet({
+  open,
+  scores,
+  dailyRows,
+  dailyDate,
+  yesterdayRows,
+  yesterdayDate,
+  onWatchYesterday,
+  canWatchYesterday,
+  onClose,
+}: Props) {
+  const [tab, setTab] = useState<"all" | "daily" | "yesterday">("all");
   if (!open) return null;
-  const today = utcDateKey();
+  const today = manilaDateKey();
   const daily = dailyDate === today ? dailyRows : [];
-  const list = tab === "daily" ? daily : scores.slice(0, 10);
+  const yestDate = dailyDate === today ? yesterdayDate : dailyDate;
+  const yest = dailyDate === today ? yesterdayRows : dailyRows;
+  const list = tab === "yesterday" ? yest : tab === "daily" ? daily : scores.slice(0, 10);
+  const stamp = tab === "yesterday" ? yestDate : today;
 
   async function shareDaily() {
-    const lines = daily.length
-      ? daily
+    const rows = tab === "yesterday" ? yest : daily;
+    const lines = rows.length
+      ? rows
           .slice(0, 10)
           .map((s, i) => `${i + 1}. ${s.score.toLocaleString()} · ${s.lines}L`)
           .join("\n")
       : "No runs yet.";
-    const text = `Stack Daily ${today}\n${lines}`;
+    const text = `Stack Daily ${stamp}\n${lines}`;
     try {
       if (navigator.share) await navigator.share({ title: "Stack Daily", text });
       else await navigator.clipboard.writeText(text);
@@ -39,8 +57,10 @@ export function BoardSheet({ open, scores, dailyRows, dailyDate, onClose }: Prop
       <div className="shop">
         <header className="shop-top">
           <div>
-            <p className="shop-kicker">{tab === "daily" ? today : "Local"}</p>
-            <h2>{tab === "daily" ? "Daily board" : "Scores"}</h2>
+            <p className="shop-kicker">
+              {tab === "all" ? "Local" : formatManilaDate(stamp)}
+            </p>
+            <h2>{tab === "yesterday" ? "Yesterday" : tab === "daily" ? "Daily" : "Scores"}</h2>
           </div>
           <button type="button" className="shop-x" aria-label="Close" onClick={onClose}>
             <X size={18} />
@@ -53,17 +73,30 @@ export function BoardSheet({ open, scores, dailyRows, dailyDate, onClose }: Prop
           <button type="button" className={tab === "daily" ? "is-on" : ""} onClick={() => setTab("daily")}>
             Daily
           </button>
+          {yestDate && yestDate !== today && (
+            <button
+              type="button"
+              className={tab === "yesterday" ? "is-on" : ""}
+              onClick={() => setTab("yesterday")}
+            >
+              Yesterday
+            </button>
+          )}
         </div>
         <ul className="score-list">
           {list.length === 0 && (
             <li className="shop-blurb empty-runs">
-              {tab === "daily" ? "No Daily runs today." : "No runs yet."}
+              {tab === "daily"
+                ? "No Daily runs today."
+                : tab === "yesterday"
+                  ? "No run kept."
+                  : "No runs yet."}
             </li>
           )}
           {list.map((s, i) => (
             <li key={`${s.t}-${i}`}>
               <span>{i + 1}</span>
-              <b>{tab === "daily" ? `${s.lines} L` : nameOf(s.mode)}</b>
+              <b>{tab === "all" ? nameOf(s.mode) : `${s.lines} L`}</b>
               <em>{s.score.toLocaleString()}</em>
               <small>
                 {s.won && s.mode === "sprint" ? formatElapsed(s.clock) : `${s.lines} L`}
@@ -71,13 +104,18 @@ export function BoardSheet({ open, scores, dailyRows, dailyDate, onClose }: Prop
             </li>
           ))}
         </ul>
-        {tab === "daily" && (
+        {tab === "yesterday" && canWatchYesterday && onWatchYesterday && (
+          <button type="button" className="shop-buy gc" onClick={onWatchYesterday}>
+            Watch yesterday
+          </button>
+        )}
+        {(tab === "daily" || tab === "yesterday") && (
           <button type="button" className="shop-buy gc" onClick={() => void shareDaily()}>
-            Share today’s board
+            {tab === "yesterday" ? "Share yesterday" : "Share today’s board"}
           </button>
         )}
         <p className="shop-note">
-          Daily ranks are this device’s top 10 for {today}. Share the list with a friend.
+          Same bag for everyone on the Manila day. This device only.
         </p>
       </div>
     </div>

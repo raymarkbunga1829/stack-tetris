@@ -37,14 +37,15 @@ import {
   dailySeed,
   formatClock,
   formatElapsed,
+  formatManilaDate,
+  manilaDateKey,
   moonPhase,
   modeOf,
   powersAllowed,
   sprintPace,
-  utcDateKey,
   type ModeId,
 } from "@/game/modes";
-import { clearLastAsh, clearLastStain, getLastAsh, getLastReplay, getLastStain, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
+import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { nameRun } from "@/game/run-name";
 import { betterRank, speakClear, type Callout, type CallRank } from "@/game/callout";
 import { shareRun } from "@/game/share-run";
@@ -165,8 +166,11 @@ type Ui = {
     splits: number[];
     perfects: number;
     extras?: number;
+    dailyDate?: string;
+    streakCount?: number;
   } | null;
   tip: string | null;
+  bagLine: boolean;
   pred: { rows: number; lock: boolean; kick: boolean } | null;
   holdPeek: PieceId | null;
   failing: boolean;
@@ -339,6 +343,7 @@ export function TetrisApp() {
     sprintBest: saveRef.current.sprintBest,
     recap: null,
     tip: null,
+    bagLine: false,
     pred: null,
     holdPeek: null,
     failing: false,
@@ -431,6 +436,12 @@ export function TetrisApp() {
     const mq = window.matchMedia("(display-mode: standalone)");
     const onMode = () => setUi((p) => ({ ...p, standalone: isStandalone() }));
     mq.addEventListener("change", onMode);
+    const today = manilaDateKey();
+    if (saveRef.current.seenDay !== today) {
+      saveRef.current = { ...saveRef.current, seenDay: today };
+      writeSave(saveRef.current);
+      setUi((p) => ({ ...p, bagLine: true }));
+    }
     return () => mq.removeEventListener("change", onMode);
   }, []);
 
@@ -606,7 +617,7 @@ export function TetrisApp() {
             : mode === "finesse"
               ? "20"
               : mode === "daily"
-                ? utcDateKey().slice(5)
+                ? formatManilaDate(manilaDateKey())
                 : mode === "zen"
                   ? "Still"
                   : mode === "arcade"
@@ -642,6 +653,7 @@ export function TetrisApp() {
       b2bPop: 0,
       recap: null,
       tip: null,
+      bagLine: false,
       pred: null,
       holdPeek: null,
       failing: false,
@@ -685,8 +697,8 @@ export function TetrisApp() {
     });
   }
 
-  function watchLast(auto = false) {
-    const snaps = getLastReplay() ?? replayRef.current;
+  function watchLast(auto = false, snapsIn?: Snap[]) {
+    const snaps = snapsIn ?? getLastReplay() ?? replayRef.current;
     if (!snaps) return;
     replayRef.current = snaps;
     replayI.current = 0;
@@ -1187,6 +1199,7 @@ export function TetrisApp() {
       replayI.current = 0;
       replayT.current = 0;
       setLastReplay(sim.history);
+      if (sim.mode === "daily") setDailyReplay(manilaDateKey(), sim.history);
     }
     if (!sim.won) {
       setLastAsh(sim.board);
@@ -1248,7 +1261,10 @@ export function TetrisApp() {
         splits: sim.splits.slice(),
         perfects: sim.perfects,
         extras: sim.mode === "finesse" ? finesseExtras.current : undefined,
+        dailyDate: sim.mode === "daily" ? manilaDateKey() : undefined,
+        streakCount: sim.mode === "daily" ? saveRef.current.streak.count : undefined,
       },
+      bagLine: false,
       tip:
         !sim.won && !saveRef.current.tipSeen
           ? "Hold saves a piece. Ghost shows the drop."
@@ -2109,11 +2125,14 @@ export function TetrisApp() {
               <div className={`veil${ui.lifting ? " is-lift" : ""}`}>
                 <p className="veil-kicker">
                   {ui.mode === "daily" &&
-                  saveRef.current.daily.date === utcDateKey() &&
+                  saveRef.current.daily.date === manilaDateKey() &&
                   saveRef.current.daily.score > 0
                     ? `Daily ${saveRef.current.daily.score.toLocaleString()}`
                     : "Insert coin"}
                 </p>
+                {ui.bagLine && (
+                  <p className="bag-up">Today’s bag is up.</p>
+                )}
                 <p className="veil-title">Stack</p>
                 <p className="veil-hint">Press start</p>
                 {isAndroid() && (
@@ -2147,7 +2166,7 @@ export function TetrisApp() {
                   }}
                 >
                   {ui.mode === "daily" &&
-                  saveRef.current.daily.date === utcDateKey() &&
+                  saveRef.current.daily.date === manilaDateKey() &&
                   saveRef.current.daily.score > 0
                     ? "Try again"
                     : "Start"}
@@ -2291,6 +2310,16 @@ export function TetrisApp() {
                         : "Game over")}
                 </p>
                 <p className="veil-title">{ui.score.toLocaleString()}</p>
+                {ui.recap?.dailyDate && (
+                  <p className="daily-stamp">
+                    {formatManilaDate(ui.recap.dailyDate)}
+                    {ui.recap.streakCount && ui.recap.streakCount > 1
+                      ? ` · ${ui.recap.streakCount} days`
+                      : ui.recap.streakCount === 1
+                        ? " · streak starts"
+                        : ""}
+                  </p>
+                )}
                 {ui.tip && <p className="veil-hint">{ui.tip}</p>}
                 {ui.recap && (
                   <ul className="recap">
@@ -2374,6 +2403,9 @@ export function TetrisApp() {
                         epitaph: ui.epitaph ?? undefined,
                         still: bestStill.current?.snap,
                         callout: bestStill.current?.label,
+                        date: ui.recap?.dailyDate
+                          ? formatManilaDate(ui.recap.dailyDate)
+                          : undefined,
                       });
                     }}
                   >
@@ -2579,6 +2611,7 @@ export function TetrisApp() {
         {ui.phase === "title" && (
           <ModeChips
             mode={ui.mode}
+            streak={ui.streak}
             onPick={pickMode}
             onMore={() => {
               unlockAudio();
@@ -2709,6 +2742,24 @@ export function TetrisApp() {
           scores={saveRef.current.scores}
           dailyRows={saveRef.current.dailyBoard.rows}
           dailyDate={saveRef.current.dailyBoard.date}
+          yesterdayRows={saveRef.current.dailyPrev.rows}
+          yesterdayDate={saveRef.current.dailyPrev.date}
+          canWatchYesterday={
+            !!getDailyReplay(
+              saveRef.current.dailyBoard.date === manilaDateKey()
+                ? saveRef.current.dailyPrev.date
+                : saveRef.current.dailyBoard.date,
+            )
+          }
+          onWatchYesterday={() => {
+            const date =
+              saveRef.current.dailyBoard.date === manilaDateKey()
+                ? saveRef.current.dailyPrev.date
+                : saveRef.current.dailyBoard.date;
+            const snaps = getDailyReplay(date);
+            syncUi({ board: false });
+            if (snaps) watchLast(false, snaps);
+          }}
           onClose={() => syncUi({ board: false })}
         />
       </div>

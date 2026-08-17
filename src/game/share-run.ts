@@ -14,6 +14,7 @@ export type SharePayload = {
   epitaph?: string;
   still?: Snap;
   callout?: string;
+  date?: string;
 };
 
 export async function shareRun(run: SharePayload): Promise<void> {
@@ -44,7 +45,7 @@ export async function shareRun(run: SharePayload): Promise<void> {
     });
     ctx.fillStyle = "#c2c4ca";
     ctx.font = "600 32px 'Segoe UI', system-ui, sans-serif";
-    ctx.fillText(run.mode.toUpperCase(), 120, 220);
+    ctx.fillText(run.date ? `${run.mode.toUpperCase()}  ${run.date}` : run.mode.toUpperCase(), 120, 220);
     if (run.epitaph) {
       ctx.fillStyle = "#f2efe6";
       ctx.font = "600 40px 'Segoe UI', system-ui, sans-serif";

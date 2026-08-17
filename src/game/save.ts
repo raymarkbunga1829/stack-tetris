@@ -1,5 +1,5 @@
 import { ensureMissions, emptyBook, type MissionBook } from "./missions";
-import { utcDateKey, utcShift, type ModeId } from "./modes";
+import { manilaDateKey, utcShift, type ModeId } from "./modes";
 import { emptyInv, type Inventory, type Receipt } from "./shop";
 import type { ThemeId } from "./themes";
 import type { PadMode } from "./device";
@@ -60,6 +60,8 @@ export type SaveData = {
   arrMs: number;
   sdf: number;
   dailyBoard: { date: string; rows: ScoreRow[] };
+  dailyPrev: { date: string; rows: ScoreRow[] };
+  seenDay: string;
   streak: { count: number; last: string };
 };
 
@@ -101,6 +103,8 @@ const DEFAULTS: SaveData = {
   arrMs: 33,
   sdf: 20,
   dailyBoard: { date: "", rows: [] },
+  dailyPrev: { date: "", rows: [] },
+  seenDay: "",
   streak: { count: 0, last: "" },
 };
 
@@ -176,6 +180,8 @@ export function loadSave(): SaveData {
       arrMs: clampMs(parsed.arrMs, 0, 80, 33),
       sdf: clampMs(parsed.sdf, 5, 40, 20),
       dailyBoard: parsed.dailyBoard ?? { date: "", rows: [] },
+      dailyPrev: parsed.dailyPrev ?? { date: "", rows: [] },
+      seenDay: typeof parsed.seenDay === "string" ? parsed.seenDay : "",
       streak: parsed.streak ?? { count: 0, last: "" },
     };
   } catch {
@@ -214,13 +220,17 @@ export function recordRun(data: SaveData, row: ScoreRow): SaveData {
     }
   }
   if (row.mode === "daily") {
-    const date = data.missions.date;
-    const prev = next.dailyBoard.date === date ? next.dailyBoard.rows : [];
+    const date = manilaDateKey();
+    let archived = next;
+    if (next.dailyBoard.date && next.dailyBoard.date !== date) {
+      archived = { ...next, dailyPrev: next.dailyBoard };
+    }
+    const prev = archived.dailyBoard.date === date ? archived.dailyBoard.rows : [];
     const rows = [row, ...prev]
       .sort((a, b) => b.score - a.score || a.clock - b.clock)
       .slice(0, 10);
     next = {
-      ...next,
+      ...archived,
       daily: {
         date,
         score: Math.max(data.daily.date === date ? data.daily.score : 0, row.score),
@@ -228,13 +238,11 @@ export function recordRun(data: SaveData, row: ScoreRow): SaveData {
       },
       dailyBoard: { date, rows },
     };
-  }
-  if (row.mode === "daily") {
-    const today = utcDateKey();
-    const prev = next.streak;
+    const today = date;
+    const prevStreak = next.streak;
     let count = 1;
-    if (prev.last === today) count = Math.max(1, prev.count);
-    else if (prev.last === utcShift(-1, today)) count = prev.count + 1;
+    if (prevStreak.last === today) count = Math.max(1, prevStreak.count);
+    else if (prevStreak.last === utcShift(-1, today)) count = prevStreak.count + 1;
     next = { ...next, streak: { count, last: today } };
   }
   writeSave(next);
