@@ -44,6 +44,8 @@ const MARK: Record<PieceId, [number, number][]> = {
   ],
 };
 const MAX_GHOST = 8;
+const MAX_HINT = 8;
+const MAX_MEM = COLS * VISIBLE_ROWS;
 
 function hex(c: string) {
   return new THREE.Color(c);
@@ -173,12 +175,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     metalness: 0.55,
     envMapIntensity: 0.95,
   });
-  const pitMat = new THREE.MeshStandardMaterial({
-    color: 0x0c0e14,
-    roughness: 0.7,
-    metalness: 0.28,
-    envMapIntensity: 0.5,
-  });
   const trimMat = new THREE.MeshStandardMaterial({
     color: 0xc8f8ff,
     roughness: 0.18,
@@ -188,10 +184,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const pitTex = makePitTexture();
   pitTex.colorSpace = THREE.SRGBColorSpace;
-  const back = new THREE.Mesh(
-    new THREE.PlaneGeometry(10.2, 20.4),
-    new THREE.MeshBasicMaterial({ map: pitTex }),
-  );
+  const backMat = new THREE.MeshBasicMaterial({ map: pitTex });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(10.2, 20.4), backMat);
   back.position.set(0, 9.5, -0.7);
   scene.add(back);
   const left = new THREE.Mesh(new THREE.BoxGeometry(0.28, 20.8, 1.55), wallMat);
@@ -219,20 +213,33 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   god.position.set(0.4, 10.2, 0.35);
   scene.add(god);
 
-  const haze = new THREE.Mesh(
-    new THREE.PlaneGeometry(10.2, 20.4),
-    new THREE.MeshBasicMaterial({
-      color: 0x50e8ff,
-      transparent: true,
-      opacity: 0.06,
-      depthWrite: false,
-    }),
-  );
+  const hazeMat = new THREE.MeshBasicMaterial({
+    color: 0x50e8ff,
+    transparent: true,
+    opacity: 0.06,
+    depthWrite: false,
+  });
+  const haze = new THREE.Mesh(new THREE.PlaneGeometry(10.2, 20.4), hazeMat);
   haze.position.set(0, 9.5, -0.55);
   scene.add(haze);
 
   const grid = makeWellGrid();
   scene.add(grid);
+  const gridTint = new THREE.Color(0x4ad4e8);
+
+  /** A cyan grid vanishes on a pale skin, so light pits get dark lines instead. */
+  function applyWellLines(theme?: Theme) {
+    if (theme) {
+      const pale = hex(theme.well).getHSL({ h: 0, s: 0, l: 0 }).l > 0.35;
+      if (pale) gridTint.copy(hex(theme.grid)).multiplyScalar(0.5);
+      else gridTint.set(0x4ad4e8);
+      hazeMat.color.copy(gridTint);
+    }
+    const gm = grid.material as THREE.LineBasicMaterial;
+    gm.opacity = clearLook ? 0.12 : 0.38;
+    if (clearLook) gm.color.set(0x2a3038);
+    else gm.color.copy(gridTint);
+  }
   const ticks = makeSprintTicks();
   ticks.visible = false;
   scene.add(ticks);
@@ -264,13 +271,34 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
+  // Each overlay owns its material: opacity is per-material, so sharing one
+  // would let whichever layer drew last flatten the others.
+  const hintMat = ghostMat.clone();
+  hintMat.opacity = 0.2;
+  // Ash and stains must never read as playable cells: flat, dim, no highlight.
+  const memMat = ghostMat.clone();
+  memMat.opacity = 0.16;
+  memMat.clearcoat = 0;
+  memMat.roughness = 0.6;
+  memMat.envMapIntensity = 0.15;
+  const streakMat = ghostMat.clone();
+  streakMat.opacity = 0.5;
+
   const solids = new THREE.InstancedMesh(geo, solidMat, MAX_SOLID);
   solids.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   solids.frustumCulled = false;
   const ghosts = new THREE.InstancedMesh(geo, ghostMat, MAX_GHOST);
   ghosts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   ghosts.frustumCulled = false;
-  scene.add(solids, ghosts);
+  const hints = new THREE.InstancedMesh(geo, hintMat, MAX_HINT);
+  hints.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  hints.frustumCulled = false;
+  hints.count = 0;
+  const memory = new THREE.InstancedMesh(geo, memMat, MAX_MEM);
+  memory.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  memory.frustumCulled = false;
+  memory.count = 0;
+  scene.add(solids, ghosts, hints, memory);
 
   const pipGeo = new THREE.BoxGeometry(0.14, 0.14, 0.05);
   const pipMat = new THREE.MeshBasicMaterial({ color: 0x141414 });
@@ -321,7 +349,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   scene.add(shards);
 
   const MAX_STREAK = 28;
-  const streaks = new THREE.InstancedMesh(geo, ghostMat, MAX_STREAK);
+  const streaks = new THREE.InstancedMesh(geo, streakMat, MAX_STREAK);
   streaks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   streaks.frustumCulled = false;
   streaks.count = 0;
@@ -339,18 +367,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   sweepMesh.position.set(0, 10, 0.55);
   sweepMesh.visible = false;
   scene.add(sweepMesh);
-
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.9, 28), ringMat);
-  ring.position.z = 0.42;
-  ring.visible = false;
-  scene.add(ring);
 
   const zapMat = new THREE.MeshBasicMaterial({
     color: 0xb8fff8,
@@ -611,6 +627,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         trimMat.color.set(0xa8f0ff);
         godMat.opacity = reduce ? 0.05 : 0.1;
       }
+      applyWellLines(theme);
     }
     if (theme.pit !== lastBg) {
       lastBg = theme.pit;
@@ -622,7 +639,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             : hex(theme.pit).multiplyScalar(0.88);
       renderer.setClearColor(bg, 1);
       scene.background = bg;
-      pitMat.color.copy(hex(theme.well).multiplyScalar(theme.id === "molten" ? 0.85 : 0.78));
+      // The pit art is greyscale, so the skin's frame colour is what you see.
+      backMat.color.copy(hex(theme.frame)).multiplyScalar(2.2);
       wallMat.color.copy(hex(theme.frame).multiplyScalar(0.7));
     }
 
@@ -768,28 +786,30 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     pips.instanceMatrix.needsUpdate = true;
     if (solids.instanceColor) solids.instanceColor.needsUpdate = true;
 
-    let g = 0;
-    if (stainCells.length) {
-      ghostMat.opacity = 0.2;
+    let m = 0;
+    if (!title) {
       for (const c of stainCells) {
-        if (g >= MAX_GHOST - 12) break;
-        place(ghosts, g++, c.x, c.y, -0.08, "#2a2018", 1, 0.28);
+        if (m >= MAX_MEM) break;
+        place(memory, m++, c.x, c.y, -0.08, "#2a2018", 1, 0.55);
       }
-    }
-    if (ashBoard && ashT > 0) {
-      ashT = Math.max(0, ashT - dt * 0.14);
-      ghostMat.opacity = 0.14 * ashT;
-      for (let y = HIDDEN_ROWS; y < ROWS; y++) {
-        const row = y - HIDDEN_ROWS;
-        for (let x = 0; x < COLS; x++) {
-          const id = ashBoard[y]?.[x];
-          if (!id) continue;
-          if (g >= MAX_GHOST - 8) break;
-          place(ghosts, g++, x, row, -0.02, theme.deep[id] ?? "#333", 1, 0.45);
+      if (ashBoard && ashT > 0) {
+        ashT = Math.max(0, ashT - dt * 0.14);
+        for (let y = HIDDEN_ROWS; y < ROWS && m < MAX_MEM; y++) {
+          const row = y - HIDDEN_ROWS;
+          for (let x = 0; x < COLS; x++) {
+            const id = ashBoard[y]?.[x];
+            if (!id) continue;
+            if (m >= MAX_MEM) break;
+            place(memory, m++, x, row, -0.02, theme.deep[id] ?? "#333", 1, 0.5 * ashT);
+          }
         }
       }
     }
-    let ringOn = false;
+    memory.count = m;
+    memory.instanceMatrix.needsUpdate = true;
+    if (memory.instanceColor) memory.instanceColor.needsUpdate = true;
+
+    let g = 0;
     if (
       showGhost &&
       sim?.piece &&
@@ -819,19 +839,22 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         }
       }
     }
-    if (sim?.hold && sim.piece && sim.phase === "playing" && g < MAX_GHOST - 4) {
-      ghostMat.opacity = 0.2;
-      for (const c of cellsOf(sim.hold, 0, sim.piece.x, sim.piece.y)) {
-        const row = c.y - HIDDEN_ROWS;
-        if (row < 0 || row >= VISIBLE_ROWS) continue;
-        if (g >= MAX_GHOST) break;
-        place(ghosts, g++, c.x, row, 0.07, theme.fill[sim.hold], 1, 0.7);
-      }
-    }
-    ring.visible = ringOn;
     ghosts.count = g;
     ghosts.instanceMatrix.needsUpdate = true;
     if (ghosts.instanceColor) ghosts.instanceColor.needsUpdate = true;
+
+    let h = 0;
+    if (sim?.hold && sim.piece && sim.phase === "playing") {
+      for (const c of cellsOf(sim.hold, 0, sim.piece.x, sim.piece.y)) {
+        const row = c.y - HIDDEN_ROWS;
+        if (row < 0 || row >= VISIBLE_ROWS) continue;
+        if (h >= MAX_HINT) break;
+        place(hints, h++, c.x, row, 0.07, theme.fill[sim.hold], 1, 0.7);
+      }
+    }
+    hints.count = h;
+    hints.instanceMatrix.needsUpdate = true;
+    if (hints.instanceColor) hints.instanceColor.needsUpdate = true;
 
     if (zapT > 0) {
       zapMesh.visible = true;
@@ -1266,11 +1289,15 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     geo.dispose();
     solidMat.dispose();
     ghostMat.dispose();
+    hintMat.dispose();
+    memMat.dispose();
+    streakMat.dispose();
     wallMat.dispose();
-    pitMat.dispose();
     trimMat.dispose();
     solids.dispose();
     ghosts.dispose();
+    hints.dispose();
+    memory.dispose();
     pipGeo.dispose();
     pipMat.dispose();
     pips.dispose();
@@ -1278,8 +1305,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sparkMat.dispose();
     sweepMat.dispose();
     sweepMesh.geometry.dispose();
-    ringMat.dispose();
-    ring.geometry.dispose();
     zapMat.dispose();
     zapMesh.geometry.dispose();
     slowMat.dispose();
@@ -1315,9 +1340,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       solidMat.roughness = on ? 0.42 : mobile ? 0.2 : 0.12;
       solidMat.sheen = on ? 0 : 0.22;
       solidMat.needsUpdate = true;
-      const gm = grid.material as THREE.LineBasicMaterial;
-      gm.opacity = on ? 0.12 : 0.38;
-      gm.color.set(on ? 0x2a3038 : 0x4ad4e8);
+      applyWellLines();
     },
     sparkRows,
     lockThump,
@@ -1376,28 +1399,28 @@ function makePitTexture(): THREE.CanvasTexture {
   c.width = w;
   c.height = h;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#12161e";
+  ctx.fillStyle = "#2a2a2a";
   ctx.fillRect(0, 0, w, h);
   const wash = ctx.createLinearGradient(0, 0, 0, h);
-  wash.addColorStop(0, "#3a4658");
-  wash.addColorStop(0.22, "#222a38");
-  wash.addColorStop(0.62, "#161b26");
-  wash.addColorStop(1, "#10141c");
+  wash.addColorStop(0, "#c8c8c8");
+  wash.addColorStop(0.22, "#6e6e6e");
+  wash.addColorStop(0.62, "#3c3c3c");
+  wash.addColorStop(1, "#242424");
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, w, h);
   const moon = ctx.createRadialGradient(w * 0.68, h * 0.16, 4, w * 0.68, h * 0.16, w * 0.48);
-  moon.addColorStop(0, "rgba(180, 255, 255, 0.42)");
-  moon.addColorStop(0.2, "rgba(255, 70, 190, 0.12)");
-  moon.addColorStop(1, "rgba(10, 11, 16, 0)");
+  moon.addColorStop(0, "rgba(255, 255, 255, 0.5)");
+  moon.addColorStop(0.2, "rgba(255, 255, 255, 0.12)");
+  moon.addColorStop(1, "rgba(0, 0, 0, 0)");
   ctx.fillStyle = moon;
   ctx.fillRect(0, 0, w, h);
   const shaft = ctx.createLinearGradient(w * 0.35, 0, w * 0.7, h);
-  shaft.addColorStop(0, "rgba(80, 255, 255, 0.2)");
-  shaft.addColorStop(0.4, "rgba(255, 40, 180, 0.06)");
+  shaft.addColorStop(0, "rgba(255, 255, 255, 0.22)");
+  shaft.addColorStop(0.4, "rgba(255, 255, 255, 0.07)");
   shaft.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = shaft;
   ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = "rgba(190, 186, 176, 0.08)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.09)";
   ctx.lineWidth = 1;
   for (let i = 0; i < 16; i++) {
     const y = h * 0.54 + i * 13;
