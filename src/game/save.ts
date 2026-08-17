@@ -55,6 +55,9 @@ export type SaveData = {
   swipeDrop: boolean;
   clearWell: boolean;
   a2hs: boolean;
+  dasMs: number;
+  arrMs: number;
+  sdf: number;
   dailyBoard: { date: string; rows: ScoreRow[] };
   streak: { count: number; last: string };
 };
@@ -90,11 +93,19 @@ const DEFAULTS: SaveData = {
   holdHinted: false,
   scan: false,
   swipeDrop: false,
-  clearWell: false,
+  clearWell: true,
   a2hs: false,
+  dasMs: 167,
+  arrMs: 33,
+  sdf: 20,
   dailyBoard: { date: "", rows: [] },
   streak: { count: 0, last: "" },
 };
+
+function clampMs(n: unknown, min: number, max: number, fallback: number): number {
+  if (typeof n !== "number" || Number.isNaN(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
 
 export function loadSave(): SaveData {
   try {
@@ -156,8 +167,11 @@ export function loadSave(): SaveData {
       holdHinted: parsed.holdHinted === true,
       scan: parsed.scan === true,
       swipeDrop: parsed.swipeDrop === true,
-      clearWell: parsed.clearWell === true,
+      clearWell: parsed.clearWell !== false,
       a2hs: parsed.a2hs === true,
+      dasMs: clampMs(parsed.dasMs, 50, 300, 167),
+      arrMs: clampMs(parsed.arrMs, 0, 80, 33),
+      sdf: clampMs(parsed.sdf, 5, 40, 20),
       dailyBoard: parsed.dailyBoard ?? { date: "", rows: [] },
       streak: parsed.streak ?? { count: 0, last: "" },
     };

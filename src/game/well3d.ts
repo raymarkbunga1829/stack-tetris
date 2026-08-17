@@ -129,7 +129,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let ashT = 0;
   let stainCells: { x: number; y: number }[] = [];
   let lastDraw = performance.now();
-  const bloomBase = reduce ? 0.14 : mobile ? 0.4 : 0.62;
+  const bloomBase = reduce ? 0.1 : mobile ? 0.16 : 0.2;
   let clearLook = false;
 
   function frameCamera() {
@@ -521,19 +521,17 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       sparkLifeMul =
         theme.id === "neon" || theme.id === "molten" ? 1.7 : night ? 1.55 : theme.id === "ice" ? 1.4 : theme.id === "ink" ? 1 : 1.15;
       bloomMul =
-        theme.id === "neon"
-          ? 1.7
-          : theme.id === "ice"
-            ? 1.55
-            : theme.id === "molten"
-              ? 1.55
-              : theme.id === "lcd" || theme.id === "monolith"
-                ? 0.55
-                : night
-                  ? 1.35
-                  : theme.id === "ink"
-                    ? 0.92
-                    : 1;
+        theme.id === "neon" && !clearLook
+          ? 1.55
+          : theme.id === "night" && !clearLook
+            ? 1.28
+            : theme.id === "ice" && !clearLook
+              ? 0.7
+              : theme.id === "molten" && !clearLook
+                ? 0.7
+                : theme.id === "lcd" || theme.id === "monolith"
+                  ? 0.4
+                  : 0.48;
       const fogDen =
         theme.id === "molten" ? 0.034 : theme.id === "ice" ? 0.022 : theme.id === "lcd" ? 0.008 : night ? 0.028 : 0.018;
       scene.fog = new THREE.FogExp2(
@@ -658,11 +656,11 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       camera.lookAt(0.05, 9.15 + punch * punch * 0.25, 0);
     }
     bloom.strength =
-      ((clearLook ? 0.08 : bloomBase) + punch * punch * (clearLook ? 0.18 : 0.42)) * (clearLook ? 0.35 : bloomMul) +
-      (sweepT > 0 ? 0.28 : 0) +
-      lockPulse * 0.18 +
-      zapT * 0.55 +
-      (sim && sim.slowT > 0 ? -0.08 : 0);
+      ((clearLook ? 0.06 : bloomBase) + punch * punch * (clearLook ? 0.14 : 0.28)) * (clearLook ? 0.28 : bloomMul) +
+      (sweepT > 0 ? 0.22 : 0) +
+      lockPulse * 0.12 +
+      zapT * 0.4 +
+      (sim && sim.slowT > 0 ? -0.06 : 0);
 
     const now = performance.now();
     const dt = Math.min(0.05, (now - lastDraw) / 1000);
@@ -886,22 +884,23 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (slowOn) {
       slowMat.opacity = 0.05 + 0.03 * (0.5 + 0.5 * Math.sin(now * 0.004));
     }
+    const lushShaft = !clearLook && (theme.id === "night" || theme.id === "neon");
     if (paused) {
       shaft.color.set(0x8a8c94);
-      shaft.intensity = 8;
+      shaft.intensity = 6;
     } else if (danger) {
       shaft.color.set(0xff6a5a);
-      shaft.intensity = 24;
+      shaft.intensity = lushShaft ? 18 : 9;
     } else if (slowOn) {
       shaft.color.set(0xffe0a0);
-      shaft.intensity = 22;
+      shaft.intensity = lushShaft ? 16 : 8;
     } else if (liveId) {
       shaft.color.set(liveHex);
-      shaft.intensity = 22;
+      shaft.intensity = lushShaft ? 16 : 7;
       jewel.color.set(liveHex);
     } else {
       shaft.color.set(0xffe4c4);
-      shaft.intensity = 18;
+      shaft.intensity = lushShaft ? 12 : 6;
     }
 
     const shieldOn = !!sim && sim.shield && sim.phase !== "title";
@@ -1335,6 +1334,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     setClear: (on: boolean) => {
       if (clearLook === on) return;
       clearLook = on;
+      lastThemeId = "";
       solidMat.iridescence = on ? 0 : reduce ? 0 : 0.28;
       solidMat.clearcoat = on ? 0.16 : reduce ? 0.25 : mobile ? 0.65 : 1;
       solidMat.roughness = on ? 0.42 : mobile ? 0.2 : 0.12;

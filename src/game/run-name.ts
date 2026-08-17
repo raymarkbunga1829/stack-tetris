@@ -31,6 +31,7 @@ export function nameRun(opts: {
   if (stacks >= 3) return "Three Bells";
   if (combo >= 6) return "The Long Chain";
   if (score >= 20000) return "A Loud Well";
+  if (!won && lines === 0) return score > 0 ? "A Soft Fall" : "Nothing Landed";
   if (!won && lines < 8) return "A Short Fall";
   if (!won) return "Left in the Pit";
   return "A Night in the Well";
