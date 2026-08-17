@@ -89,7 +89,7 @@ export function renderInstallPageHtml(template, { host, url } = {}) {
 }
 
 export function renderWebManifest(hostHeader) {
-  const name = appNameFromHost(hostHeader);
+  const name = "Stack";
   return JSON.stringify(
     {
       name,
@@ -98,9 +98,25 @@ export function renderWebManifest(hostHeader) {
       start_url: "/",
       scope: "/",
       display: "standalone",
-      background_color: "#000000",
-      theme_color: "#000000",
+      background_color: "#0c0d10",
+      theme_color: "#0c0d10",
       icons: [
+        {
+          src: "/icons/icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+        },
+        {
+          src: "/icons/icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
+        },
+        {
+          src: "/icons/icon-512-maskable.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        },
         {
           src: "/__grok/icon-180.png",
           sizes: "180x180",

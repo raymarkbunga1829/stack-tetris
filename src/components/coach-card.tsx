@@ -1,6 +1,6 @@
 import { isAndroid } from "@/game/device";
 
-export type CoachStep = "drag" | "rotate" | "hold";
+export type CoachStep = "drag" | "rotate" | "hold" | "drop";
 
 const STEPS: {
   id: CoachStep;
@@ -11,24 +11,31 @@ const STEPS: {
 }[] = [
   {
     id: "drag",
-    kicker: "1 of 3",
+    kicker: "1 of 4",
     title: "Slide sideways",
     hint: "Finger on the well. Slide left or right.",
     android: "One thumb on the stack. Slide only left or right — not down.",
   },
   {
     id: "rotate",
-    kicker: "2 of 3",
+    kicker: "2 of 4",
     title: "Tap to rotate",
     hint: "Tap the well, or a rotate button.",
     android: "Tap the stack once to turn. Use the rotate buttons if the tap misses.",
   },
   {
     id: "hold",
-    kicker: "3 of 3",
-    title: "Use the buttons",
+    kicker: "3 of 4",
+    title: "Park a piece",
     hint: "Use the Hold button to park a piece.",
-    android: "Hold parks it. Soft is the down arrow. Drop is the white button — don’t swipe down.",
+    android: "Hold parks it. Soft is the down arrow.",
+  },
+  {
+    id: "drop",
+    kicker: "4 of 4",
+    title: "Slam it",
+    hint: "White Drop slams the piece to the floor.",
+    android: "White Drop slams. Don’t swipe down unless you turned that on.",
   },
 ];
 
@@ -75,6 +82,9 @@ export function nextCoach(step: CoachStep, label: string): CoachStep | "done" {
     return "hold";
   }
   if (step === "hold" && (label === "hold" || label === "long-press")) {
+    return "drop";
+  }
+  if (step === "drop" && (label === "hard" || label === "flick")) {
     return "done";
   }
   return step;

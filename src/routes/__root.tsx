@@ -4,8 +4,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Stack";
-const host = import.meta.env.VITE_PUBLIC_HOSTNAME;
-const ogImage = host ? `https://${host}/og.jpg` : undefined;
+const OG_IMAGE = "https://stack-tetris.vercel.app/og.jpg";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -29,19 +28,16 @@ export const Route = createRootRoute({
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "theme-color", content: "#0c0d10" },
       { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:type", content: "x:game" },
+      { name: "twitter:image", content: OG_IMAGE },
+      { property: "og:type", content: "website" },
       { property: "og:title", content: APP_NAME },
       {
         property: "og:description",
         content: "Drop, clear, repeat. A Tetris-like game for phone, tablet, and keyboard.",
       },
-      ...(ogImage
-        ? [
-            { property: "og:image", content: ogImage },
-            { property: "og:image:width", content: "1200" },
-            { property: "og:image:height", content: "630" },
-          ]
-        : []),
+      { property: "og:image", content: OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

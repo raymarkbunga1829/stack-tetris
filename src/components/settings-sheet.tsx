@@ -13,6 +13,7 @@ type Props = {
   marks: boolean;
   holdRight: boolean;
   scan: boolean;
+  swipeDrop: boolean;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
@@ -25,6 +26,7 @@ type Props = {
   onMarks: () => void;
   onHoldRight: () => void;
   onScan: () => void;
+  onSwipeDrop: () => void;
   onTheme: (id: ThemeId) => void;
   onPreview: (id: ThemeId) => void;
   musicVol: number;
@@ -42,6 +44,7 @@ export function SettingsSheet({
   marks,
   holdRight,
   scan,
+  swipeDrop,
   theme,
   themes,
   credits,
@@ -54,6 +57,7 @@ export function SettingsSheet({
   onMarks,
   onHoldRight,
   onScan,
+  onSwipeDrop,
   onTheme,
   onPreview,
   musicVol,
@@ -127,6 +131,10 @@ export function SettingsSheet({
         <button type="button" className={`set-row${scan ? " is-on" : ""}`} onClick={onScan}>
           <span>Scanlines</span>
           <b>{scan ? "On" : "Off"}</b>
+        </button>
+        <button type="button" className={`set-row${swipeDrop ? " is-on" : ""}`} onClick={onSwipeDrop}>
+          <span>Swipe down to drop</span>
+          <b>{swipeDrop ? "On" : "Off"}</b>
         </button>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">

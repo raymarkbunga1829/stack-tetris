@@ -159,8 +159,33 @@ export function modeOf(id: ModeId): ModeInfo {
   return MODES.find((m) => m.id === id) ?? MODES[0]!;
 }
 
+export function localDateKey(d = new Date()): string {
+  const tz =
+    (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
+    "Asia/Manila";
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  }
+}
+
 export function utcDateKey(d = new Date()): string {
-  return d.toISOString().slice(0, 10);
+  return localDateKey(d);
+}
+
+export function powersAllowed(id: ModeId): boolean {
+  return id === "marathon" || id === "zen" || id === "arcade" || id === "siege" || id === "blitz";
 }
 
 export function utcShift(days: number, from = utcDateKey()): string {
