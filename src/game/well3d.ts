@@ -82,6 +82,7 @@ export type Well3d = {
   ) => void;
   perfectBurst: () => void;
   softTrail: (piece: { id: PieceId; rot: number; x: number; y: number }, hexCol: string) => void;
+  teachTrail: (cells: { x: number; y: number }[], hexCol: string) => void;
   failBeat: () => void;
   clientToCell: (
     rect: DOMRect,
@@ -430,6 +431,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let pickT = 0;
   let pcT = 0;
   let failT = 0;
+  let teachT = 0;
+  let teachHex = "#8aa0b8";
+  let teachCells: { x: number; y: number }[] = [];
 
   type Shard = {
     x: number;
@@ -675,6 +679,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     pickT = Math.max(0, pickT - dt * 3.2);
     pcT = Math.max(0, pcT - dt * 1.8);
     failT = Math.max(0, failT - dt * 1.15);
+    teachT = Math.max(0, teachT - dt * 1.15);
     stepSparks(dt);
     stepShards(dt);
     stepStreaks(dt);
@@ -804,6 +809,14 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             if (m >= MAX_MEM) break;
             place(memory, m++, x, row, -0.02, theme.deep[id] ?? "#333", 1, 0.5 * ashT);
           }
+        }
+      }
+      if (teachT > 0 && sim?.phase !== "over") {
+        for (const c of teachCells) {
+          if (m >= MAX_MEM) break;
+          const row = c.y - HIDDEN_ROWS;
+          if (row < 0 || row >= VISIBLE_ROWS) continue;
+          place(memory, m++, c.x, row, 0.05, teachHex, 1, 0.28 + 0.35 * teachT);
         }
       }
     }
@@ -1240,6 +1253,13 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     );
   }
 
+  function teachTrail(cells: { x: number; y: number }[], hexCol: string) {
+    if (reduce || cells.length === 0) return;
+    teachCells = cells.slice(0, 40);
+    teachHex = hexCol;
+    teachT = 1;
+  }
+
   function softTrail(
     piece: { id: PieceId; rot: number; x: number; y: number },
     hexCol: string,
@@ -1356,6 +1376,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     powerFx,
     perfectBurst,
     softTrail,
+    teachTrail,
     failBeat,
     clientToCell,
     dispose,

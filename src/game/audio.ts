@@ -369,6 +369,20 @@ export function sfxStart() {
   stealLead(0.18);
   arp([392, 523, 659], 0.055);
 }
+export function sfxFinesse(kind: "perfect" | "slide" | "turn") {
+  if (kind === "perfect") {
+    pulse(330, 0.028, 0, 50, 0.1);
+    return;
+  }
+  if (kind === "slide") {
+    pulse(247, 0.04, 0, 25, 0.16);
+    pulse(196, 0.05, 0.03, 25, 0.12);
+    return;
+  }
+  pulse(392, 0.04, 0, 12, 0.16);
+  pulse(311, 0.055, 0.035, 12, 0.14);
+}
+
 export function sfxSelect() {
   pulse(659, 0.035, 0, 25, 0.36);
 }

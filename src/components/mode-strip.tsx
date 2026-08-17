@@ -30,7 +30,7 @@ function rule(
     }
     return stamp;
   }
-  if (m.id === "finesse") return "20 pieces";
+  if (m.id === "finesse") return "20 · clean path";
   if (m.id === "zen") return "No fail";
   if (m.id === "siege") return "8 wells";
   return "Ghost on";

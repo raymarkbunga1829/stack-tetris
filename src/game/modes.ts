@@ -128,10 +128,10 @@ export const MODES: ModeInfo[] = [
   {
     id: "finesse",
     name: "Finesse",
-    blurb: "Twenty pieces. Extra taps count.",
-    look: "Twenty pieces. Extra taps stain the recap gold.",
+    blurb: "Twenty pieces. The well grades the path.",
+    look: "A sloppy T and a 180 leave different marks.",
     tint: "#6ee0e4",
-    carving: "Twenty hands. No extra.",
+    carving: "Twenty hands. No extra slide.",
     lines: null,
     seconds: null,
     startLevel: 1,

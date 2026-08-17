@@ -5,6 +5,7 @@ import {
   setMuted,
   sfxCombo,
   sfxB2b,
+  sfxFinesse,
   sfxHard,
   sfxHold,
   sfxLevel,
@@ -46,6 +47,7 @@ import {
   type ModeId,
 } from "@/game/modes";
 import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
+import { cheapTrail, gradeFinesse, gradeTitle } from "@/game/finesse";
 import { nameRun } from "@/game/run-name";
 import { registerOffline, watchLine } from "@/game/offline";
 import { betterRank, speakClear, type Callout, type CallRank } from "@/game/callout";
@@ -167,12 +169,16 @@ type Ui = {
     splits: number[];
     perfects: number;
     extras?: number;
+    clean?: number;
+    pieces?: number;
     dailyDate?: string;
     streakCount?: number;
   } | null;
   tip: string | null;
   bagLine: boolean;
   offline: boolean;
+  finesseN: number;
+  finesseClean: number;
   pred: { rows: number; lock: boolean; kick: boolean } | null;
   holdPeek: PieceId | null;
   failing: boolean;
@@ -347,6 +353,8 @@ export function TetrisApp() {
     tip: null,
     bagLine: false,
     offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
+    finesseN: 0,
+    finesseClean: 0,
     pred: null,
     holdPeek: null,
     failing: false,
@@ -375,10 +383,10 @@ export function TetrisApp() {
   const [buying, setBuying] = useState<string | null>(null);
   const [viewW, setViewW] = useState(() => (typeof window === "undefined" ? 390 : window.innerWidth));
   const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
-  const finesseKeys = useRef(0);
   const finesseN = useRef(0);
+  const finesseClean = useRef(0);
   const finesseExtras = useRef(0);
-  const pieceBorn = useRef({ x: 3, keys: 0 });
+  const pieceBorn = useRef({ x: 3, slides: 0, rots: 0 });
   const splitSeen = useRef(0);
   const lastMix = useRef({ music: 1, sfx: 1 });
   const attractUntil = useRef(0);
@@ -606,10 +614,10 @@ export function TetrisApp() {
     dying.current = false;
     failT.current = 0;
     holdPeekT.current = 0;
-    finesseKeys.current = 0;
     finesseN.current = 0;
+    finesseClean.current = 0;
     finesseExtras.current = 0;
-    pieceBorn.current = { x: sim.piece?.x ?? 3, keys: 0 };
+    pieceBorn.current = { x: sim.piece?.x ?? 3, slides: 0, rots: 0 };
     holdUsed.current = false;
     lockN.current = 0;
     sawOmen.current = false;
@@ -668,6 +676,8 @@ export function TetrisApp() {
       recap: null,
       tip: null,
       bagLine: false,
+      finesseN: 0,
+      finesseClean: 0,
       pred: null,
       holdPeek: null,
       failing: false,
@@ -925,7 +935,8 @@ export function TetrisApp() {
     }
 
     if (sim.mode === "finesse") {
-      if (just.left || just.right || just.cw || just.ccw) pieceBorn.current.keys += 1;
+      if (just.left || just.right) pieceBorn.current.slides += 1;
+      if (just.cw || just.ccw || just.flip) pieceBorn.current.rots += 1;
     }
     if (ev === "move" && (just.left || just.right)) {
       sfxMove();
@@ -945,6 +956,7 @@ export function TetrisApp() {
       payMissions({ hold: 1 });
       well3dRef.current?.punch(0.12);
       holdPeekT.current = 0.85;
+      if (sim.piece) pieceBorn.current = { x: sim.piece.x, slides: 0, rots: 0 };
       syncUi({ holdPeek: sim.piece?.id ?? null });
     }
     if (ev === "lock") {
@@ -973,18 +985,9 @@ export function TetrisApp() {
         b2bSeen.current = sim.b2b;
       }
       if (sim.mode === "finesse" && falling) {
-        const spins = falling.rot === 0 ? 0 : falling.rot === 2 ? 2 : 1;
-        const extra = Math.max(0, pieceBorn.current.keys - (Math.abs(falling.x - pieceBorn.current.x) + spins));
-        finesseN.current += 1;
-        finesseExtras.current += extra;
-        flashBanner(extra === 0 ? "CLEAN" : `+${extra}`);
-        if (finesseN.current >= 20 && !dying.current) {
-          sim.won = true;
-          sim.phase = "over";
-          finishRun(sim);
-        }
+        markFinesse(falling);
       }
-      if (sim.piece) pieceBorn.current = { x: sim.piece.x, keys: 0 };
+      if (sim.piece) pieceBorn.current = { x: sim.piece.x, slides: 0, rots: 0 };
       lockN.current += 1;
       if (
         lockN.current >= 20 &&
@@ -1244,7 +1247,7 @@ export function TetrisApp() {
     let themes = saveRef.current.themes.slice();
     if (sim.perfects > 0 && !themes.includes("citrine")) themes = [...themes, "citrine"];
     if (saveRef.current.streak.count >= 10 && !themes.includes("blood")) themes = [...themes, "blood"];
-    if (sim.mode === "finesse" && sim.won && finesseExtras.current === 0 && !themes.includes("quiet")) {
+    if (sim.mode === "finesse" && sim.won && finesseClean.current >= 20 && !themes.includes("quiet")) {
       themes = [...themes, "quiet"];
     }
     if (themes.length !== saveRef.current.themes.length) {
@@ -1275,6 +1278,8 @@ export function TetrisApp() {
         splits: sim.splits.slice(),
         perfects: sim.perfects,
         extras: sim.mode === "finesse" ? finesseExtras.current : undefined,
+        clean: sim.mode === "finesse" ? finesseClean.current : undefined,
+        pieces: sim.mode === "finesse" ? finesseN.current : undefined,
         dailyDate: sim.mode === "daily" ? manilaDateKey() : undefined,
         streakCount: sim.mode === "daily" ? saveRef.current.streak.count : undefined,
       },
@@ -1349,7 +1354,8 @@ export function TetrisApp() {
       if (u.intro) syncUi({ intro: null });
     }
     if (sim.mode === "finesse" && (p.left || p.right || p.cw || p.ccw || p.flip)) {
-      pieceBorn.current.keys += 1;
+      if (p.left || p.right) pieceBorn.current.slides += 1;
+      if (p.cw || p.ccw || p.flip) pieceBorn.current.rots += 1;
     }
     const fallingPulse = sim.piece;
     const ghostPulse = fallingPulse ? ghostY(sim) : 0;
@@ -1369,6 +1375,7 @@ export function TetrisApp() {
       payMissions({ hold: 1 });
       well3dRef.current?.punch(0.12);
       holdPeekT.current = 0.85;
+      if (sim.piece) pieceBorn.current = { x: sim.piece.x, slides: 0, rots: 0 };
       syncUi({ holdPeek: sim.piece?.id ?? null });
     }
     if (ev === "lock" || ev === "over") {
@@ -1388,6 +1395,10 @@ export function TetrisApp() {
                   : "single",
         );
       }
+      if (live?.mode === "finesse" && fallingPulse && ev !== "over") {
+        markFinesse(fallingPulse);
+      }
+      if (live?.piece) pieceBorn.current = { x: live.piece.x, slides: 0, rots: 0 };
       if (ev === "over") {
         dying.current = true;
         well3dRef.current?.failBeat();
@@ -1440,6 +1451,43 @@ export function TetrisApp() {
       bangTint();
     } else if (kind === "triple") {
       shakeRef.current = 4;
+    }
+  }
+
+  function markFinesse(falling: { id: PieceId; rot: 0 | 1 | 2 | 3; x: number; y: number }) {
+    const mark = gradeFinesse({
+      id: falling.id,
+      bornX: pieceBorn.current.x,
+      lockX: falling.x,
+      lockRot: falling.rot,
+      slides: pieceBorn.current.slides,
+      rots: pieceBorn.current.rots,
+    });
+    finesseN.current += 1;
+    if (mark.grade === "perfect") finesseClean.current += 1;
+    else finesseExtras.current += mark.extraSlide + mark.extraRot;
+    sfxFinesse(mark.grade);
+    showCallout({
+      title: gradeTitle(mark.grade),
+      sub: `${finesseClean.current}/${finesseN.current}`,
+      rank: mark.grade === "perfect" ? "single" : mark.grade === "slide" ? "double" : "mini",
+    });
+    if (mark.grade !== "perfect") {
+      const trail = cheapTrail(
+        falling.id,
+        pieceBorn.current.x,
+        falling.x,
+        falling.rot,
+        falling.y,
+      );
+      well3dRef.current?.teachTrail(trail, themeOf(saveRef.current.theme).fill[falling.id]);
+    }
+    const sim = simRef.current;
+    syncUi({ finesseN: finesseN.current, finesseClean: finesseClean.current });
+    if (sim && finesseN.current >= 20 && !dying.current) {
+      sim.won = true;
+      sim.phase = "over";
+      finishRun(sim);
     }
   }
 
@@ -2041,12 +2089,18 @@ export function TetrisApp() {
                 ? formatClock(ui.timeLeft ?? 0)
                 : ui.mode === "sprint"
                   ? formatElapsed(ui.clock)
-                  : ui.mode === "siege"
-                    ? `${ui.siege?.kos ?? 0} KO`
-                    : `Lv ${ui.level}`}
+                  : ui.mode === "finesse"
+                    ? `${ui.finesseN}/20`
+                    : ui.mode === "siege"
+                      ? `${ui.siege?.kos ?? 0} KO`
+                      : `Lv ${ui.level}`}
             </span>
             <span>
-              {ui.mode === "sprint" ? `${Math.max(0, 40 - ui.lines)} left` : `${ui.lines} L`}
+              {ui.mode === "sprint"
+                ? `${Math.max(0, 40 - ui.lines)} left`
+                : ui.mode === "finesse"
+                  ? `${ui.finesseClean} clean`
+                  : `${ui.lines} L`}
             </span>
             <em>{modeOf(ui.mode).name}</em>
             {ui.mode === "sprint" && sprintPace(ui.clock, ui.lines, ui.sprintBest) ? (
@@ -2374,7 +2428,15 @@ export function TetrisApp() {
                         <b>{ui.recap.perfects}</b>
                       </li>
                     )}
-                    {ui.recap.extras != null && (
+                    {ui.recap.clean != null && (
+                      <li className={ui.recap.clean >= 20 ? "is-clean" : "is-messy"}>
+                        <span>Clean</span>
+                        <b>
+                          {ui.recap.clean} / {ui.recap.pieces && ui.recap.pieces < 20 ? ui.recap.pieces : 20}
+                        </b>
+                      </li>
+                    )}
+                    {ui.recap.extras != null && ui.recap.clean == null && (
                       <li className={ui.recap.extras === 0 ? "is-clean" : "is-messy"}>
                         <span>Extra taps</span>
                         <b>{ui.recap.extras}</b>
