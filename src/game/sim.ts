@@ -15,6 +15,7 @@ import {
   MAX_LOCK_RESETS,
   PIECE_IDS,
   ROWS,
+  T_SPIN_MINI_SCORE,
   T_SPIN_SCORE,
   type Cell,
   type Phase,
@@ -57,6 +58,7 @@ export type Sim = {
   lastRotate: boolean;
   lastKickIndex: number;
   tSpin: boolean;
+  tSpinMini: boolean;
   slowT: number;
   shield: boolean;
   pendingCoins: number;
@@ -219,6 +221,7 @@ export function createSim(opts: NewGame = {}): Sim {
     lastRotate: false,
     lastKickIndex: -1,
     tSpin: false,
+    tSpinMini: false,
     slowT: 0,
     shield: false,
     pendingCoins: 0,
@@ -371,7 +374,7 @@ function spawn(sim: Sim, id: PieceId): boolean {
   sim.lockResets = 0;
   sim.lastRotate = false;
   sim.lastKickIndex = -1;
-  sim.tSpin = false;
+  clearSpin(sim);
   return true;
 }
 
@@ -407,7 +410,7 @@ function tryFall(sim: Sim): boolean {
   if (!p || grounded(sim, p)) return false;
   sim.piece = { ...p, y: p.y + 1 };
   sim.lastRotate = false;
-  sim.tSpin = false;
+  clearSpin(sim);
   if (grounded(sim, sim.piece)) sim.lockT = 0;
   return true;
 }
@@ -419,7 +422,7 @@ function tryShift(sim: Sim, dx: number): boolean {
   if (!fits(sim.board, next)) return false;
   sim.piece = next;
   sim.lastRotate = false;
-  sim.tSpin = false;
+  clearSpin(sim);
   bumpLock(sim);
   return true;
 }
@@ -437,22 +440,32 @@ function bumpLock(sim: Sim) {
   }
 }
 
-function tCornersFilled(sim: Sim, p: Piece): number {
-  const corners: Cell[] = [
-    { x: p.x, y: p.y },
-    { x: p.x + 2, y: p.y },
-    { x: p.x, y: p.y + 2 },
-    { x: p.x + 2, y: p.y + 2 },
-  ];
-  let n = 0;
-  for (const c of corners) {
-    if (c.x < 0 || c.x >= COLS || c.y < 0 || c.y >= ROWS) {
-      n += 1;
-      continue;
-    }
-    if (sim.board[c.y]![c.x]) n += 1;
-  }
-  return n;
+/** A spin only counts once the T is wedged: both corners it faces, plus a heel. */
+function tSpinKind(sim: Sim, p: Piece, kickIndex: number): "none" | "mini" | "full" {
+  if (p.id !== "T") return "none";
+  const solid = (x: number, y: number) => {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return true;
+    return sim.board[y]![x] !== null;
+  };
+  const tl = solid(p.x, p.y);
+  const tr = solid(p.x + 2, p.y);
+  const bl = solid(p.x, p.y + 2);
+  const br = solid(p.x + 2, p.y + 2);
+  const face: [boolean, boolean] =
+    p.rot === 0 ? [tl, tr] : p.rot === 1 ? [tr, br] : p.rot === 2 ? [bl, br] : [tl, bl];
+  const heel: [boolean, boolean] =
+    p.rot === 0 ? [bl, br] : p.rot === 1 ? [tl, bl] : p.rot === 2 ? [tl, tr] : [tr, br];
+  const faces = face.filter(Boolean).length;
+  const heels = heel.filter(Boolean).length;
+  if (faces === 2 && heels >= 1) return "full";
+  // The deepest kick is the tuck that earns a triple, so it scores in full.
+  if (faces === 1 && heels === 2) return kickIndex >= 4 ? "full" : "mini";
+  return "none";
+}
+
+function clearSpin(sim: Sim) {
+  sim.tSpin = false;
+  sim.tSpinMini = false;
 }
 
 export function canRotate(sim: Sim, dir: 1 | -1): boolean {
@@ -531,7 +544,9 @@ function tryRotate(sim: Sim, dir: 1 | -1 | 2): boolean {
     sim.piece = next;
     sim.lastRotate = true;
     sim.lastKickIndex = i;
-    sim.tSpin = next.id === "T" && tCornersFilled(sim, next) >= 3;
+    const kind = tSpinKind(sim, next, i);
+    sim.tSpin = kind !== "none";
+    sim.tSpinMini = kind === "mini";
     bumpLock(sim);
     return true;
   }
@@ -546,6 +561,8 @@ function hardDrop(sim: Sim): "ok" | "clearing" | "over" {
   sim.piece = { ...p, y };
   sim.score += dist * 2;
   sim.lastRotate = false;
+  // Falling is a move, so a spin earned upstairs does not pay out down here.
+  if (dist > 0) clearSpin(sim);
   return lockPiece(sim);
 }
 
@@ -589,8 +606,9 @@ function lockPiece(sim: Sim): "ok" | "clearing" | "over" {
   if (full.length === 0) {
     sim.combo = -1;
     if (sim.tSpin) {
-      sim.score += T_SPIN_SCORE[0]! * sim.level;
-      sim.lastClear = "T-SPIN";
+      const mini = sim.tSpinMini;
+      sim.score += (mini ? T_SPIN_MINI_SCORE[0]! : T_SPIN_SCORE[0]!) * sim.level;
+      sim.lastClear = mini ? "MINI T-SPIN" : "T-SPIN";
       sim.tspins += 1;
     } else {
       sim.lastClear = null;
@@ -623,8 +641,13 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
   if (sim.combo > sim.maxCombo) sim.maxCombo = sim.combo;
 
   const tspin = sim.tSpin;
+  const mini = sim.tSpin && sim.tSpinMini;
   let pts = (LINE_SCORE[n] ?? 0) * sim.level;
-  if (tspin) pts = (T_SPIN_SCORE[n] ?? T_SPIN_SCORE[0]!) * sim.level;
+  if (tspin) {
+    pts = mini
+      ? (T_SPIN_MINI_SCORE[n] ?? T_SPIN_MINI_SCORE[0]!) * sim.level
+      : (T_SPIN_SCORE[n] ?? T_SPIN_SCORE[0]!) * sim.level;
+  }
   const difficult = n === 4 || tspin;
   if (difficult && sim.b2b) pts = Math.floor(pts * 1.5);
   if (sim.combo > 0) pts += COMBO_SCORE * sim.combo * sim.level;
@@ -651,18 +674,16 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
     sim.lastClear = "ALL CLEAR";
   } else {
     sim.lastClear = tspin
-      ? n === 0
-        ? "T-SPIN"
-        : `T-SPIN ${n}`
+      ? `${mini ? "MINI " : ""}T-SPIN${n === 0 ? "" : ` ${n}`}`
       : n === 4
         ? "STACK"
         : n === 3
           ? "TRIPLE"
           : n === 2
             ? "DOUBLE"
-            : "SINGLE";
+              : "SINGLE";
   }
-  sim.tSpin = false;
+  clearSpin(sim);
   sim.phase = "playing";
   if (sim.lineGoal && sim.lines >= sim.lineGoal) {
     sim.won = true;
@@ -790,15 +811,14 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   if (!grounded(sim, sim.piece)) {
     sim.lockT = 0;
     const slid = input.justLeft || input.justRight || Math.abs(input.nudge) > 0;
-    if (slid) return "move";
     sim.gravityAcc += capped;
-    let ev: StepEvent = "none";
+    let ev: StepEvent = slid ? "move" : "none";
     while (sim.piece && sim.gravityAcc >= g) {
       sim.gravityAcc -= g;
       if (!grounded(sim, sim.piece)) {
         sim.piece = { ...sim.piece, y: sim.piece.y + 1 };
         sim.lastRotate = false;
-        sim.tSpin = false;
+        clearSpin(sim);
         if (input.softDrop) sim.score += 1;
         ev = "move";
       }
@@ -892,7 +912,7 @@ export function pickFromNext(sim: Sim, index: number): boolean {
   sim.lockResets = 0;
   sim.gravityAcc = 0;
   sim.lastRotate = false;
-  sim.tSpin = false;
+  clearSpin(sim);
   sim.lastClear = "PICK";
   return true;
 }

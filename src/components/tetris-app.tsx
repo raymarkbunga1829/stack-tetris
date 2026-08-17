@@ -1108,9 +1108,11 @@ export function TetrisApp() {
   function linesOfClear(label: string | null): number {
     if (!label) return 0;
     if (label === "STACK" || label === "ALL CLEAR") return 4;
-    if (label === "TRIPLE" || label.includes("3")) return 3;
-    if (label === "DOUBLE" || label.includes("2")) return 2;
-    if (label === "SINGLE" || label === "T-SPIN") return 1;
+    const spin = /T-SPIN(?: (\d+))?$/.exec(label);
+    if (spin) return spin[1] ? Number(spin[1]) : 0;
+    if (label === "TRIPLE") return 3;
+    if (label === "DOUBLE") return 2;
+    if (label === "SINGLE") return 1;
     return 0;
   }
 

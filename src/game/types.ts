@@ -20,6 +20,7 @@ export const LINES_PER_LEVEL = 10;
 
 export const LINE_SCORE = [0, 100, 300, 500, 800] as const;
 export const T_SPIN_SCORE = [400, 800, 1200, 1600] as const;
+export const T_SPIN_MINI_SCORE = [100, 200, 400] as const;
 export const COMBO_SCORE = 50;
 
 export type HighKey = string;
