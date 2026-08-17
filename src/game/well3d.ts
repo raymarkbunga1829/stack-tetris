@@ -691,8 +691,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const clearEase = clearing
       ? 1 - Math.max(0, Math.min(1, sim.clearT / CLEAR_TIME))
       : 0;
-    const settle = 1 - Math.pow(1 - clearEase, 3) + Math.sin(clearEase * Math.PI) * 0.1 * (1 - clearEase);
-    const pinch = Math.max(0, 1 - clearEase);
+    const flatten = Math.max(0, 1 - clearEase * 1.25);
+    const dropT = Math.max(0, (clearEase - 0.38) / 0.62);
+    const settle = 1 - Math.pow(1 - dropT, 3);
 
     let n = 0;
     let pipN = 0;
@@ -716,20 +717,18 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const row = y - HIDDEN_ROWS;
           const dyingRow = clearing && sim.clearRows.includes(y);
           if (dyingRow) {
-            if (pinch <= 0.03) continue;
-            const pull = 1 - pinch;
-            const mid = (COLS - 1) / 2;
+            if (flatten <= 0.04) continue;
             place(
               solids,
               n++,
               x,
               row,
-              0.06,
+              0.04,
               theme.fill[id as PieceId],
-              0.88 + pinch * 0.16,
-              1.08 + pinch * 0.2,
-              0.62 + pinch * 0.38,
-              (mid - x) * pull * 0.42,
+              flatten,
+              1.06,
+              1,
+              0,
             );
             continue;
           }
