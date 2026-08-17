@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { formatClock, MODES, utcDateKey, type ModeId } from "@/game/modes";
+import { formatElapsed, MODES, utcDateKey, type ModeId } from "@/game/modes";
 import type { ScoreRow } from "@/game/save";
 
 type Props = {
@@ -66,7 +66,7 @@ export function BoardSheet({ open, scores, dailyRows, dailyDate, onClose }: Prop
               <b>{tab === "daily" ? `${s.lines} L` : nameOf(s.mode)}</b>
               <em>{s.score.toLocaleString()}</em>
               <small>
-                {s.won && s.mode === "sprint" ? formatClock(s.clock) : `${s.lines} L`}
+                {s.won && s.mode === "sprint" ? formatElapsed(s.clock) : `${s.lines} L`}
               </small>
             </li>
           ))}

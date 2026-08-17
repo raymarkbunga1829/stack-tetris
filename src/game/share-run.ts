@@ -1,4 +1,4 @@
-import { formatClock } from "./modes";
+import { formatElapsed } from "./modes";
 import { HIDDEN_ROWS, VISIBLE_ROWS, COLS, type PieceId } from "./types";
 import { PIECE_FILL } from "./pieces";
 import type { Snap } from "./replay";
@@ -20,8 +20,8 @@ export async function shareRun(run: SharePayload): Promise<void> {
     run.epitaph ? run.epitaph : "",
     `${run.score.toLocaleString()} · ${run.lines}L · x${run.combo}`,
     run.splits?.length
-      ? run.splits.map((s, i) => `${(i + 1) * 10} ${formatClock(s)}`).join(" · ")
-      : formatClock(run.clock),
+      ? run.splits.map((s, i) => `${(i + 1) * 10} ${formatElapsed(s)}`).join(" · ")
+      : formatElapsed(run.clock),
   ].join("\n");
 
   const canvas = document.createElement("canvas");
@@ -47,7 +47,7 @@ export async function shareRun(run: SharePayload): Promise<void> {
     ctx.fillText(run.score.toLocaleString(), 120, run.epitaph ? 360 : 300);
     ctx.font = "600 36px system-ui, sans-serif";
     ctx.fillStyle = "#c8c6bf";
-    ctx.fillText(`${run.lines} lines · x${run.combo} · ${formatClock(run.clock)}`, 120, 360);
+    ctx.fillText(`${run.lines} lines · x${run.combo} · ${formatElapsed(run.clock)}`, 120, 360);
 
     const frames = pickFrames(run.frames);
     if (frames.length) {
@@ -63,7 +63,7 @@ export async function shareRun(run: SharePayload): Promise<void> {
     } else if (run.splits?.length) {
       ctx.font = "600 32px system-ui, sans-serif";
       run.splits.forEach((s, i) => {
-        ctx.fillText(`${(i + 1) * 10}  ${formatClock(s)}`, 120, 480 + i * 56);
+        ctx.fillText(`${(i + 1) * 10}  ${formatElapsed(s)}`, 120, 480 + i * 56);
       });
     }
     ctx.fillStyle = "#6a6d76";
