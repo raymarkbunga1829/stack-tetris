@@ -64,6 +64,7 @@ export type Well3d = {
   nod: (amount: number, force?: boolean) => void;
   setAsh: (board: import("./sim").Board | null) => void;
   setStain: (cells: { x: number; y: number }[] | null) => void;
+  setClear: (on: boolean) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string, slam?: boolean) => void;
   shatter: (sim: Sim, theme: Theme) => void;
@@ -127,6 +128,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let stainCells: { x: number; y: number }[] = [];
   let lastDraw = performance.now();
   const bloomBase = reduce ? 0.14 : mobile ? 0.4 : 0.62;
+  let clearLook = false;
 
   function frameCamera() {
     const wellH = 21.6;
@@ -638,7 +640,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       camera.lookAt(0.05, 9.15 + punch * punch * 0.25, 0);
     }
     bloom.strength =
-      (bloomBase + punch * punch * 0.42) * bloomMul +
+      ((clearLook ? 0.08 : bloomBase) + punch * punch * (clearLook ? 0.18 : 0.42)) * (clearLook ? 0.35 : bloomMul) +
       (sweepT > 0 ? 0.28 : 0) +
       lockPulse * 0.18 +
       zapT * 0.55 +
@@ -1304,6 +1306,18 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     },
     setStain: (cells) => {
       stainCells = cells ?? [];
+    },
+    setClear: (on: boolean) => {
+      if (clearLook === on) return;
+      clearLook = on;
+      solidMat.iridescence = on ? 0 : reduce ? 0 : 0.28;
+      solidMat.clearcoat = on ? 0.16 : reduce ? 0.25 : mobile ? 0.65 : 1;
+      solidMat.roughness = on ? 0.42 : mobile ? 0.2 : 0.12;
+      solidMat.sheen = on ? 0 : 0.22;
+      solidMat.needsUpdate = true;
+      const gm = grid.material as THREE.LineBasicMaterial;
+      gm.opacity = on ? 0.12 : 0.38;
+      gm.color.set(on ? 0x2a3038 : 0x4ad4e8);
     },
     sparkRows,
     lockThump,

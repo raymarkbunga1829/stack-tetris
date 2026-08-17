@@ -53,6 +53,8 @@ export type SaveData = {
   holdHinted: boolean;
   scan: boolean;
   swipeDrop: boolean;
+  clearWell: boolean;
+  a2hs: boolean;
   dailyBoard: { date: string; rows: ScoreRow[] };
   streak: { count: number; last: string };
 };
@@ -88,6 +90,8 @@ const DEFAULTS: SaveData = {
   holdHinted: false,
   scan: false,
   swipeDrop: false,
+  clearWell: false,
+  a2hs: false,
   dailyBoard: { date: "", rows: [] },
   streak: { count: 0, last: "" },
 };
@@ -152,6 +156,8 @@ export function loadSave(): SaveData {
       holdHinted: parsed.holdHinted === true,
       scan: parsed.scan === true,
       swipeDrop: parsed.swipeDrop === true,
+      clearWell: parsed.clearWell === true,
+      a2hs: parsed.a2hs === true,
       dailyBoard: parsed.dailyBoard ?? { date: "", rows: [] },
       streak: parsed.streak ?? { count: 0, last: "" },
     };
