@@ -131,6 +131,14 @@
   text-transform: uppercase;
 }
 
+.off-mark {
+  margin: 0 auto 0 0;
+  color: var(--color-muted);
+  font: 600 0.62rem/1 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .hud {
   display: flex;
   align-items: baseline;
