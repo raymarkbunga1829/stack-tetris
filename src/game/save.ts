@@ -51,6 +51,7 @@ export type SaveData = {
   sprintSplits: number[];
   niceSeen: boolean;
   holdHinted: boolean;
+  holeSeen: boolean;
   scan: boolean;
   swipeDrop: boolean;
   clearWell: boolean;
@@ -91,6 +92,7 @@ const DEFAULTS: SaveData = {
   sprintSplits: [],
   niceSeen: false,
   holdHinted: false,
+  holeSeen: false,
   scan: false,
   swipeDrop: false,
   clearWell: true,
@@ -165,6 +167,7 @@ export function loadSave(): SaveData {
       sprintSplits: Array.isArray(parsed.sprintSplits) ? parsed.sprintSplits.filter((n): n is number => typeof n === "number") : [],
       niceSeen: parsed.niceSeen === true,
       holdHinted: parsed.holdHinted === true,
+      holeSeen: parsed.holeSeen === true,
       scan: parsed.scan === true,
       swipeDrop: parsed.swipeDrop === true,
       clearWell: parsed.clearWell !== false,

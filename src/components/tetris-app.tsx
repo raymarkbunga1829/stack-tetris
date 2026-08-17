@@ -45,8 +45,9 @@ import {
 } from "@/game/modes";
 import { clearLastAsh, clearLastStain, getLastAsh, getLastReplay, getLastStain, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { nameRun } from "@/game/run-name";
+import { betterRank, speakClear, type Callout, type CallRank } from "@/game/callout";
 import { shareRun } from "@/game/share-run";
-import { REPLAY_STEP, type Snap } from "@/game/replay";
+import { REPLAY_STEP, takeSnap, type Snap } from "@/game/replay";
 import { resizeCanvas } from "@/game/render";
 import { createViz } from "@/game/viz";
 import { createWell3d, type Well3d } from "@/game/well3d";
@@ -109,6 +110,8 @@ type Ui = {
   hold: PieceId | null;
   next: PieceId[];
   banner: string | null;
+  callout: Callout | null;
+  holeHint: boolean;
   gesture: string | null;
   muted: boolean;
   musicVol: number;
@@ -263,6 +266,8 @@ export function TetrisApp() {
   const shakeRef = useRef(0);
   const bannerT = useRef(0);
   const bannerKind = useRef<"plain" | "mid" | "big">("plain");
+  const calloutT = useRef(0);
+  const bestStill = useRef<{ snap: Snap; label: string; rank: CallRank } | null>(null);
   const swipeRef = useRef<ReturnType<typeof createGestures> | null>(null);
   const applyGestureRef = useRef<(ev: GestureEmit) => void>(() => {});
   const lastGestureRef = useRef<GestureLabel | null>(null);
@@ -287,6 +292,8 @@ export function TetrisApp() {
     hold: null,
     next: [],
     banner: null,
+    callout: null,
+    holeHint: false,
     gesture: null,
     muted: saveRef.current.muted,
     musicVol: saveRef.current.musicVol,
@@ -585,6 +592,7 @@ export function TetrisApp() {
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 0.4;
+    bestStill.current = null;
     wipePit();
     well3dRef.current?.setClear(saveRef.current.clearWell || mode === "sprint" || mode === "daily");
     const intro =
@@ -611,6 +619,8 @@ export function TetrisApp() {
     syncUi({
       phase: "playing",
       banner: null,
+      callout: null,
+      holeHint: false,
       score: 0,
       lines: 0,
       level: sim.level,
@@ -807,6 +817,10 @@ export function TetrisApp() {
       bannerT.current -= dt;
       if (bannerT.current <= 0) syncUi({ banner: null });
     }
+    if (calloutT.current > 0) {
+      calloutT.current -= dt;
+      if (calloutT.current <= 0) syncUi({ callout: null });
+    }
     if (holdPeekT.current > 0) {
       holdPeekT.current -= dt;
       if (holdPeekT.current <= 0) syncUi({ holdPeek: null });
@@ -865,6 +879,22 @@ export function TetrisApp() {
         canHold: sim.canHold,
         canUndo: !!sim.undo,
       });
+    }
+    if (
+      sim.phase === "playing" &&
+      !saveRef.current.holeSeen &&
+      !u.coach &&
+      !u.holeHint
+    ) {
+      let hole = false;
+      for (let y = HIDDEN_ROWS; y < ROWS && !hole; y++) {
+        const row = sim.board[y];
+        if (!row) continue;
+        let filled = 0;
+        for (let x = 0; x < COLS; x++) if (row[x]) filled += 1;
+        if (filled === COLS - 1) hole = true;
+      }
+      if (hole) syncUi({ holeHint: true });
     }
 
     if (sim.mode === "finesse") {
@@ -938,25 +968,18 @@ export function TetrisApp() {
     }
     if (ev === "clear") {
       haptic("clear");
-      shakeRef.current = 5;
-      bangTint();
       if (!saveRef.current.niceSeen) {
         saveRef.current = { ...saveRef.current, niceSeen: true };
         writeSave(saveRef.current);
-        flashBanner("Nice.");
-      } else {
-        flashBanner(sim.lastClear ?? "CLEAR");
       }
       fireChain(sim, false);
       if (sim.lastPerfect) juicePerfect();
       fireSiege(sim);
+      markHoleSeen();
       syncUi();
     }
     if (ev === "tetris" || ev === "tspin") {
       haptic("tetris");
-      shakeRef.current = ev === "tetris" ? 12 : 8;
-      well3dRef.current?.punch(ev === "tetris" ? 0.35 : 0.25);
-      bangTint();
       if (sim.blessed && ev === "tetris") {
         sim.blessed = false;
         syncUi({ picking: true });
@@ -966,14 +989,12 @@ export function TetrisApp() {
       } else if (!saveRef.current.niceSeen) {
         saveRef.current = { ...saveRef.current, niceSeen: true };
         writeSave(saveRef.current);
-        flashBanner("Nice.");
-      } else {
-        flashBanner(sim.lastClear ?? "STACK");
       }
       fireChain(sim, ev === "tetris" || ev === "tspin");
       if (ev === "tetris") payMissions({ tetris: 1 });
       if (sim.lastPerfect) juicePerfect();
       fireSiege(sim);
+      markHoleSeen();
       syncUi();
     }
     if (ev === "win" || ev === "over") {
@@ -1131,7 +1152,9 @@ export function TetrisApp() {
 
   function linesOfClear(label: string | null): number {
     if (!label) return 0;
-    if (label === "STACK" || label === "ALL CLEAR") return 4;
+    if (label === "STACK" || label === "TETRIS" || label === "ALL CLEAR") return 4;
+    if (label === "TST") return 3;
+    if (label === "MINI") return 1;
     const spin = /T-SPIN(?: (\d+))?$/.exec(label);
     if (spin) return spin[1] ? Number(spin[1]) : 0;
     if (label === "TRIPLE") return 3;
@@ -1183,6 +1206,7 @@ export function TetrisApp() {
       won: sim.won,
       combo: sim.maxCombo,
       stacks: sim.stacks,
+      tspins: sim.tspins,
       perfects: sim.perfects,
       extras: sim.mode === "finesse" ? finesseExtras.current : undefined,
     });
@@ -1346,8 +1370,19 @@ export function TetrisApp() {
     const engine = well3dRef.current;
     const sim = simRef.current;
     if (!engine || !sim) return;
+    const n = sim.clearRows.length;
+    const spoken = speakClear({
+      lines: n,
+      tspin: sim.tSpin,
+      mini: sim.tSpinMini,
+      perfect: false,
+      wasB2b: sim.b2b && (n === 4 || sim.tSpin),
+      combo: Math.max(0, sim.combo + 1),
+    });
+    showCallout(spoken);
+    noteStill(sim, spoken);
     engine.punch(
-      kind === "stack" ? 0.95 : kind === "tspin" ? 0.78 : kind === "triple" ? 0.62 : kind === "double" ? 0.48 : 0.32,
+      kind === "stack" ? 0.28 : kind === "tspin" ? 0.24 : kind === "triple" ? 0.16 : kind === "double" ? 0.1 : 0.06,
     );
     const tint =
       kind === "stack"
@@ -1360,33 +1395,61 @@ export function TetrisApp() {
               ? "#e8d4a0"
               : "#a8b4c4";
     engine.sparkRows(sim.clearRows, tint);
-    engine.shatter(sim, themeOf(saveRef.current.theme));
+    if (kind !== "single") engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(kind);
-    if (kind === "stack" || kind === "tspin") engine.nod(0.85);
-    else if (kind === "triple") engine.nod(0.32);
-    const n =
-      kind === "stack" ? 4 : kind === "triple" ? 3 : kind === "double" ? 2 : kind === "tspin" ? 3 : 1;
-    sfxClear(n);
-    sfxShatter();
-    if (kind === "stack") {
-      shakeRef.current = 16;
-      syncUi({ takeover: 1 });
-      window.setTimeout(() => {
-        if (uiRef.current.takeover) syncUi({ takeover: 0 });
-      }, 430);
+    if (kind === "stack" || kind === "tspin") engine.nod(0.42);
+    else if (kind === "triple") engine.nod(0.18);
+    sfxClear(kind === "stack" ? 4 : kind === "triple" ? 3 : kind === "double" ? 2 : kind === "tspin" ? 3 : 1);
+    if (kind !== "single") sfxShatter();
+    if (kind === "stack" || kind === "tspin") {
+      shakeRef.current = kind === "stack" ? 8 : 6;
+      bangTint();
+    } else if (kind === "triple") {
+      shakeRef.current = 4;
     }
   }
 
+  function showCallout(next: Callout) {
+    calloutT.current = next.rank === "pc" || next.rank === "tetris" ? 1.4 : next.rank === "single" ? 0.7 : 1.05;
+    syncUi({ callout: next });
+  }
+
+  function noteStill(sim: import("@/game/sim").Sim, spoken: Callout) {
+    if (!betterRank(bestStill.current?.rank ?? null, spoken.rank) && bestStill.current) return;
+    bestStill.current = {
+      snap: takeSnap(sim.board, null, sim.score, sim.lines),
+      label: spoken.title,
+      rank: spoken.rank,
+    };
+  }
+
   function juicePerfect() {
+    const sim = simRef.current;
     well3dRef.current?.perfectBurst();
     sfxPerfect();
     haptic("win");
-    shakeRef.current = 14;
-    flashBanner("ALL CLEAR");
+    shakeRef.current = 7;
+    const spoken = speakClear({
+      lines: 4,
+      tspin: !!sim?.tSpin,
+      mini: !!sim?.tSpinMini,
+      perfect: true,
+      wasB2b: !!sim?.b2b,
+      combo: Math.max(0, sim?.combo ?? 0),
+    });
+    showCallout(spoken);
+    if (sim) noteStill(sim, spoken);
     syncUi({ cinema: true });
     window.setTimeout(() => {
       if (uiRef.current.phase === "playing") syncUi({ cinema: false });
     }, 900);
+  }
+
+  function markHoleSeen() {
+    if (saveRef.current.holeSeen && !uiRef.current.holeHint) return;
+    saveRef.current = { ...saveRef.current, holeSeen: true };
+    writeSave(saveRef.current);
+    if (uiRef.current.holeHint) syncUi({ holeHint: false });
   }
 
   function fireChain(sim: Sim, difficult: boolean) {
@@ -2305,6 +2368,8 @@ export function TetrisApp() {
                         splits: ui.mode === "sprint" ? ui.recap!.splits : undefined,
                         frames: getLastReplay() ?? replayRef.current ?? undefined,
                         epitaph: ui.epitaph ?? undefined,
+                        still: bestStill.current?.snap,
+                        callout: bestStill.current?.label,
                       });
                     }}
                   >
@@ -2370,6 +2435,15 @@ export function TetrisApp() {
               <p key={`bb-${ui.b2bPop}`} className="b2b-burst">
                 B2B
               </p>
+            )}
+            {ui.phase === "playing" && ui.callout && (
+              <p className={`callout is-${ui.callout.rank}`} aria-live="polite">
+                <b>{ui.callout.title}</b>
+                {ui.callout.sub && <em>{ui.callout.sub}</em>}
+              </p>
+            )}
+            {ui.phase === "playing" && ui.holeHint && !ui.coach && (
+              <p className="hole-hint">One more. Close the hole.</p>
             )}
             {ui.coach && ui.phase === "playing" && (
               <CoachCard step={ui.coach} onSkip={finishCoach} />
@@ -2711,3 +2785,4 @@ declare global {
     };
   }
 }
+

@@ -502,9 +502,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     scale = 1,
     lift = 1,
     squash = 1,
+    ox = 0,
   ) {
     const p = cellPos(col, row, z);
-    dummy.position.set(p.x, p.y - (1 - squash) * 0.18, p.z);
+    dummy.position.set(p.x + ox, p.y - (1 - squash) * 0.18, p.z);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(scale * (2 - squash), scale * squash, scale);
     dummy.updateMatrix();
@@ -710,17 +711,20 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const row = y - HIDDEN_ROWS;
           const dyingRow = clearing && sim.clearRows.includes(y);
           if (dyingRow) {
-            if (pinch <= 0.02) continue;
+            if (pinch <= 0.03) continue;
+            const pull = 1 - pinch;
+            const mid = (COLS - 1) / 2;
             place(
               solids,
               n++,
               x,
               row,
-              0,
+              0.06,
               theme.fill[id as PieceId],
-              pinch,
-              1.2,
-              0.55 + pinch * 0.45,
+              0.88 + pinch * 0.16,
+              1.08 + pinch * 0.2,
+              0.62 + pinch * 0.38,
+              (mid - x) * pull * 0.42,
             );
             continue;
           }
@@ -1019,8 +1023,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (reduce) return;
     sweepKind = kind;
     sweepT =
-      kind === "single" ? 0.28 : kind === "double" ? 0.2 : kind === "triple" ? 0.32 : kind === "clear" ? 0.22 : 0.38;
-    punchCam(kind === "stack" ? 0.35 : kind === "triple" ? 0.28 : 0.18);
+      kind === "single" ? 0.18 : kind === "double" ? 0.24 : kind === "triple" ? 0.3 : kind === "clear" ? 0.22 : 0.36;
+    punchCam(
+      kind === "stack" ? 0.22 : kind === "tspin" ? 0.2 : kind === "triple" ? 0.14 : kind === "double" ? 0.1 : 0.06,
+    );
   }
 
   function hardStreak(
@@ -1262,8 +1268,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   function perfectBurst() {
     if (reduce) return;
     pcT = 1;
-    punchCam(0.7);
-    sweep("stack");
+    punchCam(0.38);
+    sweep("clear");
   }
 
   function clientToCell(rect: DOMRect, clientX: number, clientY: number) {
