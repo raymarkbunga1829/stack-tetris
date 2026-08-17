@@ -35,7 +35,6 @@ import { applyMissions, type MissionBook } from "@/game/missions";
 import {
   dailySeed,
   formatClock,
-  sprintPace,
   moonPhase,
   modeOf,
   powersAllowed,
@@ -92,7 +91,7 @@ import {
 } from "@/game/siege";
 import { MiniPiece } from "./mini-piece";
 import { MissionRow } from "./mission-row";
-import { ModeStrip } from "./mode-strip";
+import { ModeChips, ModeStrip } from "./mode-strip";
 import { PowerBar } from "./power-bar";
 import { SettingsSheet } from "./settings-sheet";
 import { ShopSheet } from "./shop-sheet";
@@ -136,6 +135,8 @@ type Ui = {
   holdRight: boolean;
   scan: boolean;
   swipeDrop: boolean;
+  clearWell: boolean;
+  modesOpen: boolean;
   watching: boolean;
   streak: { count: number; last: string };
   missions: MissionBook;
@@ -307,6 +308,8 @@ export function TetrisApp() {
     holdRight: saveRef.current.holdRight,
     scan: saveRef.current.scan,
     swipeDrop: saveRef.current.swipeDrop,
+    clearWell: saveRef.current.clearWell,
+    modesOpen: false,
     watching: false,
     streak: saveRef.current.streak,
     missions: saveRef.current.missions,
@@ -371,6 +374,10 @@ export function TetrisApp() {
   useEffect(() => {
     document.documentElement.classList.toggle("is-android", isAndroid());
     document.documentElement.classList.toggle("is-ios", isIOS());
+    document.documentElement.classList.toggle(
+      "is-touch",
+      window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 720,
+    );
   }, []);
 
   useEffect(() => {
@@ -425,6 +432,11 @@ export function TetrisApp() {
     try {
       const engine = createWell3d(canvas);
       well3dRef.current = engine;
+      engine.setClear(
+        saveRef.current.clearWell ||
+          saveRef.current.mode === "sprint" ||
+          saveRef.current.mode === "daily",
+      );
       const ro = new ResizeObserver(() => {
         engine.resize();
         if (vizCanvas) resizeCanvas(vizCanvas);
@@ -556,6 +568,7 @@ export function TetrisApp() {
     splitSeen.current = 0;
     quietT.current = 0.4;
     well3dRef.current?.setAsh(getLastAsh());
+    well3dRef.current?.setClear(saveRef.current.clearWell || mode === "sprint" || mode === "daily");
     const stain = getLastStain();
     well3dRef.current?.setStain(stain?.cells ?? null);
     const intro =
@@ -1664,7 +1677,14 @@ export function TetrisApp() {
 
   function pickMode(id: ModeId) {
     unlockAudio();
-    startGame(id);
+    saveRef.current = { ...saveRef.current, mode: id };
+    writeSave(saveRef.current);
+    well3dRef.current?.setClear(
+      saveRef.current.clearWell || id === "sprint" || id === "daily",
+    );
+    sfxSelect();
+    haptic("select");
+    syncUi({ mode: id, modesOpen: false });
   }
 
   function openSettings() {
@@ -1746,6 +1766,14 @@ export function TetrisApp() {
     syncUi({ swipeDrop: next });
   }
 
+  function toggleClearWell() {
+    const next = !saveRef.current.clearWell;
+    saveRef.current = { ...saveRef.current, clearWell: next };
+    writeSave(saveRef.current);
+    well3dRef.current?.setClear(next || saveRef.current.mode === "sprint" || saveRef.current.mode === "daily");
+    syncUi({ clearWell: next });
+  }
+
   function onTheme(id: ThemeId) {
     const next = buyTheme(saveRef.current, id);
     if (!next) return;
@@ -1823,82 +1851,49 @@ export function TetrisApp() {
       >
         <header className="topbar">
           <h1 className="logo">Stack</h1>
-          <button type="button" className="cr-pill" onClick={openShop} data-qa="open-shop">
-            {ui.credits.toLocaleString()} CR
-          </button>
-          <p className="hi">Best {ui.high.toLocaleString()}</p>
+          {ui.phase === "title" && (
+            <p className="hi">Best {ui.high.toLocaleString()}</p>
+          )}
         </header>
 
-        <div className={`stats${ui.lockPop ? " is-lock" : ""}${ui.pbPop ? " is-pb" : ""}`}>
-          <TickScore value={ui.score} />
-          <Stat
-            label={
-              ui.mode === "blitz" ? "Time" : ui.mode === "sprint" ? "Clock" : ui.mode === "siege" ? "KOs" : "Level"
-            }
-            value={
-              ui.mode === "blitz"
+        {(ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
+          <div className="hud" role="status">
+            <b className="hud-score">{ui.score.toLocaleString()}</b>
+            <span>
+              {ui.mode === "blitz"
                 ? formatClock(ui.timeLeft ?? 0)
                 : ui.mode === "sprint"
                   ? formatClock(ui.clock)
                   : ui.mode === "siege"
-                    ? String(ui.siege?.kos ?? 0)
-                    : String(ui.level)
-            }
-            fill={
-              ui.mode === "blitz" || ui.mode === "sprint"
-                ? undefined
-                : (ui.lines % 10) / 10
-            }
-            hint={
-              ui.mode === "sprint"
-                ? sprintPace(ui.clock, ui.lines, ui.sprintBest)
-                : ui.mode === "siege" && ui.siege
-                  ? `${ui.siege.badges} badges`
-                  : undefined
-            }
-            hot={
-              ui.mode === "blitz" && ui.timeLeft != null
-                ? ui.timeLeft <= 3
-                  ? "red"
-                  : ui.timeLeft <= 10
-                    ? "amber"
-                    : undefined
-                : undefined
-            }
-          />
-          <Stat
-            label={ui.mode === "sprint" ? "Goal" : "Lines"}
-            value={
-              ui.mode === "sprint"
-                ? `${Math.max(0, 40 - ui.lines)} left`
-                : String(ui.lines)
-            }
-          />
-          {ui.phase === "playing" && (
-            <button
-              type="button"
-              className="stat stat-pause"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                unlockAudio();
-                if (simRef.current) {
-                  pauseToggle(simRef.current);
-                  setMusicPaused(simRef.current.phase === "paused");
-                  syncUi({ phase: simRef.current.phase });
-                }
-              }}
-            >
-              <span className="stat-label">Game</span>
-              <span className="stat-value">Pause</span>
-            </button>
-          )}
-          {ui.phase === "paused" && (
-            <div className="stat stat-pause is-on">
-              <span className="stat-label">Game</span>
-              <span className="stat-value">Paused</span>
-            </div>
-          )}
-        </div>
+                    ? `${ui.siege?.kos ?? 0} KO`
+                    : `Lv ${ui.level}`}
+            </span>
+            <span>
+              {ui.mode === "sprint" ? `${Math.max(0, 40 - ui.lines)} left` : `${ui.lines} L`}
+            </span>
+            <em>{modeOf(ui.mode).name}</em>
+            <small>Best {ui.high.toLocaleString()}</small>
+            {ui.phase === "playing" ? (
+              <button
+                type="button"
+                className="hud-pause"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  unlockAudio();
+                  if (simRef.current) {
+                    pauseToggle(simRef.current);
+                    setMusicPaused(simRef.current.phase === "paused");
+                    syncUi({ phase: simRef.current.phase });
+                  }
+                }}
+              >
+                Pause
+              </button>
+            ) : (
+              <span className="hud-pause is-on">Paused</span>
+            )}
+          </div>
+        )}
 
         <div className={`stage${ui.holdRight ? " is-flip" : ""}`}>
           <aside className="rail">
@@ -1954,7 +1949,7 @@ export function TetrisApp() {
             </div>
             {ui.mode === "classic" && <i className="scan" aria-hidden="true" />}
             {ui.mode === "daily" && <i className="moon-wash" aria-hidden="true" />}
-            {!ui.intro && (
+            {!ui.intro && ui.phase === "title" && (
               <p className="carving" aria-hidden="true">
                 {modeOf(ui.mode).carving}
               </p>
@@ -2029,19 +2024,6 @@ export function TetrisApp() {
             )}
             {ui.phase === "paused" && (
               <div className="veil is-pause">
-                <button
-                  type="button"
-                  className="veil-x"
-                  aria-label="Home"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    goHome();
-                  }}
-                >
-                  ×
-                  <em>Home</em>
-                </button>
                 <div className="pause-card">
                   <p className="veil-kicker">Still here</p>
                   <p className="veil-title">Paused</p>
@@ -2074,6 +2056,17 @@ export function TetrisApp() {
                     }}
                   >
                     New game
+                  </button>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      goHome();
+                    }}
+                  >
+                    Home
                   </button>
                 </div>
               </div>
@@ -2365,49 +2358,44 @@ export function TetrisApp() {
           }
         />
 
-        {(ui.phase === "title" || ui.phase === "over" || ui.phase === "paused") && (
-          <ModeStrip
-            mode={ui.mode}
-            sprintBest={ui.sprintBest}
-            daily={saveRef.current.daily}
-            streak={ui.streak}
-            onPick={pickMode}
-          />
+        {(ui.phase === "title" || ui.phase === "over") && (
+          <ModeChips mode={ui.mode} onPick={pickMode} />
         )}
-        {ui.phase === "title" && <MissionRow book={ui.missions} />}
 
         <footer className="foot">
-          <button type="button" className="text-btn" onClick={openShop}>
+          <button type="button" className="icon-btn" onClick={openShop} aria-label="Store" data-qa="open-shop">
             Store
           </button>
-          <button type="button" className="text-btn" onClick={openSettings}>
+          <button type="button" className="icon-btn" onClick={openSettings} aria-label="Settings">
             Settings
           </button>
-          <button type="button" className="text-btn" onClick={openBoard}>
+          <button type="button" className="icon-btn" onClick={() => syncUi({ modesOpen: true })} aria-label="Modes">
+            Modes
+          </button>
+          <button type="button" className="icon-btn" onClick={openBoard} aria-label="Scores">
             Scores
           </button>
-          <button type="button" className="text-btn" onClick={toggleMute}>
-            {ui.musicVol > 0 ? "Quiet" : ui.sfxVol > 0 ? "Sound off" : "Sound on"}
+          <button type="button" className="icon-btn" onClick={toggleMute} aria-label="Sound">
+            {ui.musicVol > 0 ? "Quiet" : ui.sfxVol > 0 ? "Sound" : "Muted"}
           </button>
-          {ui.phase === "playing" && (
+        </footer>
+        {!ui.standalone && !saveRef.current.a2hs && (ui.phase === "title" || ui.phase === "over") && (
+          <div className="a2hs">
+            <InstallButton />
             <button
               type="button"
-              className="text-btn"
+              className="a2hs-x"
+              aria-label="Dismiss install"
               onClick={() => {
-                unlockAudio();
-                if (simRef.current) {
-                  pauseToggle(simRef.current);
-                  syncUi({ phase: simRef.current.phase });
-                }
+                saveRef.current = { ...saveRef.current, a2hs: true };
+                writeSave(saveRef.current);
+                syncUi({});
               }}
             >
-              Pause
+              Dismiss
             </button>
-          )}
-          {!ui.standalone && ui.phase !== "playing" && ui.phase !== "clearing" && (
-            <InstallButton />
-          )}
-        </footer>
+          </div>
+        )}
         <p className="help help-keys">
           ← → move · ↑ / X / W rotate · Z / Q flip · F 180 · ↓ soft · Space hard · C / Shift hold · P pause · 1–5 powers
         </p>
@@ -2431,6 +2419,34 @@ export function TetrisApp() {
           onBuyCredits={onBuySku}
           onBuyPower={onBuyPower}
         />
+        {ui.modesOpen && (
+          <div className="shop-veil" role="dialog" aria-label="Modes">
+            <div className="shop">
+              <header className="shop-top">
+                <div>
+                  <p className="shop-kicker">Cabinet</p>
+                  <h2>Modes</h2>
+                </div>
+                <button
+                  type="button"
+                  className="shop-x"
+                  aria-label="Close"
+                  onClick={() => syncUi({ modesOpen: false })}
+                >
+                  Close
+                </button>
+              </header>
+              <ModeStrip
+                mode={ui.mode}
+                sprintBest={ui.sprintBest}
+                daily={saveRef.current.daily}
+                streak={ui.streak}
+                onPick={pickMode}
+              />
+              <MissionRow book={ui.missions} />
+            </div>
+          </div>
+        )}
         <SettingsSheet
           open={ui.settings}
           haptic={ui.haptic}
@@ -2442,6 +2458,7 @@ export function TetrisApp() {
           holdRight={ui.holdRight}
           scan={ui.scan}
           swipeDrop={ui.swipeDrop}
+          clearWell={ui.clearWell}
           theme={ui.theme}
           themes={saveRef.current.themes}
           credits={ui.credits}
@@ -2455,6 +2472,7 @@ export function TetrisApp() {
           onHoldRight={toggleHoldRight}
           onScan={toggleScan}
           onSwipeDrop={toggleSwipeDrop}
+          onClearWell={toggleClearWell}
           onTheme={onTheme}
           onPreview={previewTheme}
           musicVol={ui.musicVol}

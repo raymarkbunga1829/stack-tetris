@@ -14,6 +14,7 @@ type Props = {
   holdRight: boolean;
   scan: boolean;
   swipeDrop: boolean;
+  clearWell: boolean;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
@@ -27,6 +28,7 @@ type Props = {
   onHoldRight: () => void;
   onScan: () => void;
   onSwipeDrop: () => void;
+  onClearWell: () => void;
   onTheme: (id: ThemeId) => void;
   onPreview: (id: ThemeId) => void;
   musicVol: number;
@@ -45,6 +47,7 @@ export function SettingsSheet({
   holdRight,
   scan,
   swipeDrop,
+  clearWell,
   theme,
   themes,
   credits,
@@ -58,6 +61,7 @@ export function SettingsSheet({
   onHoldRight,
   onScan,
   onSwipeDrop,
+  onClearWell,
   onTheme,
   onPreview,
   musicVol,
@@ -136,6 +140,10 @@ export function SettingsSheet({
           <span>Swipe down to drop</span>
           <b>{swipeDrop ? "On" : "Off"}</b>
         </button>
+        <button type="button" className={`set-row${clearWell ? " is-on" : ""}`} onClick={onClearWell}>
+          <span>Clear well</span>
+          <b>{clearWell ? "On" : "Off"}</b>
+        </button>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">
           {(["auto", "on", "off"] as const).map((m) => (
@@ -159,6 +167,7 @@ export function SettingsSheet({
             return (
               <li key={t.id}>
                 <button type="button" className="theme-preview" onClick={() => onPreview(t.id)}>
+                  <i className="theme-swatch" style={{ background: t.well }} aria-hidden="true" />
                   <p className="shop-name">{t.name}</p>
                   <p className="shop-blurb">{t.blurb}</p>
                 </button>

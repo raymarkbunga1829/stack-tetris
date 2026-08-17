@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bomb, Hourglass, Layers, Shield, X, Zap } from "lucide-react";
+import { Bomb, Coins, Hourglass, Layers, Shield, Sparkles, X, Zap } from "lucide-react";
 import {
   POWERS,
   SKUS,
@@ -72,6 +72,13 @@ export function ShopSheet({
           <ul className="shop-list">
             {SKUS.map((sku) => (
               <li key={sku.id}>
+                <span className="shop-mark" aria-hidden="true">
+                  {sku.id.includes("pack") || sku.credits >= 400 ? (
+                    <Sparkles size={16} />
+                  ) : (
+                    <Coins size={16} />
+                  )}
+                </span>
                 <div>
                   <p className="shop-name">{sku.name}</p>
                   <p className="shop-blurb">{sku.blurb}</p>

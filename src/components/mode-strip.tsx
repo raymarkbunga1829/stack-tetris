@@ -35,6 +35,28 @@ function rule(
   return "Ghost on";
 }
 
+export function ModeChips({ mode, onPick }: { mode: ModeId; onPick: (id: ModeId) => void }) {
+  return (
+    <div className="mode-chips" role="tablist" aria-label="Game mode">
+      {MODES.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          role="tab"
+          aria-selected={mode === m.id}
+          className={mode === m.id ? "is-on" : ""}
+          style={{ ["--tint" as string]: m.tint }}
+          data-qa={`mode-${m.id}`}
+          onClick={() => onPick(m.id)}
+        >
+          <i aria-hidden="true" />
+          <span>{m.name}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ModeStrip({ mode, sprintBest, daily, streak, onPick }: Props) {
   const dailyBag = peekDailyBag(4);
   const played = !!(daily && daily.date === utcDateKey() && daily.score > 0);
@@ -48,7 +70,7 @@ export function ModeStrip({ mode, sprintBest, daily, streak, onPick }: Props) {
           aria-selected={mode === m.id}
           className={`${mode === m.id ? "is-on" : ""}${m.id === "daily" && played ? " is-played" : ""}`}
           style={{ ["--tint" as string]: m.tint }}
-          data-qa={`mode-${m.id}`}
+          data-qa={`sheet-mode-${m.id}`}
           onClick={() => onPick(m.id)}
         >
           <span className="mode-name">{m.name}</span>
@@ -60,7 +82,6 @@ export function ModeStrip({ mode, sprintBest, daily, streak, onPick }: Props) {
               ))}
             </span>
           ) : null}
-          <span className="mode-blurb">{mode === m.id ? m.look : m.blurb}</span>
         </button>
       ))}
     </div>
