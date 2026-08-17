@@ -16,6 +16,8 @@ let muted = false;
 let musicVol = 1;
 let sfxVol = 1;
 let leadMute = 0;
+let duckUntil = 0;
+let softGate = 0;
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
@@ -60,9 +62,25 @@ function applyGains() {
   if (!bus) return;
   const t = bus.ctx.currentTime;
   bus.sfx.gain.setTargetAtTime(0.32 * sfxVol, t, 0.03);
+  if (t < duckUntil) {
+    bus.master.gain.setTargetAtTime(1, t, 0.02);
+    return;
+  }
   const bed = 0.18 * musicVol;
   bus.music.gain.setTargetAtTime(musicPaused ? bed * 0.28 : bed, t, 0.08);
   bus.master.gain.setTargetAtTime(1, t, 0.02);
+}
+
+function duckMusic(sec: number, depth = 0.2) {
+  if (!bus || musicVol <= 0) return;
+  const t = bus.ctx.currentTime;
+  const bed = 0.18 * musicVol;
+  const nowBed = musicPaused ? bed * 0.28 : bed;
+  duckUntil = Math.max(duckUntil, t + sec);
+  stealLead(sec);
+  bus.music.gain.cancelScheduledValues(t);
+  bus.music.gain.setTargetAtTime(nowBed * depth, t, 0.035);
+  bus.music.gain.setTargetAtTime(nowBed, t + sec, 0.14);
 }
 
 export function isMuted(): boolean {
@@ -240,54 +258,86 @@ function arp(notes: number[], step = 0.055, _type: OscillatorType = "square", vo
 }
 
 export function sfxMove() {
-  stealLead(0.04);
-  pulse(196, 0.028, 0, 50, 0.3);
+  pulse(196, 0.016, 0, 50, 0.08);
 }
 export function sfxRotate() {
-  stealLead(0.07);
-  pulse(330, 0.03, 0, 25, 0.34);
-  pulse(392, 0.04, 0.028, 25, 0.32);
+  pulse(330, 0.028, 0, 25, 0.26);
+  pulse(392, 0.036, 0.024, 25, 0.24);
 }
 export function sfxLock() {
-  stealLead(0.09);
-  pulse(165, 0.05, 0, 50, 0.4);
-  slide(165, 82, 0.07, 0.01, "square", 0.28);
-  noiseBurst(0.06, 0, 0.2, 240, 0.7, false);
+  pulse(147, 0.04, 0, 50, 0.22);
+  noiseBurst(0.04, 0, 0.1, 240, 0.7, false);
 }
 export function sfxLand(mass = 1) {
   const m = Math.max(0.6, Math.min(1.4, mass));
   noiseBurst(0.03 + m * 0.02, 0, 0.08 + m * 0.1, 140, 0.4, m > 1);
 }
 export function sfxHold() {
-  stealLead(0.1);
-  pulse(262, 0.04, 0, 25, 0.34);
-  pulse(392, 0.05, 0.04, 25, 0.32);
+  pulse(262, 0.036, 0, 25, 0.28);
+  pulse(392, 0.048, 0.036, 25, 0.26);
+}
+export function sfxSoft() {
+  if (!bus || sfxVol <= 0) return;
+  const t = bus.ctx.currentTime;
+  if (t < softGate) return;
+  softGate = t + 0.055;
+  slide(210, 140, 0.04, 0, "square", 0.09);
 }
 export function sfxOmen() {
   stealLead(0.16);
   pulse(1568, 0.12, 0, 12, 0.22);
   pulse(2093, 0.18, 0.06, 12, 0.16);
 }
+export function sfxSingle() {
+  pulse(523, 0.07, 0, 25, 0.22);
+}
+export function sfxDouble() {
+  pulse(523, 0.055, 0, 25, 0.24);
+  pulse(659, 0.08, 0.055, 25, 0.26);
+}
+export function sfxTriple() {
+  pulse(392, 0.05, 0, 25, 0.24);
+  pulse(523, 0.055, 0.05, 25, 0.26);
+  pulse(659, 0.1, 0.1, 25, 0.28);
+}
+export function sfxMini() {
+  pulse(880, 0.05, 0, 12, 0.22);
+  pulse(1175, 0.08, 0.045, 12, 0.2);
+}
+export function sfxTspin() {
+  duckMusic(0.48, 0.22);
+  pulse(311, 0.06, 0, 25, 0.28);
+  pulse(392, 0.07, 0.05, 25, 0.3);
+  pulse(523, 0.12, 0.1, 12, 0.24);
+  noiseBurst(0.08, 0.02, 0.12, 1800, 0.7, true);
+}
+export function sfxTst() {
+  duckMusic(0.58, 0.18);
+  pulse(311, 0.05, 0, 25, 0.28);
+  pulse(392, 0.06, 0.045, 25, 0.3);
+  pulse(523, 0.07, 0.09, 25, 0.3);
+  pulse(784, 0.1, 0.14, 12, 0.26);
+  pulse(1047, 0.14, 0.2, 12, 0.22);
+}
 export function sfxClear(n = 1) {
-  if (n >= 4) {
-    sfxTetris();
-    return;
-  }
-  noiseBurst(0.07, 0, 0.16, 1600, 0.7, true);
-  if (n <= 1) {
-    stealLead(0.24);
-    arp([523, 659, 784, 1047], 0.052);
-  } else if (n === 2) {
-    stealLead(0.3);
-    arp([392, 523, 659, 784, 1047], 0.05);
-  } else {
-    stealLead(0.38);
-    arp([330, 392, 523, 659, 784, 988, 1175], 0.048);
-  }
+  if (n >= 4) sfxTetris();
+  else if (n === 3) sfxTriple();
+  else if (n === 2) sfxDouble();
+  else sfxSingle();
+}
+export function sfxLine(rank: "single" | "double" | "triple" | "tetris" | "mini" | "tspin" | "tst" | "pc") {
+  if (rank === "pc") sfxPerfect();
+  else if (rank === "tetris") sfxTetris();
+  else if (rank === "tst") sfxTst();
+  else if (rank === "tspin") sfxTspin();
+  else if (rank === "mini") sfxMini();
+  else if (rank === "triple") sfxTriple();
+  else if (rank === "double") sfxDouble();
+  else sfxSingle();
 }
 export function sfxShatter() {
-  noiseBurst(0.12, 0, 0.22, 1800, 0.55, false);
-  noiseBurst(0.08, 0.02, 0.14, 2800, 1, true);
+  noiseBurst(0.1, 0, 0.14, 1800, 0.55, false);
+  noiseBurst(0.06, 0.02, 0.1, 2800, 1, true);
 }
 export function sfxSweep() {
   stealLead(0.2);
@@ -295,24 +345,25 @@ export function sfxSweep() {
 }
 export function sfxHard() {
   stealLead(0.14);
-  slide(620, 110, 0.11, 0, "square", 0.3);
-  noiseBurst(0.09, 0, 0.22, 500, 0.55, true);
+  slide(620, 90, 0.1, 0, "square", 0.34);
+  noiseBurst(0.09, 0, 0.24, 480, 0.55, true);
+  pulse(98, 0.08, 0.02, 50, 0.22);
 }
 export function sfxTetris() {
-  stealLead(0.95);
-  noiseBurst(0.14, 0, 0.22, 1200, 0.75, true);
-  arp([392, 523, 659, 784, 988, 784, 1047, 1319], 0.055, "square", 0.58);
-  pulse(392 * 1.5, 0.18, 0.08, 12, 0.22);
-  pulse(392 * 1.5 * 1.5, 0.16, 0.16, 12, 0.16);
-  slide(196, 98, 0.22, 0.02, "triangle", 0.22);
+  duckMusic(0.72, 0.16);
+  noiseBurst(0.12, 0, 0.18, 1200, 0.75, true);
+  arp([392, 523, 659, 784, 988, 784, 1047, 1319], 0.052, "square", 0.52);
+  pulse(588, 0.16, 0.08, 12, 0.18);
+  slide(196, 98, 0.2, 0.02, "triangle", 0.18);
 }
 export function sfxLevel() {
   stealLead(0.28);
   arp([523, 659, 784, 1047], 0.06);
 }
 export function sfxOver() {
-  stealLead(0.55);
-  arp([392, 330, 262, 196, 147], 0.1);
+  stealLead(0.22);
+  slide(294, 110, 0.2, 0, "square", 0.26);
+  noiseBurst(0.12, 0.02, 0.14, 220, 0.5, false);
 }
 export function sfxStart() {
   stealLead(0.18);
@@ -353,23 +404,24 @@ export function sfxPick() {
 }
 
 export function sfxCombo(n: number) {
-  const step = Math.min(6, Math.max(1, n));
-  tone(420 + step * 70, 0.07, 0, "triangle", 0.28);
-  tone(620 + step * 80, 0.1, 0.04, "sine", 0.24);
+  const step = Math.min(8, Math.max(1, n));
+  pulse(392 + step * 55, 0.055, 0, 25, 0.2);
+  pulse(523 + step * 70, 0.08, 0.04, 12, 0.18);
 }
 
 export function sfxB2b() {
-  tone(392, 0.07, 0, "square", 0.28);
-  tone(523, 0.09, 0.05, "triangle", 0.3);
-  tone(784, 0.14, 0.1, "sine", 0.26);
+  pulse(392, 0.06, 0, 25, 0.26);
+  pulse(523, 0.08, 0.05, 25, 0.28);
+  pulse(784, 0.12, 0.1, 12, 0.22);
 }
 
 export function sfxPerfect() {
-  tone(523, 0.1, 0, "triangle", 0.32);
-  tone(659, 0.12, 0.05, "sine", 0.3);
-  tone(784, 0.16, 0.1, "triangle", 0.28);
-  tone(1046, 0.22, 0.16, "sine", 0.22);
-  noiseBurst(0.14, 0.02, 0.18, 1800, 0.6);
+  duckMusic(0.95, 0.12);
+  noiseBurst(0.16, 0, 0.2, 1600, 0.6, true);
+  arp([523, 659, 784, 988, 1047, 1319, 1568, 2093], 0.06, "square", 0.5);
+  pulse(1047, 0.22, 0.18, 12, 0.2);
+  pulse(1568, 0.28, 0.28, 12, 0.16);
+  slide(196, 392, 0.24, 0.04, "triangle", 0.16);
 }
 
 export function sfxPower(id: "zap" | "slow" | "shield" | "quake" | "pick") {

@@ -3,12 +3,12 @@ import {
   resumeAudio,
   setMix,
   setMuted,
-  sfxClear,
   sfxCombo,
   sfxB2b,
   sfxHard,
   sfxHold,
   sfxLevel,
+  sfxLine,
   sfxLock,
   sfxMove,
   sfxOmen,
@@ -18,6 +18,7 @@ import {
   sfxRotate,
   sfxSelect,
   sfxShatter,
+  sfxSoft,
   sfxStart,
   sfxSweep,
   sfxTetris,
@@ -904,6 +905,9 @@ export function TetrisApp() {
       sfxMove();
       haptic("move");
     }
+    if (ev === "move" && held.down && !just.left && !just.right && !just.hard) {
+      sfxSoft();
+    }
     if (ev === "rotate") {
       sfxRotate();
       haptic("rotate");
@@ -918,7 +922,7 @@ export function TetrisApp() {
       syncUi({ holdPeek: sim.piece?.id ?? null });
     }
     if (ev === "lock") {
-      sfxLock();
+      if (!just.hard) sfxLock();
       slamLock(just.hard, falling, just.hard ? ghostAt : falling?.y ?? 0);
       if (held.down && falling && !just.hard) {
         well3dRef.current?.softTrail(
@@ -1338,7 +1342,7 @@ export function TetrisApp() {
       syncUi({ holdPeek: sim.piece?.id ?? null });
     }
     if (ev === "lock" || ev === "over") {
-      sfxLock();
+      if (!p.hard) sfxLock();
       slamLock(!!p.hard, fallingPulse, p.hard ? ghostPulse : fallingPulse?.y ?? 0);
       const live = simRef.current;
       if (live && live.clearRows.length) {
@@ -1399,8 +1403,8 @@ export function TetrisApp() {
     engine.sweep(kind);
     if (kind === "stack" || kind === "tspin") engine.nod(0.42);
     else if (kind === "triple") engine.nod(0.18);
-    sfxClear(kind === "stack" ? 4 : kind === "triple" ? 3 : kind === "double" ? 2 : kind === "tspin" ? 3 : 1);
-    if (kind !== "single") sfxShatter();
+    sfxLine(spoken.rank);
+    if (kind === "triple" || kind === "stack" || kind === "tspin") sfxShatter();
     if (kind === "stack" || kind === "tspin") {
       shakeRef.current = kind === "stack" ? 8 : 6;
       bangTint();
