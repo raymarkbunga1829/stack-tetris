@@ -47,6 +47,7 @@ import {
 } from "@/game/modes";
 import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { nameRun } from "@/game/run-name";
+import { registerOffline, watchLine } from "@/game/offline";
 import { betterRank, speakClear, type Callout, type CallRank } from "@/game/callout";
 import { shareRun } from "@/game/share-run";
 import { REPLAY_STEP, takeSnap, type Snap } from "@/game/replay";
@@ -171,6 +172,7 @@ type Ui = {
   } | null;
   tip: string | null;
   bagLine: boolean;
+  offline: boolean;
   pred: { rows: number; lock: boolean; kick: boolean } | null;
   holdPeek: PieceId | null;
   failing: boolean;
@@ -344,6 +346,7 @@ export function TetrisApp() {
     recap: null,
     tip: null,
     bagLine: false,
+    offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
     pred: null,
     holdPeek: null,
     failing: false,
@@ -442,7 +445,18 @@ export function TetrisApp() {
       writeSave(saveRef.current);
       setUi((p) => ({ ...p, bagLine: true }));
     }
-    return () => mq.removeEventListener("change", onMode);
+    const stopLine = watchLine((online) => {
+      setUi((p) => (p.offline === !online ? p : { ...p, offline: !online }));
+    });
+    const stopSw = registerOffline(() => {
+      const phase = uiRef.current.phase;
+      return phase === "title" || phase === "over";
+    });
+    return () => {
+      mq.removeEventListener("change", onMode);
+      stopLine();
+      stopSw();
+    };
   }, []);
 
   useEffect(() => {
@@ -2009,6 +2023,11 @@ export function TetrisApp() {
       >
         <header className="topbar">
           <h1 className="logo">Stack</h1>
+          {ui.offline && (
+            <p className="off-mark" aria-live="polite">
+              Radio off
+            </p>
+          )}
           {ui.phase === "title" && (
             <p className="hi">Best {ui.high.toLocaleString()}</p>
           )}
