@@ -677,14 +677,22 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
     sim.lastClear = "ALL CLEAR";
   } else {
     sim.lastClear = tspin
-      ? `${mini ? "MINI " : ""}T-SPIN${n === 0 ? "" : ` ${n}`}`
+      ? mini
+        ? n <= 1
+          ? "MINI"
+          : `MINI T-SPIN ${n}`
+        : n === 3
+          ? "TST"
+          : n === 0
+            ? "T-SPIN"
+            : `T-SPIN ${n}`
       : n === 4
-        ? "STACK"
+        ? "TETRIS"
         : n === 3
           ? "TRIPLE"
           : n === 2
             ? "DOUBLE"
-              : "SINGLE";
+            : "SINGLE";
   }
   clearSpin(sim);
   sim.phase = "playing";

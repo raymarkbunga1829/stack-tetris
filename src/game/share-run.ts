@@ -12,6 +12,8 @@ export type SharePayload = {
   splits?: number[];
   frames?: Snap[];
   epitaph?: string;
+  still?: Snap;
+  callout?: string;
 };
 
 export async function shareRun(run: SharePayload): Promise<void> {
@@ -55,22 +57,31 @@ export async function shareRun(run: SharePayload): Promise<void> {
     ctx.fillStyle = "#c8c6bf";
     ctx.fillText(`${run.lines} lines · x${run.combo} · ${formatElapsed(run.clock)}`, 120, run.epitaph ? 470 : 410);
 
-    const frames = pickFrames(run.frames);
-    if (frames.length) {
-      const fw = 200;
-      const fh = 400;
-      const gap = 24;
-      const total = frames.length * fw + (frames.length - 1) * gap;
-      let x = (1080 - total) / 2;
-      frames.forEach((s) => {
-        drawMini(ctx, s, x, 430, fw, fh);
-        x += fw + gap;
-      });
-    } else if (run.splits?.length) {
-      ctx.font = "600 32px system-ui, sans-serif";
-      run.splits.forEach((s, i) => {
-        ctx.fillText(`${(i + 1) * 10}  ${formatElapsed(s)}`, 120, 480 + i * 56);
-      });
+    if (run.still) {
+      drawMini(ctx, run.still, 180, 520, 720, 620);
+      if (run.callout) {
+        ctx.fillStyle = "#f2efe6";
+        ctx.font = "700 52px 'Segoe UI', system-ui, sans-serif";
+        ctx.fillText(run.callout, 200, 1140);
+      }
+    } else {
+      const frames = pickFrames(run.frames);
+      if (frames.length) {
+        const fw = 200;
+        const fh = 400;
+        const gap = 24;
+        const total = frames.length * fw + (frames.length - 1) * gap;
+        let x = (1080 - total) / 2;
+        frames.forEach((s) => {
+          drawMini(ctx, s, x, 520, fw, fh);
+          x += fw + gap;
+        });
+      } else if (run.splits?.length) {
+        ctx.font = "600 32px system-ui, sans-serif";
+        run.splits.forEach((s, i) => {
+          ctx.fillText(`${(i + 1) * 10}  ${formatElapsed(s)}`, 120, 540 + i * 56);
+        });
+      }
     }
     ctx.fillStyle = "#6a6d76";
     ctx.font = "600 28px system-ui, sans-serif";

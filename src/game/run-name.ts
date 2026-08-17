@@ -7,10 +7,11 @@ export function nameRun(opts: {
   won: boolean;
   combo: number;
   stacks: number;
+  tspins?: number;
   perfects: number;
   extras?: number;
 }): string {
-  const { mode, won, combo, stacks, perfects, extras, lines, score } = opts;
+  const { mode, won, combo, stacks, tspins = 0, perfects, extras, lines, score } = opts;
   if (perfects > 0 && stacks > 0) return "The Empty Cathedral";
   if (perfects > 0) return "A Clean Moon";
   if (mode === "sprint" && won && (extras === 0 || combo >= 4)) return "The Quiet Forty";
@@ -27,8 +28,11 @@ export function nameRun(opts: {
   if (mode === "zen" && lines >= 40) return "The Long Sketch";
   if (mode === "siege" && won) return "Last Well Standing";
   if (mode === "siege") return "Buried by Eight";
-  if (stacks >= 7) return "Seven Omens";
+  if (tspins > 0 && stacks > 0) return "Spins and Stacks";
+  if (tspins >= 3) return "The Named Spins";
+  if (tspins > 0) return "A Named Spin";
   if (stacks >= 3) return "Three Bells";
+  if (stacks >= 1) return "A Tetris";
   if (combo >= 6) return "The Long Chain";
   if (score >= 20000) return "A Loud Well";
   if (!won && lines === 0) return score > 0 ? "A Soft Fall" : "Nothing Landed";
