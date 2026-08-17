@@ -31,23 +31,29 @@ export async function shareRun(run: SharePayload): Promise<void> {
   if (ctx) {
     ctx.fillStyle = "#0b0c10";
     ctx.fillRect(0, 0, 1080, 1350);
-    ctx.fillStyle = "#16181f";
+    ctx.fillStyle = "#12151c";
     roundRect(ctx, 72, 88, 936, 1170, 36);
     ctx.fill();
-    ctx.fillStyle = "#8b8d96";
-    ctx.font = "600 32px system-ui, sans-serif";
-    ctx.fillText(run.mode.toUpperCase(), 120, 180);
+    const gems = ["#6ee0e4", "#e4cc62", "#b08ad4", "#78c47c"];
+    gems.forEach((c, i) => {
+      ctx.fillStyle = c;
+      roundRect(ctx, 120 + i * 44, 148, 32, 32, 6);
+      ctx.fill();
+    });
+    ctx.fillStyle = "#c2c4ca";
+    ctx.font = "600 32px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText(run.mode.toUpperCase(), 120, 220);
     if (run.epitaph) {
-      ctx.fillStyle = "#c8b070";
-      ctx.font = "600 40px system-ui, sans-serif";
-      ctx.fillText(run.epitaph, 120, 236);
+      ctx.fillStyle = "#f2efe6";
+      ctx.font = "600 40px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText(run.epitaph, 120, 276);
     }
     ctx.fillStyle = "#f2efe6";
-    ctx.font = "700 96px system-ui, sans-serif";
-    ctx.fillText(run.score.toLocaleString(), 120, run.epitaph ? 360 : 300);
-    ctx.font = "600 36px system-ui, sans-serif";
+    ctx.font = "700 96px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText(run.score.toLocaleString(), 120, run.epitaph ? 400 : 340);
+    ctx.font = "600 36px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = "#c8c6bf";
-    ctx.fillText(`${run.lines} lines · x${run.combo} · ${formatElapsed(run.clock)}`, 120, 360);
+    ctx.fillText(`${run.lines} lines · x${run.combo} · ${formatElapsed(run.clock)}`, 120, run.epitaph ? 470 : 410);
 
     const frames = pickFrames(run.frames);
     if (frames.length) {

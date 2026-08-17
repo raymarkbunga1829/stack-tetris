@@ -15,6 +15,9 @@ type Props = {
   scan: boolean;
   swipeDrop: boolean;
   clearWell: boolean;
+  dasMs: number;
+  arrMs: number;
+  sdf: number;
   theme: ThemeId;
   themes: ThemeId[];
   credits: number;
@@ -29,6 +32,7 @@ type Props = {
   onScan: () => void;
   onSwipeDrop: () => void;
   onClearWell: () => void;
+  onHandling: (part: "dasMs" | "arrMs" | "sdf", value: number) => void;
   onTheme: (id: ThemeId) => void;
   onPreview: (id: ThemeId) => void;
   musicVol: number;
@@ -48,6 +52,9 @@ export function SettingsSheet({
   scan,
   swipeDrop,
   clearWell,
+  dasMs,
+  arrMs,
+  sdf,
   theme,
   themes,
   credits,
@@ -62,6 +69,7 @@ export function SettingsSheet({
   onScan,
   onSwipeDrop,
   onClearWell,
+  onHandling,
   onTheme,
   onPreview,
   musicVol,
@@ -144,6 +152,43 @@ export function SettingsSheet({
           <span>Clear well</span>
           <b>{clearWell ? "On" : "Off"}</b>
         </button>
+        <p className="shop-blurb">Handling</p>
+        <label className="mix-row">
+          <span>DAS</span>
+          <input
+            type="range"
+            min={50}
+            max={300}
+            step={1}
+            value={dasMs}
+            onChange={(e) => onHandling("dasMs", Number(e.target.value))}
+          />
+          <b>{dasMs}</b>
+        </label>
+        <label className="mix-row">
+          <span>ARR</span>
+          <input
+            type="range"
+            min={0}
+            max={80}
+            step={1}
+            value={arrMs}
+            onChange={(e) => onHandling("arrMs", Number(e.target.value))}
+          />
+          <b>{arrMs}</b>
+        </label>
+        <label className="mix-row">
+          <span>SDF</span>
+          <input
+            type="range"
+            min={5}
+            max={40}
+            step={1}
+            value={sdf}
+            onChange={(e) => onHandling("sdf", Number(e.target.value))}
+          />
+          <b>{sdf}</b>
+        </label>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">
           {(["auto", "on", "off"] as const).map((m) => (
@@ -167,7 +212,12 @@ export function SettingsSheet({
             return (
               <li key={t.id}>
                 <button type="button" className="theme-preview" onClick={() => onPreview(t.id)}>
-                  <i className="theme-swatch" style={{ background: t.well }} aria-hidden="true" />
+                  <span className="theme-swatch" aria-hidden="true">
+                    <i className="swatch-pit" style={{ background: t.pit }} />
+                    <i style={{ background: t.fill.I }} />
+                    <i style={{ background: t.fill.T }} />
+                    <i style={{ background: t.fill.O }} />
+                  </span>
                   <p className="shop-name">{t.name}</p>
                   <p className="shop-blurb">{t.blurb}</p>
                 </button>

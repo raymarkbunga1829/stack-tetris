@@ -118,6 +118,8 @@ export type InputFrame = {
   heldFlip: boolean;
   nudge: number;
   das?: number;
+  arr?: number;
+  sdf?: number;
 };
 
 export type StepEvent =
@@ -736,7 +738,7 @@ function handleShift(sim: Sim, input: InputFrame, dt: number) {
       sim.arrT = 0;
       break;
     }
-    sim.arrT += ARR;
+    sim.arrT += input.arr ?? ARR;
   }
 }
 
@@ -805,7 +807,7 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   handleShift(sim, input, capped);
 
   const g = input.softDrop
-    ? Math.min(0.05, gravityInterval(sim.level, sim.slowT > 0) / 20)
+    ? Math.min(0.05, gravityInterval(sim.level, sim.slowT > 0) / (input.sdf ?? 20))
     : gravityInterval(sim.level, sim.slowT > 0);
 
   if (!grounded(sim, sim.piece)) {
