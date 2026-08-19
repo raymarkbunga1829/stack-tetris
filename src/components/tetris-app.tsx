@@ -790,6 +790,11 @@ export function TetrisApp() {
     if (!sim || u.phase === "title") return;
 
     if (sim.phase === "paused") {
+      // The swap chip lives on a play-clock, so a pause mid-swap would pin it there.
+      if (holdPeekT.current > 0) {
+        holdPeekT.current = 0;
+        syncUi({ holdPeek: null });
+      }
       if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 8);
       return;
     }
@@ -2155,11 +2160,6 @@ export function TetrisApp() {
               }}
             >
               <MiniPiece key={ui.hold ?? "empty"} id={ui.hold} theme={ui.theme} />
-              {ui.phase === "playing" && ui.live && !ui.holdPeek && (
-                <span className="hold-swap" aria-hidden="true">
-                  <MiniPiece id={ui.live} theme={ui.theme} />
-                </span>
-              )}
               {ui.holdPeek && (
                 <span className="hold-peek" aria-hidden="true">
                   <MiniPiece id={ui.holdPeek} theme={ui.theme} />

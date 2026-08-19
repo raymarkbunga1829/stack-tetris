@@ -932,13 +932,6 @@
   max-width: 22px;
 }
 
-.hold-swap {
-  position: absolute;
-  inset: 6px;
-  opacity: 0.22;
-  pointer-events: none;
-}
-
 .pocket-hold.is-swap > .mini {
   animation: hold-settle 0.34s ease-out;
 }
@@ -955,10 +948,6 @@
     transform: translate(-14px, 16px) scale(1.25);
     opacity: 0;
   }
-}
-
-.hold-swap .mini {
-  max-width: 36px;
 }
 
 .bag-strip {
