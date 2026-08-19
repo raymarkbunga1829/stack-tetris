@@ -49,16 +49,18 @@ export function CoachCard({ step, onSkip }: Props) {
   const cur = STEPS[i] ?? STEPS[0]!;
   return (
     <div className="coach-card" role="status">
-      <div className="coach-dots" aria-hidden="true">
-        {STEPS.map((s) => (
-          <span
-            key={s.id}
-            className={`coach-dot${s.id === step ? " is-on" : ""}`}
-          />
-        ))}
+      <div className="coach-say">
+        <div className="coach-dots" aria-hidden="true">
+          {STEPS.map((s) => (
+            <span
+              key={s.id}
+              className={`coach-dot${s.id === step ? " is-on" : ""}`}
+            />
+          ))}
+        </div>
+        <p className="coach-kicker">{cur.kicker}</p>
+        <p className="coach-title">{cur.title}</p>
       </div>
-      <p className="coach-kicker">{cur.kicker}</p>
-      <p className="coach-title">{cur.title}</p>
       <p className="coach-hint">{isAndroid() ? cur.android : cur.hint}</p>
       <button
         type="button"

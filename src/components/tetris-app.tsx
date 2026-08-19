@@ -847,6 +847,7 @@ export function TetrisApp() {
       das: showPad(u.padMode) ? DAS_TOUCH : saveRef.current.dasMs / 1000,
       arr: saveRef.current.arrMs / 1000,
       sdf: saveRef.current.sdf,
+      freeze: !!u.coach,
     });
 
     if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 10);
@@ -2561,9 +2562,6 @@ export function TetrisApp() {
             {ui.phase === "playing" && ui.holeHint && !ui.coach && (
               <p className="hole-hint">One more. Close the hole.</p>
             )}
-            {ui.coach && ui.phase === "playing" && (
-              <CoachCard step={ui.coach} onSkip={finishCoach} />
-            )}
             {ui.banner && ui.phase === "playing" && (
               <p className={`banner is-${bannerKind.current}`}>{ui.banner}</p>
             )}
@@ -2605,14 +2603,18 @@ export function TetrisApp() {
           </aside>
         </div>
 
-        {powersAllowed(ui.mode) && (
-        <PowerBar
-          inv={ui.inv}
-          shieldOn={ui.shield}
-          slowOn={ui.slow}
-          onUse={usePower}
-          pickOn={ui.picking}
-        />
+        {ui.coach && ui.phase === "playing" ? (
+          <CoachCard step={ui.coach} onSkip={finishCoach} />
+        ) : (
+          powersAllowed(ui.mode) && (
+            <PowerBar
+              inv={ui.inv}
+              shieldOn={ui.shield}
+              slowOn={ui.slow}
+              onUse={usePower}
+              pickOn={ui.picking}
+            />
+          )
         )}
         {ui.mode === "siege" && ui.siege && ui.phase === "playing" && (
           <SiegeRail
