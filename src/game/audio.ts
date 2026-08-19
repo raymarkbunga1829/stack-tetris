@@ -6,12 +6,14 @@ type Bus = {
   noise: AudioBuffer;
   noiseLong: AudioBuffer;
   noiseShort: AudioBuffer;
+  silence: AudioBuffer;
   pulse25: PeriodicWave;
   pulse50: PeriodicWave;
   pulse12: PeriodicWave;
 };
 
 let bus: Bus | null = null;
+let armed = false;
 let muted = false;
 let musicVol = 1;
 let sfxVol = 1;
@@ -110,6 +112,37 @@ function makeNoise(ctx: AudioContext): AudioBuffer {
   return makeLfsr(ctx, false, 8);
 }
 
+/** A dead sample through the master. Some browsers only open the tap for a source started in the gesture. */
+function kick() {
+  if (!bus) return;
+  const src = bus.ctx.createBufferSource();
+  src.buffer = bus.silence;
+  src.connect(bus.master);
+  src.start();
+}
+
+const GESTURES = ["pointerdown", "touchend", "mousedown", "keydown"] as const;
+
+/**
+ * The cabinet is deaf until a gesture opens it, and only some controls remember to ask.
+ * Listen wide so a player's first touch — any touch — is the one that turns the radio on.
+ */
+export function armAudio() {
+  if (armed || typeof window === "undefined") return;
+  armed = true;
+  for (const type of GESTURES) {
+    window.addEventListener(type, unlockAudio, { capture: true, passive: true });
+  }
+}
+
+function disarm() {
+  if (!armed || typeof window === "undefined") return;
+  armed = false;
+  for (const type of GESTURES) {
+    window.removeEventListener(type, unlockAudio, { capture: true });
+  }
+}
+
 export function unlockAudio() {
   if (!bus) {
     const AudioCtx =
@@ -134,16 +167,30 @@ export function unlockAudio() {
       noise: makeLfsr(ctx, false, 8),
       noiseLong: makeLfsr(ctx, false, 12),
       noiseShort: makeLfsr(ctx, true, 3),
+      silence: ctx.createBuffer(1, 1, ctx.sampleRate),
       pulse25: pulseWave(ctx, 0.25),
       pulse50: pulseWave(ctx, 0.5),
       pulse12: pulseWave(ctx, 0.125),
     };
   }
-  if (bus.ctx.state === "suspended") void bus.ctx.resume();
+  const { ctx } = bus;
+  if (ctx.state === "running") {
+    disarm();
+    return;
+  }
+  kick();
+  // A refused resume leaves every later sound falling into a locked bus, so stay armed for the next touch.
+  void ctx.resume().then(
+    () => {
+      if (ctx.state === "running") disarm();
+      else armAudio();
+    },
+    () => armAudio(),
+  );
 }
 
 export function resumeAudio() {
-  if (bus && bus.ctx.state === "suspended") void bus.ctx.resume();
+  if (bus) unlockAudio();
 }
 
 function pulse(
@@ -508,6 +555,8 @@ let musicTight = false;
 let sirenId = 0;
 
 export function setMusicTension(on: boolean) {
+  // The well says "danger" every frame it is in danger, and a honk per frame is a drone, not a siren.
+  if (on === musicTight && (!on || sirenId)) return;
   musicTight = on;
   if (sirenId) {
     clearInterval(sirenId);
