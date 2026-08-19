@@ -2154,25 +2154,22 @@ export function TetrisApp() {
 
         {(ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
           <div className="hud" role="status">
-            <b className="hud-score">{ui.score.toLocaleString()}</b>
-            <span>
-              {ui.mode === "blitz"
-                ? formatClock(ui.timeLeft ?? 0)
-                : ui.mode === "sprint"
-                  ? formatElapsed(ui.clock)
-                  : ui.mode === "finesse"
-                    ? `${ui.finesseN}/20`
-                    : ui.mode === "siege"
-                      ? `${ui.siege?.kos ?? 0} KO`
-                      : `Lv ${ui.level}`}
-            </span>
-            <span>
-              {ui.mode === "sprint"
-                ? `${Math.max(0, 40 - ui.lines)} left`
-                : ui.mode === "finesse"
-                  ? `${ui.finesseClean} clean`
-                  : `${ui.lines} L`}
-            </span>
+            <p className="hud-cell is-score">
+              <span>Score</span>
+              <b>{ui.score.toLocaleString()}</b>
+            </p>
+            {hudCells(ui).map((cell) => (
+              <p className="hud-cell" key={cell.label}>
+                <span>{cell.label}</span>
+                <b>{cell.value}</b>
+              </p>
+            ))}
+            {powersAllowed(ui.mode) && (
+              <p className="hud-cell is-cr" data-qa="hud-cr">
+                <span>Credits</span>
+                <b key={ui.credits}>{ui.credits.toLocaleString()}</b>
+              </p>
+            )}
             <em>{modeOf(ui.mode).name}</em>
             {ui.mode === "sprint" && sprintPace(ui.clock, ui.lines, ui.sprintBest) ? (
               <small>{sprintPace(ui.clock, ui.lines, ui.sprintBest)}</small>
@@ -2667,8 +2664,11 @@ export function TetrisApp() {
                 ))}
             </div>
             {ui.phase === "playing" && ui.bag.length > 0 && (
-              <div className={`bag-strip${ui.bagPop ? " is-fill" : ""}`} aria-label="Left in bag">
-                <b>{ui.bag.length}</b>
+              <div className={`bag-strip${ui.bagPop ? " is-fill" : ""}`}>
+                <b>
+                  {ui.bag.length}
+                  <span>in bag</span>
+                </b>
                 {ui.bag.map((id, i) => (
                   <i key={`${id}-${i}`} style={{ background: themeOf(ui.theme).fill[id] }} />
                 ))}
@@ -2924,6 +2924,39 @@ export function TetrisApp() {
       </div>
     </main>
   );
+}
+
+/**
+ * The two counters beside the score, and the word for each.
+ *
+ * Every mode counts something else there — a clock, a KO tally, twenty graded
+ * pieces — and a bare number in a strip cannot say which.
+ */
+function hudCells(ui: Ui): { label: string; value: string }[] {
+  if (ui.mode === "blitz")
+    return [
+      { label: "Time", value: formatClock(ui.timeLeft ?? 0) },
+      { label: "Lines", value: `${ui.lines}` },
+    ];
+  if (ui.mode === "sprint")
+    return [
+      { label: "Time", value: formatElapsed(ui.clock) },
+      { label: "Lines left", value: `${Math.max(0, 40 - ui.lines)}` },
+    ];
+  if (ui.mode === "finesse")
+    return [
+      { label: "Pieces", value: `${ui.finesseN}/20` },
+      { label: "Clean", value: `${ui.finesseClean}` },
+    ];
+  if (ui.mode === "siege")
+    return [
+      { label: "KOs", value: `${ui.siege?.kos ?? 0}` },
+      { label: "Lines", value: `${ui.lines}` },
+    ];
+  return [
+    { label: "Level", value: `${ui.level}` },
+    { label: "Lines", value: `${ui.lines}` },
+  ];
 }
 
 function Stat({

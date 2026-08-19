@@ -141,21 +141,71 @@
 
 .hud {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 9px;
   min-height: 36px;
-  padding: 4px 2px;
+  padding: 2px;
+  overflow: hidden;
   color: var(--color-fg);
   font: 500 0.78rem/1 var(--font-sans);
 }
 
-.hud-score {
-  font: 600 1.05rem/1 var(--font-mono);
+/* Every number in the strip wears its word, stacked so the row stays one
+   slim bar instead of a legend the player has to already know. */
+.hud-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  /* Numbers never give up room to each other — the nameplate goes first. */
+  flex: none;
+}
+
+.hud-cell > span {
+  color: var(--color-muted);
+  font: 500 0.54rem/1 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hud-cell > b {
+  font: 600 0.9rem/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.hud-cell.is-score > b {
+  font-size: 1.05rem;
   letter-spacing: -0.03em;
 }
 
-.hud span,
+/* The pocket, not the run: powers wear a CR price, so the wallet stays on
+   screen while they are for sale — behind a hairline, so it reads as money. */
+.hud-cell.is-cr {
+  padding-left: 10px;
+  border-left: 1px solid var(--color-line);
+}
+
+/* A +50 CR toast in the well used to be the only place credits ever showed. */
+@media (prefers-reduced-motion: no-preference) {
+  .hud-cell.is-cr > b {
+    animation: cr-take 0.5s ease-out;
+  }
+}
+
+@keyframes cr-take {
+  0% {
+    color: #f4f0e6;
+    text-shadow: 0 0 10px rgba(244, 240, 230, 0.55);
+  }
+  100% {
+    color: var(--color-fg);
+    text-shadow: none;
+  }
+}
+
 .hud em,
 .hud small {
   color: var(--color-muted);
@@ -167,12 +217,37 @@
 .hud em {
   color: var(--color-fg);
   margin-left: auto;
+  padding-left: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font: 600 0.72rem/1 var(--font-sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
+/* A six-figure score on a small phone: give the strip the room and let the
+   mode nameplate go. The intro already said which mode this is. */
+@media (max-width: 359px) {
+  .hud {
+    gap: 7px;
+  }
+  .hud em {
+    display: none;
+  }
+  .hud-pause {
+    margin-left: auto;
+  }
+  .hud-cell > b {
+    font-size: 0.82rem;
+  }
+  .hud-cell.is-score > b {
+    font-size: 0.95rem;
+  }
+}
+
 .hud-pause {
+  flex: none;
   min-height: 32px;
   padding: 0 12px;
   border: 0;
@@ -963,6 +1038,16 @@
   text-align: center;
   font: 600 0.58rem/1 var(--font-mono);
   color: var(--color-muted);
+}
+
+/* The count jumps by seven when the bag refills, so it says what it counts. */
+.bag-strip b span {
+  display: block;
+  margin-top: 2px;
+  font: 500 0.48rem/1 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-faint);
 }
 
 .bag-strip.is-fill i {
