@@ -1375,7 +1375,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 40px;
   min-width: 0;
   padding: 0 6px;
@@ -1388,16 +1388,25 @@
 }
 
 .mode-chips button:first-child {
-  flex: 1.45 1 0;
+  flex-grow: 1.45;
 }
 
 .mode-chips button.is-more {
-  flex: 0.85 1 0;
+  flex-grow: 0.85;
 }
 
 .mode-chips button span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Daily carries a name and a date, so stack them instead of splitting the chip. */
+.mode-chips button .chip-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
 .mode-chips button .chip-date {
