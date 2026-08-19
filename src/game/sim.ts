@@ -120,6 +120,8 @@ export type InputFrame = {
   das?: number;
   arr?: number;
   sdf?: number;
+  /** Hold the clock, gravity and the lock timer. The player still moves. */
+  freeze?: boolean;
 };
 
 export type StepEvent =
@@ -758,7 +760,7 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   if (sim.phase === "over" || sim.phase === "paused" || sim.phase === "title") {
     return "none";
   }
-  if (sim.phase === "playing") {
+  if (sim.phase === "playing" && !input.freeze) {
     sim.clock += capped;
     if (sim.timeLeft != null) {
       sim.timeLeft -= capped;
@@ -822,6 +824,7 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   if (!grounded(sim, sim.piece)) {
     sim.lockT = 0;
     const slid = input.justLeft || input.justRight || Math.abs(input.nudge) > 0;
+    if (input.freeze) return slid ? "move" : "none";
     sim.gravityAcc += capped;
     let ev: StepEvent = slid ? "move" : "none";
     while (sim.piece && sim.gravityAcc >= g) {
@@ -838,6 +841,7 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   }
 
   sim.gravityAcc = 0;
+  if (input.freeze) return "none";
   sim.lockT += capped;
   if (sim.lockT >= LOCK_DELAY) {
     const r = lockPiece(sim);
