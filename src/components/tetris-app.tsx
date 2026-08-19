@@ -363,7 +363,8 @@ export function TetrisApp() {
     recap: null,
     tip: null,
     bagLine: false,
-    offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
+    // Only the browser knows whether the line is up. A server guess ships a title that reads as dead.
+    offline: false,
     finesseN: 0,
     finesseClean: 0,
     pred: null,
@@ -2124,7 +2125,7 @@ export function TetrisApp() {
           <h1 className="logo">Stack</h1>
           {ui.offline && (
             <p className="off-mark" aria-live="polite">
-              Radio off
+              No signal
             </p>
           )}
           {ui.phase === "title" && (
