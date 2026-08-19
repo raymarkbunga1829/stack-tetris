@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bomb, Coins, Hourglass, Layers, Shield, Sparkles, X, Zap } from "lucide-react";
 import {
   POWERS,
@@ -19,6 +19,7 @@ type Props = {
   open: boolean;
   credits: number;
   buying: string | null;
+  want?: PowerId | null;
   onClose: () => void;
   onBuyCredits: (sku: Sku) => void;
   onBuyPower: (id: PowerId) => void;
@@ -28,11 +29,15 @@ export function ShopSheet({
   open,
   credits,
   buying,
+  want,
   onClose,
   onBuyCredits,
   onBuyPower,
 }: Props) {
   const [tab, setTab] = useState<"iap" | "ops">("iap");
+  useEffect(() => {
+    if (open && want) setTab("ops");
+  }, [open, want]);
   if (!open) return null;
 
   return (
@@ -99,8 +104,9 @@ export function ShopSheet({
           <ul className="shop-list">
             {POWERS.map((p) => {
               const Icon = ICO[p.id];
+              const short = credits < p.cost;
               return (
-                <li key={p.id}>
+                <li key={p.id} className={want === p.id ? "is-want" : undefined}>
                   <Icon size={18} className="shop-ico" aria-hidden />
                   <div>
                     <p className="shop-name">{p.name}</p>
@@ -108,10 +114,15 @@ export function ShopSheet({
                   </div>
                   <button
                     type="button"
-                    className="shop-buy"
+                    className={`shop-buy${short ? " is-short" : ""}`}
                     data-qa={`buy-${p.id}`}
-                    disabled={credits < p.cost || buying !== null}
-                    onClick={() => onBuyPower(p.id)}
+                    disabled={buying !== null}
+                    aria-label={
+                      short
+                        ? `${p.name}, ${p.cost} CR, get more credits`
+                        : `Buy ${p.name} for ${p.cost} CR`
+                    }
+                    onClick={() => (short ? setTab("iap") : onBuyPower(p.id))}
                   >
                     {p.cost} CR
                   </button>
