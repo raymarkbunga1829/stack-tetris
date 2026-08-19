@@ -213,6 +213,11 @@ function forceCoach() {
   return new URLSearchParams(window.location.search).has("coach");
 }
 
+function radioLabel(music: number, sfx: number): string {
+  if (music > 0) return "Radio on";
+  return sfx > 0 ? "Radio low" : "Radio off";
+}
+
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
   const nav = window.navigator as Navigator & { standalone?: boolean };
@@ -2764,8 +2769,8 @@ export function TetrisApp() {
           <button type="button" className="icon-btn" onClick={openBoard} aria-label="Scores">
             Scores
           </button>
-          <button type="button" className="icon-btn" onClick={toggleMute} aria-label="Sound">
-            {ui.musicVol > 0 ? "Quiet" : ui.sfxVol > 0 ? "Sound" : "Muted"}
+          <button type="button" className="icon-btn" onClick={toggleMute}>
+            {radioLabel(ui.musicVol, ui.sfxVol)}
           </button>
         </footer>
         {!ui.standalone && !saveRef.current.a2hs && ui.phase === "title" && (
