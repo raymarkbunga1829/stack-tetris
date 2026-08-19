@@ -72,13 +72,15 @@ export function ModeChips({
           onClick={() => onPick(m.id)}
         >
           <i aria-hidden="true" />
-          <span>{CHIP_NAME[m.id] ?? m.name}</span>
-          {m.id === "daily" && (
-            <small className="chip-date">
-              {formatManilaDate(today)}
-              {days > 1 ? ` · ${days}` : ""}
-            </small>
-          )}
+          <span className="chip-label">
+            <span className="chip-name">{CHIP_NAME[m.id] ?? m.name}</span>
+            {m.id === "daily" && (
+              <small className="chip-date">
+                {formatManilaDate(today)}
+                {days > 1 ? ` · ${days}` : ""}
+              </small>
+            )}
+          </span>
         </button>
       ))}
       <button
