@@ -1266,8 +1266,6 @@
 .cabinet.is-play .mode-chips,
 .cabinet.is-play .a2hs,
 .cabinet.is-play .foot,
-.cabinet.is-play .modes,
-.cabinet.is-play .missions,
 .cabinet.is-play .marquee,
 .cabinet.is-over .mode-chips,
 .cabinet.is-over .a2hs,
@@ -1280,7 +1278,6 @@
 .cabinet.is-paused .pad,
 .cabinet.is-paused .powers,
 .cabinet.is-paused .siege,
-.cabinet.is-paused .missions,
 .cabinet.is-paused .mode-chips,
 .cabinet.is-paused .foot {
   visibility: hidden;
@@ -1302,7 +1299,6 @@
   grid-template-rows: auto minmax(0, 1fr) auto auto auto;
 }
 
-.cabinet.is-paused .modes,
 .cabinet.is-paused .foot {
   display: none;
 }
@@ -2236,7 +2232,6 @@ html.is-ios .help-android {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
-  .cabinet.is-paused .modes,
   .cabinet.is-paused .foot {
     display: none;
   }
