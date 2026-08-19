@@ -2238,6 +2238,7 @@ html.is-ios .help-android {
     grid-row: 2;
   }
   .cabinet:not(.is-play) {
+    width: min(620px, calc(100vw - 28px));
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   }
@@ -2276,16 +2277,16 @@ html.is-ios .help-android {
   display: none;
 }
 
+/* The title has no pad or powers to park in a side column, so on a desk the
+   cabinet stays one column and the rails hug a screen-shaped well. */
 @media (min-width: 1024px) {
-  .cabinet.is-keys:not(.is-play):not(.is-paused) {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  .cabinet:not(.is-play) .stage {
+    grid-template-columns: 64px auto 64px;
+    justify-content: center;
   }
-}
-
-@media (min-width: 1024px) and (min-height: 700px) {
-  .cabinet.is-keys:not(.is-play):not(.is-paused) {
-    width: min(1100px, calc(100vw - 28px));
-    height: min(900px, calc(100dvh - 24px));
+  .cabinet:not(.is-play) .well {
+    height: 100%;
+    aspect-ratio: 1 / 2;
   }
 }
 
