@@ -2759,12 +2759,68 @@ html.is-ios .help-android {
   animation: well-breath 1.15s ease-in-out infinite, siren-sweep 0.88s ease-in-out infinite;
 }
 
+/* The last rows before the lid: same siren, twice as urgent. */
+.cabinet.is-brink .well {
+  animation: well-breath 0.58s ease-in-out infinite, siren-sweep 0.44s ease-in-out infinite;
+}
+
 @keyframes siren-sweep {
   50% {
     box-shadow:
       inset 0 0 0 5px #c45a5a,
       0 0 22px rgba(196, 70, 70, 0.4);
   }
+}
+
+.cabinet.is-topout .well {
+  animation: topout-rim 1.25s ease-out forwards;
+}
+
+@keyframes topout-rim {
+  0% {
+    box-shadow:
+      inset 0 0 0 10px #e8503c,
+      0 0 40px rgba(232, 80, 60, 0.7);
+  }
+  100% {
+    box-shadow: inset 0 0 0 8px var(--bezel, #2a2e3a);
+  }
+}
+
+.banner.is-topout {
+  top: 52%;
+  font-size: 1.3rem;
+  white-space: nowrap;
+  color: #ffd8cf;
+  background: color-mix(in oklab, #40100c 68%, transparent);
+  border-color: color-mix(in oklab, #e8503c 55%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .banner.is-topout {
+    animation: topout-word 1.25s ease-out both;
+  }
+}
+
+@keyframes topout-word {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.28);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.veil-hint.is-cause {
+  color: color-mix(in oklab, #e8907c 78%, var(--color-fg));
 }
 
 .stamp {
@@ -2831,7 +2887,8 @@ html.is-ios .help-android {
   }
 }
 
-.cabinet.is-danger .well::before {
+.cabinet.is-danger .well::before,
+.cabinet.is-topout .well::before {
   content: "";
   position: absolute;
   left: 0;
@@ -2841,6 +2898,26 @@ html.is-ios .help-android {
   z-index: 2;
   pointer-events: none;
   background: linear-gradient(to bottom, rgba(180, 40, 40, 0.38), transparent);
+}
+
+.cabinet.is-brink .well::before {
+  height: 48%;
+  background: linear-gradient(to bottom, rgba(214, 52, 42, 0.58), transparent);
+}
+
+.cabinet.is-topout .well::before {
+  height: 100%;
+  background: linear-gradient(to bottom, rgba(214, 52, 42, 0.62), rgba(120, 24, 20, 0.18));
+  animation: topout-wash 1.25s ease-out forwards;
+}
+
+@keyframes topout-wash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .siege {

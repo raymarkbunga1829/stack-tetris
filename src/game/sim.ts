@@ -17,6 +17,7 @@ import {
   ROWS,
   T_SPIN_MINI_SCORE,
   T_SPIN_SCORE,
+  VISIBLE_ROWS,
   type Cell,
   type Phase,
   type PieceId,
@@ -85,6 +86,7 @@ export type Sim = {
   omenFalse: boolean;
   curseLeft: number;
   irsReady: boolean;
+  toppedOut: boolean;
 };
 
 export type ZenUndo = {
@@ -252,6 +254,7 @@ export function createSim(opts: NewGame = {}): Sim {
     omenFalse: false,
     curseLeft: 0,
     irsReady: true,
+    toppedOut: false,
   };
   fillBag(sim);
   sim.next = sim.bag.slice(0, 5);
@@ -365,6 +368,7 @@ function spawn(sim: Sim, id: PieceId): boolean {
     if (!fits(sim.board, piece)) {
       sim.piece = piece;
       sim.phase = "over";
+      sim.toppedOut = true;
       return false;
     }
   }
@@ -857,11 +861,24 @@ function boardEmpty(board: Board): boolean {
   return true;
 }
 
-export function inDanger(sim: Sim): boolean {
-  for (let y = HIDDEN_ROWS; y < HIDDEN_ROWS + 6; y++) {
-    if (sim.board[y]!.some((c) => c !== null)) return true;
+export const DANGER_ROWS = 6;
+export const BRINK_ROWS = 3;
+
+/** Empty rows left between the top of the stack and the lip of the well. */
+export function headroom(sim: Sim): number {
+  for (let y = HIDDEN_ROWS; y < ROWS; y++) {
+    if (sim.board[y]!.some((c) => c !== null)) return y - HIDDEN_ROWS;
   }
-  return false;
+  return VISIBLE_ROWS;
+}
+
+export function inDanger(sim: Sim): boolean {
+  return headroom(sim) < DANGER_ROWS;
+}
+
+/** The last rows, where the next unlucky piece ends the run. */
+export function onBrink(sim: Sim): boolean {
+  return headroom(sim) < BRINK_ROWS;
 }
 
 export function dirtyRows(sim: Sim, max: number): number[] {

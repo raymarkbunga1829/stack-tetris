@@ -10,8 +10,20 @@ export function nameRun(opts: {
   tspins?: number;
   perfects: number;
   extras?: number;
+  toppedOut?: boolean;
 }): string {
-  const { mode, won, combo, stacks, tspins = 0, perfects, extras, lines, score } = opts;
+  const {
+    mode,
+    won,
+    combo,
+    stacks,
+    tspins = 0,
+    perfects,
+    extras,
+    lines,
+    score,
+    toppedOut = false,
+  } = opts;
   if (perfects > 0 && stacks > 0) return "The Empty Cathedral";
   if (perfects > 0) return "A Clean Moon";
   if (mode === "sprint" && won && (extras === 0 || combo >= 4)) return "The Quiet Forty";
@@ -35,6 +47,12 @@ export function nameRun(opts: {
   if (stacks >= 1) return "A Tetris";
   if (combo >= 6) return "The Long Chain";
   if (score >= 20000) return "A Loud Well";
+  // A run that ends at the ceiling was never soft, whatever the line count says.
+  if (!won && toppedOut) {
+    if (lines === 0) return "Buried Before a Line";
+    if (lines < 8) return "Up to the Rim";
+    return "The Well Filled";
+  }
   if (!won && lines === 0) return score > 0 ? "A Soft Fall" : "Nothing Landed";
   if (!won && lines < 8) return "A Short Fall";
   if (!won) return "Left in the Pit";
