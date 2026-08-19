@@ -826,6 +826,16 @@ export function TetrisApp() {
       }
     }
 
+    // Keys count as the taught gesture too, or the coach never lets the well go.
+    if (u.coach) {
+      if (just.left) advanceCoach("left");
+      else if (just.right) advanceCoach("right");
+      else if (just.cw || just.flip) advanceCoach("cw");
+      else if (just.ccw) advanceCoach("ccw");
+      else if (just.hold) advanceCoach("hold");
+      else if (just.hard) advanceCoach("hard");
+    }
+
     const falling = sim.piece;
     const ghostAt = falling ? ghostY(sim) : 0;
     const ev = advance(sim, dt, {
