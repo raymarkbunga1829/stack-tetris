@@ -395,6 +395,7 @@ export function TetrisApp() {
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const [buying, setBuying] = useState<string | null>(null);
+  const [want, setWant] = useState<PowerId | null>(null);
   const [viewW, setViewW] = useState(() => (typeof window === "undefined" ? 390 : window.innerWidth));
   const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
   const finesseN = useRef(0);
@@ -1687,8 +1688,9 @@ export function TetrisApp() {
     syncUi({ musicVol: music, sfxVol: sfx, muted });
   }
 
-  function openShop() {
+  function openShop(wanted: PowerId | null = null) {
     unlockAudio();
+    setWant(wanted);
     if (simRef.current?.phase === "playing") {
       simRef.current.phase = "paused";
       setMusicPaused(true);
@@ -1699,6 +1701,7 @@ export function TetrisApp() {
   }
 
   function closeShop() {
+    setWant(null);
     syncUi({ shop: false });
   }
 
@@ -1747,6 +1750,22 @@ export function TetrisApp() {
       slow: sim.slowT > 0,
       shield: sim.shield,
     });
+  }
+
+  /** Tapping an empty slot on the bar: spend credits on the spot, or go get some. */
+  function stockPower(id: PowerId) {
+    unlockAudio();
+    const next = buyWithCredits(saveRef.current, id);
+    if (!next) {
+      openShop(id);
+      return;
+    }
+    saveRef.current = next;
+    writeSave(next);
+    sfxSelect();
+    haptic("select");
+    flashBanner(`${id.toUpperCase()} +1`);
+    syncUi({ credits: next.credits, inv: next.inv });
   }
 
   function chooseNext(index: number) {
@@ -2664,9 +2683,11 @@ export function TetrisApp() {
           powersAllowed(ui.mode) && (
             <PowerBar
               inv={ui.inv}
+              credits={ui.credits}
               shieldOn={ui.shield}
               slowOn={ui.slow}
               onUse={usePower}
+              onBuy={stockPower}
               pickOn={ui.picking}
             />
           )
@@ -2758,7 +2779,7 @@ export function TetrisApp() {
         )}
 
         <footer className="foot">
-          <button type="button" className="icon-btn" onClick={openShop} aria-label="Store" data-qa="open-shop">
+          <button type="button" className="icon-btn" onClick={() => openShop()} aria-label="Store" data-qa="open-shop">
             Store
           </button>
           <button type="button" className="icon-btn" onClick={openSettings} aria-label="Settings">
@@ -2806,6 +2827,7 @@ export function TetrisApp() {
           open={ui.shop}
           credits={ui.credits}
           buying={buying}
+          want={want}
           onClose={closeShop}
           onBuyCredits={onBuySku}
           onBuyPower={onBuyPower}

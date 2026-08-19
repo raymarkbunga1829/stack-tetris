@@ -1645,8 +1645,31 @@
   color: var(--color-muted);
 }
 
-.pwr:disabled {
-  opacity: 0.38;
+/* An empty slot is stock you can still buy, so it wears a price tag, not a corpse. */
+.pwr.is-empty {
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in oklab, var(--color-fg) 6%, #1b1f28) 0%,
+      #12151c 100%
+    );
+  color: var(--color-muted);
+  outline: 1px dashed color-mix(in oklab, var(--color-fg) 34%, transparent);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+.pwr-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+  color: var(--color-fg);
+}
+
+.pwr-cost i {
+  font: 600 0.44rem/1 var(--font-sans);
+  letter-spacing: 0.06em;
+  color: var(--color-faint);
 }
 
 .pwr.is-lit {
@@ -1811,6 +1834,18 @@
 
 .shop-buy:disabled {
   opacity: 0.45;
+}
+
+/* Short on credits is not a dead end: the price still shows, the tap goes for CR. */
+.shop-buy.is-short {
+  background: var(--color-raised);
+  color: var(--color-muted);
+  border-color: var(--color-line);
+}
+
+.shop-list li.is-want {
+  border-color: color-mix(in oklab, var(--color-fg) 45%, var(--color-line));
+  background: color-mix(in oklab, var(--color-fg) 6%, var(--color-raised));
 }
 
 .shop-note {

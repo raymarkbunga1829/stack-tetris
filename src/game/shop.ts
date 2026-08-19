@@ -69,6 +69,10 @@ export const SKUS: Sku[] = [
   },
 ];
 
+export function costOf(power: PowerId): number {
+  return POWERS.find((p) => p.id === power)?.cost ?? 0;
+}
+
 export function emptyInv(): Inventory {
   return { zap: 0, slow: 0, shield: 0, quake: 0, pick: 1 };
 }
