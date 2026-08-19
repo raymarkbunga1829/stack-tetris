@@ -555,6 +555,8 @@ let musicTight = false;
 let sirenId = 0;
 
 export function setMusicTension(on: boolean) {
+  // The well says "danger" every frame it is in danger, and a honk per frame is a drone, not a siren.
+  if (on === musicTight && (!on || sirenId)) return;
   musicTight = on;
   if (sirenId) {
     clearInterval(sirenId);
