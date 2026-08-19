@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  armAudio,
   resumeAudio,
   setMix,
   setMuted,
@@ -438,6 +439,7 @@ export function TetrisApp() {
 
   useEffect(() => {
     setMix({ music: saveRef.current.musicVol, sfx: saveRef.current.sfxVol });
+    armAudio();
     setHaptic(saveRef.current.haptic);
     setUi((p) => ({
       ...p,
