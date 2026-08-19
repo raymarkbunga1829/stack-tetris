@@ -65,7 +65,9 @@ import {
   dirtyRows,
   dragPiece,
   ghostY,
+  headroom,
   inDanger,
+  onBrink,
   pauseToggle,
   pickFromNext,
   predictCollision,
@@ -184,6 +186,7 @@ type Ui = {
   failing: boolean;
   live: PieceId | null;
   danger: boolean;
+  brink: boolean;
   bag: PieceId[];
   canHold: boolean;
   canUndo: boolean;
@@ -200,6 +203,7 @@ type Ui = {
   cinema: boolean;
   handoff: PieceId | null;
   epitaph: string | null;
+  cause: string | null;
   siege: import("@/game/siege").SiegeSnap | null;
 };
 
@@ -294,6 +298,7 @@ export function TetrisApp() {
   const b2bSeen = useRef(false);
   const failT = useRef(0);
   const dying = useRef(false);
+  const dangerSaid = useRef(false);
   const holdPeekT = useRef(0);
 
   const [ui, setUi] = useState<Ui>({
@@ -360,6 +365,7 @@ export function TetrisApp() {
     failing: false,
     live: null,
     danger: false,
+    brink: false,
     bag: [],
     canHold: true,
     canUndo: false,
@@ -376,6 +382,7 @@ export function TetrisApp() {
     cinema: false,
     handoff: null,
     epitaph: null,
+    cause: null,
     siege: null,
   });
   const uiRef = useRef(ui);
@@ -613,6 +620,7 @@ export function TetrisApp() {
     b2bSeen.current = false;
     dying.current = false;
     failT.current = 0;
+    dangerSaid.current = false;
     holdPeekT.current = 0;
     finesseN.current = 0;
     finesseClean.current = 0;
@@ -689,9 +697,11 @@ export function TetrisApp() {
       takeover: 0,
       cinema: false,
       epitaph: null,
+      cause: null,
       siege: siegeRef.current ? snapshotSiege(siegeRef.current) : null,
       live: sim.piece?.id ?? null,
       danger: false,
+      brink: false,
       bag: sim.bag.slice(),
       canHold: true,
       canUndo: false,
@@ -713,9 +723,11 @@ export function TetrisApp() {
       watching: false,
       failing: false,
       danger: false,
+      brink: false,
       live: null,
       recap: null,
       epitaph: null,
+      cause: null,
       coinTake: false,
       intro: null,
     });
@@ -738,6 +750,7 @@ export function TetrisApp() {
       watching: true,
       failing: false,
       danger: false,
+      brink: false,
       live: null,
     });
   }
@@ -909,6 +922,12 @@ export function TetrisApp() {
     }
     const live = sim.piece?.id ?? null;
     const danger = sim.phase === "playing" && inDanger(sim);
+    const brink = danger && onBrink(sim);
+    // Nothing dies in Zen, so Zen is not told it is about to.
+    if (danger && !dangerSaid.current && sim.mode !== "zen") {
+      dangerSaid.current = true;
+      flashBanner("The well is filling.");
+    }
     if (live && live !== u.live && u.phase === "playing") {
       syncUi({ handoff: live });
       window.setTimeout(() => {
@@ -922,12 +941,14 @@ export function TetrisApp() {
     if (
       live !== u.live ||
       danger !== u.danger ||
+      brink !== u.brink ||
       sim.canHold !== u.canHold ||
       !!sim.undo !== u.canUndo
     ) {
       syncUi({
         live,
         danger,
+        brink,
         bag: sim.bag.slice(),
         canHold: sim.canHold,
         canUndo: !!sim.undo,
@@ -1053,12 +1074,7 @@ export function TetrisApp() {
         flashBanner(sim.won && sim.mode === "sprint" ? "CLEAR" : "TIME");
         finishRun(sim);
       } else if (!dying.current) {
-        dying.current = true;
-        sfxOver();
-        haptic("over");
-        well3dRef.current?.failBeat();
-        failT.current = 0.9;
-        syncUi({ failing: true });
+        beginFail(sim);
       }
     }
 
@@ -1072,7 +1088,7 @@ export function TetrisApp() {
       syncUi({ credits: saveRef.current.credits });
     }
 
-    if (sim.phase === "playing") setMusicTension(sim.mode === "classic" && inDanger(sim));
+    if (sim.phase === "playing") setMusicTension(sim.mode !== "zen" && danger);
     const siege = siegeRef.current;
     if (siege && sim.mode === "siege" && sim.phase === "playing") {
       tickSiege(siege, dt, inDanger(sim));
@@ -1212,6 +1228,18 @@ export function TetrisApp() {
     return 0;
   }
 
+  /** The well gets a beat to show what buried it before the card comes up. */
+  function beginFail(sim: Sim) {
+    dying.current = true;
+    setMusicTension(false);
+    sfxOver();
+    haptic("over");
+    well3dRef.current?.failBeat(HIDDEN_ROWS + headroom(sim));
+    shakeRef.current = Math.max(shakeRef.current, 9);
+    failT.current = 1.25;
+    syncUi({ failing: true, danger: false, brink: false });
+  }
+
   function finishRun(sim: Sim) {
     stopMusic();
     saveRef.current = recordRun(saveRef.current, {
@@ -1259,6 +1287,7 @@ export function TetrisApp() {
       tspins: sim.tspins,
       perfects: sim.perfects,
       extras: sim.mode === "finesse" ? finesseExtras.current : undefined,
+      toppedOut: sim.toppedOut,
     });
     let themes = saveRef.current.themes.slice();
     if (sim.perfects > 0 && !themes.includes("citrine")) themes = [...themes, "citrine"];
@@ -1278,11 +1307,13 @@ export function TetrisApp() {
       coinTake: true,
       streak: saveRef.current.streak,
       danger: false,
+      brink: false,
       live: null,
       high: saveRef.current.high,
       won: sim.won,
       clock: sim.clock,
       epitaph,
+      cause: sim.toppedOut ? "The stack reached the top of the well." : null,
       sprintBest: saveRef.current.sprintBest,
       recap: {
         mode: sim.mode,
@@ -1416,10 +1447,7 @@ export function TetrisApp() {
       }
       if (live?.piece) pieceBorn.current = { x: live.piece.x, slides: 0, rots: 0 };
       if (ev === "over") {
-        dying.current = true;
-        well3dRef.current?.failBeat();
-        failT.current = 0.9;
-        syncUi({ failing: true });
+        if (live) beginFail(live);
       } else {
         syncUi();
       }
@@ -1901,6 +1929,7 @@ export function TetrisApp() {
         phase: "title",
         recap: null,
         epitaph: null,
+        cause: null,
         watching: false,
         failing: false,
         coinTake: false,
@@ -2070,7 +2099,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${viewW < 720 ? " is-narrow" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${viewW < 720 ? " is-narrow" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -2283,7 +2312,9 @@ export function TetrisApp() {
                       if (simRef.current) {
                         simRef.current.phase = "playing";
                         setMusicPaused(false);
-                        setMusicTension(simRef.current.mode === "classic" && inDanger(simRef.current));
+                        setMusicTension(
+                          simRef.current.mode !== "zen" && inDanger(simRef.current),
+                        );
                         syncUi({ phase: "playing" });
                       }
                     }}
@@ -2403,6 +2434,7 @@ export function TetrisApp() {
                         : ""}
                   </p>
                 )}
+                {ui.cause && <p className="veil-hint is-cause">{ui.cause}</p>}
                 {ui.tip && <p className="veil-hint">{ui.tip}</p>}
                 {ui.recap && (
                   <ul className="recap">
@@ -2574,6 +2606,11 @@ export function TetrisApp() {
             )}
             {ui.banner && ui.phase === "playing" && (
               <p className={`banner is-${bannerKind.current}`}>{ui.banner}</p>
+            )}
+            {ui.failing && (
+              <p className="banner is-big is-topout" aria-live="assertive">
+                Topped out
+              </p>
             )}
             {ui.gesture && ui.phase === "playing" && (
               <p className="gchip">{ui.gesture}</p>

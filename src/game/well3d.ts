@@ -7,7 +7,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { cellsOf } from "./pieces";
 import { fitDpr } from "./device";
-import { ghostY, inDanger, type Sim } from "./sim";
+import { DANGER_ROWS, ghostY, headroom, type Sim } from "./sim";
 import type { Theme } from "./themes";
 import type { PowerId } from "./shop";
 import { COLS, HIDDEN_ROWS, ROWS, VISIBLE_ROWS, CLEAR_TIME, LOCK_DELAY, PIECE_IDS, type PieceId } from "./types";
@@ -83,7 +83,7 @@ export type Well3d = {
   perfectBurst: () => void;
   softTrail: (piece: { id: PieceId; rot: number; x: number; y: number }, hexCol: string) => void;
   teachTrail: (cells: { x: number; y: number }[], hexCol: string) => void;
-  failBeat: () => void;
+  failBeat: (overflowRow?: number) => void;
   clientToCell: (
     rect: DOMRect,
     clientX: number,
@@ -678,7 +678,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     quakeT = Math.max(0, quakeT - dt * 2.4);
     pickT = Math.max(0, pickT - dt * 3.2);
     pcT = Math.max(0, pcT - dt * 1.8);
-    failT = Math.max(0, failT - dt * 1.15);
+    failT = Math.max(0, failT - dt * 0.8);
     teachT = Math.max(0, teachT - dt * 1.15);
     stepSparks(dt);
     stepShards(dt);
@@ -877,16 +877,29 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     } else zapMesh.visible = false;
 
     const paused = sim?.phase === "paused";
-    const danger = !!sim && sim.phase === "playing" && inDanger(sim);
+    // 0 while there is room, 1 when the stack is at the lip.
+    const heat =
+      sim && sim.phase === "playing"
+        ? Math.max(0, Math.min(1, (DANGER_ROWS - headroom(sim)) / DANGER_ROWS))
+        : 0;
+    const danger = heat > 0;
+    const dying = failT > 0 && sim?.phase === "over";
     if (paused) {
       dangerVeil.visible = true;
       dangerMat.color.set(0x07080c);
       dangerMat.opacity = 0.42;
+    } else if (dying) {
+      // The red does not blink out at the moment it was finally right.
+      dangerVeil.visible = true;
+      dangerMat.color.set(0xd8402c);
+      dangerMat.opacity = 0.34 * failT;
     } else {
       dangerMat.color.set(0xc23a3a);
       dangerVeil.visible = danger;
       if (danger) {
-        dangerMat.opacity = 0.07 + 0.05 * (0.5 + 0.5 * Math.sin(now * 0.008));
+        const beat = 0.008 + heat * 0.014;
+        dangerMat.opacity =
+          0.05 + heat * 0.12 + (0.03 + heat * 0.06) * (0.5 + 0.5 * Math.sin(now * beat));
       }
     }
 
@@ -904,9 +917,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (paused) {
       shaft.color.set(0x8a8c94);
       shaft.intensity = 6;
+    } else if (dying) {
+      shaft.color.set(0xff5040);
+      shaft.intensity = (lushShaft ? 22 : 12) * failT;
     } else if (danger) {
       shaft.color.set(0xff6a5a);
-      shaft.intensity = lushShaft ? 18 : 9;
+      shaft.intensity = (lushShaft ? 18 : 9) * (0.55 + heat * 0.45);
     } else if (slowOn) {
       shaft.color.set(0xffe0a0);
       shaft.intensity = lushShaft ? 16 : 8;
@@ -1279,9 +1295,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     while (streakList.length > MAX_STREAK) streakList.shift();
   }
 
-  function failBeat() {
+  /** `overflowRow` is the board row the stack died on, so the sparks land there. */
+  function failBeat(overflowRow?: number) {
     failT = 1;
     punchCam(0.55);
+    nod(0.6);
+    if (overflowRow != null) sparkRows([overflowRow], "#ff6a5a");
   }
 
   function perfectBurst() {
