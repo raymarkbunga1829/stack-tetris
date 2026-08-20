@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type HoldKey = "left" | "right" | "down";
 
@@ -39,6 +39,26 @@ const ICO = {
 export function TouchPad({ onHold, onCw, onCcw, onFlip, onHard, onHoldPiece, onUndo, slam = 0, spent = false, dropAsk = false }: Props) {
   const [down, setDown] = useState<Partial<Record<HoldKey, boolean>>>({});
   const held = useRef<Set<HoldKey>>(new Set());
+  const hard = useRef<HTMLButtonElement | null>(null);
+
+  /**
+   * Rewind the slam flash without handing the pad a new Drop button.
+   *
+   * The flash used to restart the honest CSS way, by remounting the button on
+   * every lock, and a fresh node runs the animation from the top. But a lock is
+   * exactly when a thumb is coming down on Drop, and a phone aims a touch before
+   * it delivers it: the pointer arrives at the node the screen was showing, so
+   * the tap lands on a button React has already thrown away and the piece never
+   * slams. The node stays put now and the animation goes back to the start.
+   */
+  useEffect(() => {
+    if (!slam) return;
+    for (const a of hard.current?.getAnimations?.() ?? []) {
+      if ((a as CSSAnimation).animationName !== "drop-slam") continue;
+      a.currentTime = 0;
+      a.play();
+    }
+  }, [slam]);
 
   const startHold = useCallback(
     (key: HoldKey) => (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -169,7 +189,7 @@ export function TouchPad({ onHold, onCw, onCcw, onFlip, onHard, onHoldPiece, onU
         ) : null}
         <button
           type="button"
-          key={slam}
+          ref={hard}
           className={`pad-btn pad-hard${slam ? " is-slam" : ""}${dropAsk ? " is-ask" : ""}`}
           aria-label="Hard drop"
           data-qa="pad-hard"
