@@ -1759,8 +1759,15 @@
     0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
+/*
+ * A glyph is not a name. On a phone the pad is the only place a power says what
+ * it is, and an owned one used to read as a bare "1", so the label rides along
+ * at every width: one line, kept inside the pad.
+ */
 .pwr span {
-  display: none;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .pwr b {
@@ -2292,8 +2299,7 @@ html.is-ios .help-android {
   .pad-btn {
     min-height: 56px;
   }
-  .pad-btn span,
-  .pwr span {
+  .pad-btn span {
     display: block;
   }
   .help {
