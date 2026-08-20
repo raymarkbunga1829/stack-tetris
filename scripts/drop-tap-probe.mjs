@@ -64,7 +64,8 @@ const watchPad = () =>
     }).observe(act, { childList: true, subtree: true });
   });
 
-const padChurn = () => page.evaluate(() => ({ swaps: window.__pad.swaps, gone: !window.__pad.node }));
+const padChurn = () =>
+  page.evaluate(() => ({ swaps: window.__pad.swaps, gone: !window.__pad.node }));
 
 const look = () =>
   page.evaluate(() => ({
@@ -144,7 +145,12 @@ results.queued = await page.evaluate(async () => {
   const locked = t.getScore();
   const live = document.querySelector('[data-qa="pad-hard"]');
   aimed.dispatchEvent(
-    new PointerEvent("pointerdown", { pointerId: 7, isPrimary: true, bubbles: true, cancelable: true }),
+    new PointerEvent("pointerdown", {
+      pointerId: 7,
+      isPrimary: true,
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   await new Promise((r) => setTimeout(r, 140));
   return {
@@ -187,7 +193,8 @@ if (results.keys.swaps)
 
 if (results.queued.replaced)
   fail.push("a lock swapped the Drop node the phone had already aimed a touch at");
-if (!results.queued.attached) fail.push("the Drop node a touch was aimed at is no longer in the page");
+if (!results.queued.attached)
+  fail.push("the Drop node a touch was aimed at is no longer in the page");
 if (!results.queued.slammed)
   fail.push("a tap that landed during a lock was swallowed — the next piece did not slam");
 
