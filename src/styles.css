@@ -1812,6 +1812,15 @@
   background: color-mix(in oklab, var(--color-bg) 92%, #000);
 }
 
+/*
+ * Modes is a short sheet, so an opaque veil over it is a black wall where the
+ * well used to be. The cabinet stays lit behind a scrim instead: the stack you
+ * paused, the Paused card, still there while you read the list.
+ */
+.shop-veil.is-modes {
+  background: color-mix(in oklab, var(--color-bg) 32%, transparent);
+}
+
 @media (min-width: 1024px) {
   .shop-veil {
     place-items: center;
