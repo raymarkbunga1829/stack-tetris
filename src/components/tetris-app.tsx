@@ -2886,7 +2886,7 @@ export function TetrisApp() {
           onBuyPower={onBuyPower}
         />
         {ui.modesOpen && (
-          <div className="shop-veil" role="dialog" aria-label="Modes">
+          <div className="shop-veil is-modes" role="dialog" aria-label="Modes">
             <div className="shop">
               <header className="shop-top">
                 <div>
