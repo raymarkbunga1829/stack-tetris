@@ -968,6 +968,44 @@
   }
 }
 
+/* A paid daily goal: the name in the player's own words, the money under it.
+   Takes the banner's slot in the well, since that is where the cabinet talks. */
+.banner.is-goal {
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  /* Half the well is all a left: 50% pill is offered, and a goal has a name to fit. */
+  width: max-content;
+  max-width: 84%;
+  padding: 9px 16px;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--color-bg) 82%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-fg) 26%, transparent);
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: center;
+}
+
+/* A goal outlasts a flash, so the flash steps down instead of printing over it. */
+.banner.is-goal ~ .banner:not(.is-goal):not(.is-topout) {
+  top: 54%;
+}
+
+.banner.is-goal b {
+  font: 700 0.95rem/1.15 var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.banner.is-goal em {
+  font: 600 0.62rem/1 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-style: normal;
+  color: var(--color-muted);
+}
+
 .gchip {
   position: absolute;
   left: 50%;
@@ -2024,6 +2062,17 @@
   gap: 8px;
   color: var(--color-muted);
   font: 500 0.68rem/1.3 var(--font-sans);
+}
+
+.missions li span {
+  flex: 1;
+  min-width: 0;
+}
+
+.missions li em {
+  color: var(--color-faint);
+  font-style: normal;
+  white-space: nowrap;
 }
 
 .missions li.is-done {
