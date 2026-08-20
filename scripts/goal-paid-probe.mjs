@@ -186,6 +186,7 @@ const fail = [];
 const paidWell = ({ before, paid }, where) => {
   if (before.card) fail.push(`${where}: a goal card was already up before the park`);
   if (before.credits !== 80) fail.push(`${where}: the run did not open on 80 CR`);
+  if (paid.plain === "+50 CR") fail.push(`${where}: the bare credit toast is still firing`);
   if (!paid.card) {
     fail.push(`${where}: 50 CR landed with nothing on screen to explain it`);
     return;
@@ -200,7 +201,6 @@ const paidWell = ({ before, paid }, where) => {
   if (paid.card.fit.spill > 1) fail.push(`${where}: the card runs past the well`);
   if (paid.card.fit.wrap > 1) fail.push(`${where}: the goal name is cut off`);
   if (paid.card.fit.top < 0) fail.push(`${where}: the card sits above the well`);
-  if (paid.plain === "+50 CR") fail.push(`${where}: the bare credit toast is still firing`);
   if (paid.credits !== 130) fail.push(`${where}: the wallet holds ${paid.credits}, not 130`);
   if (paid.cr !== "130") fail.push(`${where}: the strip reads ${paid.cr} after the payout`);
   if (!paid.parked) fail.push(`${where}: Hold no longer parks a piece`);
