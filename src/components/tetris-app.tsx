@@ -208,6 +208,11 @@ type Ui = {
   siege: import("@/game/siege").SiegeSnap | null;
 };
 
+/** How long a spent run flashes "Insert coin" before the card comes up. */
+const COIN_FLASH = 720;
+/** How long a run stays over before the well will take another coin: the flash, then a beat to read. */
+const COIN_WAIT = COIN_FLASH + 420;
+
 function forceCoach() {
   if (typeof window === "undefined") return false;
   return new URLSearchParams(window.location.search).has("coach");
@@ -304,6 +309,7 @@ export function TetrisApp() {
   const b2bSeen = useRef(false);
   const failT = useRef(0);
   const dying = useRef(false);
+  const coinAt = useRef(0);
   const dangerSaid = useRef(false);
   const holdPeekT = useRef(0);
 
@@ -598,6 +604,22 @@ export function TetrisApp() {
     clearLastStain();
   }
 
+  /**
+   * Whether Drop or Confirm should feed the cabinet right now.
+   *
+   * Drop is both the slam and the coin, and a run is already over on the frame
+   * the slam buries it. So the well stays shut through the fail beat and the
+   * coin flash, and for a beat after the card lands — otherwise the death that
+   * earned the card pays for the next run instead of being read.
+   */
+  function wantCoin(): boolean {
+    const u = uiRef.current;
+    if (u.phase === "title") return true;
+    if (u.phase !== "over") return false;
+    if (u.failing || dying.current || u.coinTake) return false;
+    return performance.now() >= coinAt.current;
+  }
+
   function startGame(nextMode?: ModeId) {
     const mode = nextMode ?? saveRef.current.mode;
     if (uiRef.current.phase === "playing" && quietT.current > 0) {
@@ -629,6 +651,7 @@ export function TetrisApp() {
     b2bSeen.current = false;
     dying.current = false;
     failT.current = 0;
+    coinAt.current = 0;
     dangerSaid.current = false;
     holdPeekT.current = 0;
     finesseN.current = 0;
@@ -770,8 +793,9 @@ export function TetrisApp() {
     const { held, just } = input.sample();
     const u = uiRef.current;
 
-    if (just.confirm || (just.hard && (u.phase === "title" || u.phase === "over"))) {
-      if (u.phase === "title" || u.phase === "over") {
+    if (just.confirm || just.hard) {
+      // A refused coin must fall through: the fail beat below still needs its frames.
+      if ((u.phase === "title" || u.phase === "over") && wantCoin()) {
         startGame();
         return;
       }
@@ -1310,6 +1334,7 @@ export function TetrisApp() {
     }
     dying.current = false;
     failT.current = 0;
+    coinAt.current = performance.now() + COIN_WAIT;
     syncUi({
       phase: "over",
       failing: false,
@@ -1351,7 +1376,7 @@ export function TetrisApp() {
     }
     window.setTimeout(() => {
       if (uiRef.current.phase === "over") syncUi({ coinTake: false });
-    }, 720);
+    }, COIN_FLASH);
   }
 
   function stepReplay(dt: number) {
@@ -1401,7 +1426,7 @@ export function TetrisApp() {
     const sim = simRef.current;
     const u = uiRef.current;
     if (p.hard && (u.phase === "title" || u.phase === "over")) {
-      startGame();
+      if (wantCoin()) startGame();
       return;
     }
     if (!sim || sim.phase !== "playing") return;
@@ -1866,7 +1891,7 @@ export function TetrisApp() {
     }
 
     if (phase === "title" || phase === "over") {
-      if (action.name === "confirm" || action.name === "hard") startGame();
+      if ((action.name === "confirm" || action.name === "hard") && wantCoin()) startGame();
       return;
     }
     if (phase === "paused") {
@@ -2083,7 +2108,7 @@ export function TetrisApp() {
     if (e.type === "pointerdown" && (phase === "title" || phase === "over")) {
       e.preventDefault();
       e.stopPropagation();
-      startGame();
+      if (wantCoin()) startGame();
       return;
     }
     if (e.type === "pointerdown" && phase === "paused") {
@@ -2730,8 +2755,9 @@ export function TetrisApp() {
           }}
           onHard={() => {
             unlockAudio();
-            if (ui.phase === "title" || ui.phase === "over") startGame();
-            else if (wantHard()) {
+            if (ui.phase === "title" || ui.phase === "over") {
+              if (wantCoin()) startGame();
+            } else if (wantHard()) {
               inputRef.current?.tap({ hard: true });
               advanceCoach("hard");
             }

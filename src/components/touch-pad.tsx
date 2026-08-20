@@ -172,6 +172,7 @@ export function TouchPad({ onHold, onCw, onCcw, onFlip, onHard, onHoldPiece, onU
           key={slam}
           className={`pad-btn pad-hard${slam ? " is-slam" : ""}${dropAsk ? " is-ask" : ""}`}
           aria-label="Hard drop"
+          data-qa="pad-hard"
           onPointerDown={tap(onHard)}
         >
           <Icon d={ICO.drop} label="Hard drop" />
