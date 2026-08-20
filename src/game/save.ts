@@ -55,6 +55,7 @@ export type SaveData = {
   scan: boolean;
   swipeDrop: boolean;
   clearWell: boolean;
+  played: boolean;
   a2hs: boolean;
   dasMs: number;
   arrMs: number;
@@ -98,6 +99,7 @@ const DEFAULTS: SaveData = {
   scan: false,
   swipeDrop: false,
   clearWell: true,
+  played: false,
   a2hs: false,
   dasMs: 167,
   arrMs: 33,
@@ -175,6 +177,11 @@ export function loadSave(): SaveData {
       scan: parsed.scan === true,
       swipeDrop: parsed.swipeDrop === true,
       clearWell: parsed.clearWell !== false,
+      // Anyone with a run behind them has already played, flag or no flag.
+      played:
+        parsed.played === true ||
+        (Array.isArray(parsed.scores) && parsed.scores.length > 0) ||
+        (parsed.high ?? 0) > 0,
       a2hs: parsed.a2hs === true,
       dasMs: clampMs(parsed.dasMs, 50, 300, 167),
       arrMs: clampMs(parsed.arrMs, 0, 80, 33),
