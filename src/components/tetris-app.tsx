@@ -156,6 +156,8 @@ type Ui = {
   watching: boolean;
   streak: { count: number; last: string };
   missions: MissionBook;
+  /** The daily goal that just paid, so the credits arrive with a name on them. */
+  goal: { name: string; cr: number; n: number } | null;
   picking: boolean;
   combo: number;
   b2b: boolean;
@@ -212,6 +214,8 @@ type Ui = {
 const COIN_FLASH = 720;
 /** How long a run stays over before the well will take another coin: the flash, then a beat to read. */
 const COIN_WAIT = COIN_FLASH + 420;
+/** How long a paid daily goal stays up: long enough to read the name on the money. */
+const GOAL_READ = 2;
 
 function forceCoach() {
   if (typeof window === "undefined") return false;
@@ -295,6 +299,7 @@ export function TetrisApp() {
   const bannerT = useRef(0);
   const bannerKind = useRef<"plain" | "mid" | "big">("plain");
   const calloutT = useRef(0);
+  const goalT = useRef(0);
   const bestStill = useRef<{ snap: Snap; label: string; rank: CallRank } | null>(null);
   const swipeRef = useRef<ReturnType<typeof createGestures> | null>(null);
   const applyGestureRef = useRef<(ev: GestureEmit) => void>(() => {});
@@ -360,6 +365,7 @@ export function TetrisApp() {
     watching: false,
     streak: saveRef.current.streak,
     missions: saveRef.current.missions,
+    goal: null,
     picking: false,
     combo: 0,
     b2b: false,
@@ -666,6 +672,7 @@ export function TetrisApp() {
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 0.4;
+    goalT.current = 0;
     bestStill.current = null;
     wipePit();
     well3dRef.current?.setClear(saveRef.current.clearWell || mode === "sprint" || mode === "daily");
@@ -694,6 +701,7 @@ export function TetrisApp() {
       phase: "playing",
       banner: null,
       callout: null,
+      goal: null,
       holeHint: false,
       score: 0,
       lines: 0,
@@ -919,6 +927,10 @@ export function TetrisApp() {
     if (calloutT.current > 0) {
       calloutT.current -= dt;
       if (calloutT.current <= 0) syncUi({ callout: null });
+    }
+    if (goalT.current > 0) {
+      goalT.current -= dt;
+      if (goalT.current <= 0) syncUi({ goal: null });
     }
     if (holdPeekT.current > 0) {
       holdPeekT.current -= dt;
@@ -1218,8 +1230,15 @@ export function TetrisApp() {
       credits: saveRef.current.credits + payout,
     };
     writeSave(saveRef.current);
-    if (done[0]) flashBanner(`+${payout} CR`);
-    syncUi({ missions: book, credits: saveRef.current.credits });
+    // Credits that turn up on their own read as a glitch next to a Store that
+    // charges for a Shield, so the goal that paid says which goal it was.
+    const goal = done.length ? { name: done.join(" · "), cr: payout, n: done.length } : null;
+    if (goal) goalT.current = GOAL_READ;
+    syncUi({
+      missions: book,
+      credits: saveRef.current.credits,
+      ...(goal ? { goal } : {}),
+    });
   }
 
   function fireSiege(sim: Sim) {
@@ -2652,6 +2671,14 @@ export function TetrisApp() {
             )}
             {ui.phase === "playing" && ui.holeHint && !ui.coach && (
               <p className="hole-hint">One more. Close the hole.</p>
+            )}
+            {ui.goal && ui.phase === "playing" && (
+              <p className="banner is-goal" aria-live="polite">
+                <b>{ui.goal.name}</b>
+                <em>
+                  {ui.goal.n > 1 ? "Daily goals" : "Daily goal"} paid +{ui.goal.cr} CR
+                </em>
+              </p>
             )}
             {ui.banner && ui.phase === "playing" && (
               <p className={`banner is-${bannerKind.current}`}>{ui.banner}</p>
