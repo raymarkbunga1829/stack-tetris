@@ -642,7 +642,7 @@ export function TetrisApp() {
   }
 
   function beginGame(mode: ModeId) {
-    saveRef.current = { ...saveRef.current, mode };
+    saveRef.current = { ...saveRef.current, mode, played: true };
     writeSave(saveRef.current);
     const seed = mode === "daily" ? dailySeed() : undefined;
     const sim = createSim({ mode, seed });
@@ -2848,8 +2848,9 @@ export function TetrisApp() {
             {radioLabel(ui.musicVol, ui.sfxVol)}
           </button>
         </footer>
-        {!ui.standalone && !saveRef.current.a2hs && ui.phase === "title" && (
-          <div className="a2hs">
+        {/* An install is an offer, not a greeting: the first title belongs to Start. */}
+        {!ui.standalone && saveRef.current.played && !saveRef.current.a2hs && ui.phase === "title" && (
+          <div className="a2hs" data-qa="a2hs">
             <InstallButton />
             <button
               type="button"
