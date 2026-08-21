@@ -1888,7 +1888,10 @@ export function TetrisApp() {
     const { action, label } = ev;
     if (action.name !== "drag") grabRef.current = null;
     showGesture(label);
-    advanceCoach(label);
+    // A drag fires on the first twitch, before a finger has crossed a column.
+    // The card only moves on once the piece did, so the step the coach ticks
+    // off is a step the player watched happen.
+    if (label !== "drag") advanceCoach(label);
 
     if (action.name === "hard" && !wantHard()) return;
     const pt = swipeRef.current?.lastPoint();
@@ -1934,7 +1937,7 @@ export function TetrisApp() {
         action.y,
       );
       if (grabRef.current == null) grabRef.current = sim.piece.x - hit.col;
-      dragPiece(sim, hit.col + grabRef.current, sim.piece.y);
+      if (dragPiece(sim, hit.col + grabRef.current, sim.piece.y)) advanceCoach("drag");
       return;
     }
     if (action.name === "soft") {
