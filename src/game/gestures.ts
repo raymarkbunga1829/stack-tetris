@@ -101,6 +101,11 @@ export function createGestures(emit: (ev: GestureEmit) => void, opts?: { swipeDr
   }
 
   function onDown(id: number, x: number, y: number, t: number) {
+    // A pointer can only be down once. A stroke still holding this id is one
+    // the browser never finished, not a second finger, so it does not get to
+    // make the new one multi-touch and mute its drag.
+    strokes.delete(id);
+    clearLong(id);
     const stroke: Stroke = {
       id,
       sx: x,
