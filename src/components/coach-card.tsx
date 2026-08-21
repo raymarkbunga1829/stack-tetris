@@ -13,8 +13,8 @@ const STEPS: {
     id: "drag",
     kicker: "1 of 4",
     title: "Slide sideways",
-    hint: "Finger on the well. Slide left or right.",
-    android: "One thumb on the stack. Slide only left or right — not down.",
+    hint: "Tap ← or →. Or slide across the well.",
+    android: "Tap ← or →. Or slide a thumb on the stack — sideways only.",
   },
   {
     id: "rotate",
