@@ -1888,7 +1888,10 @@ export function TetrisApp() {
     const { action, label } = ev;
     if (action.name !== "drag") grabRef.current = null;
     showGesture(label);
-    advanceCoach(label);
+    // A drag fires on the first twitch, before a finger has crossed a column.
+    // The card only moves on once the piece did, so the step the coach ticks
+    // off is a step the player watched happen.
+    if (label !== "drag") advanceCoach(label);
 
     if (action.name === "hard" && !wantHard()) return;
     const pt = swipeRef.current?.lastPoint();
@@ -1934,7 +1937,7 @@ export function TetrisApp() {
         action.y,
       );
       if (grabRef.current == null) grabRef.current = sim.piece.x - hit.col;
-      dragPiece(sim, hit.col + grabRef.current, sim.piece.y);
+      if (dragPiece(sim, hit.col + grabRef.current, sim.piece.y)) advanceCoach("drag");
       return;
     }
     if (action.name === "soft") {
@@ -2121,6 +2124,27 @@ export function TetrisApp() {
     syncUi({ theme: id });
   }
 
+  /**
+   * Forget fingers the well no longer holds.
+   *
+   * Every touch on the well is captured, so a finger still down is a finger
+   * the well still has. One that got away — a touch the phone took for a
+   * system swipe, an up that never landed — leaves its stroke behind, and a
+   * leftover stroke reads as a second finger: the well emits no more drags and
+   * stops sliding for the rest of the page while the pad plays on. The first
+   * thing the coach asks for is that slide, so every touch clears the ghosts
+   * before it starts.
+   */
+  function dropGhostStrokes(well: HTMLDivElement, live: number) {
+    const gestures = swipeRef.current;
+    if (!gestures) return;
+    for (const s of gestures.snapshot()) {
+      if (s.id !== live && !well.hasPointerCapture(s.id)) {
+        gestures.feed("cancel", s.id, s.x, s.y);
+      }
+    }
+  }
+
   function onWellPointer(e: React.PointerEvent<HTMLDivElement>) {
     unlockAudio();
     const phase = uiRef.current.phase;
@@ -2140,6 +2164,7 @@ export function TetrisApp() {
     }
     if (e.type === "pointerdown") {
       e.preventDefault();
+      dropGhostStrokes(e.currentTarget, e.pointerId);
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
