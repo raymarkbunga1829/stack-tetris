@@ -119,13 +119,15 @@ const look = () =>
   });
 
 /** Stack straight up until the lid arrives, then let the card settle. */
-const bury = async () => {
-  await page.locator('[data-qa="play"]').click({ force: true });
-  await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", {
-    timeout: 8000,
-  });
-  const skip = page.locator(".coach-skip");
-  if (await skip.count()) await skip.click({ force: true });
+const bury = async ({ start = true } = {}) => {
+  if (start) {
+    await page.locator('[data-qa="play"]').click({ force: true });
+    await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", {
+      timeout: 8000,
+    });
+    const skip = page.locator(".coach-skip");
+    if (await skip.count()) await skip.click({ force: true });
+  }
   for (let i = 0; i < 60; i++) {
     await page.keyboard.press("Space");
     await page.waitForTimeout(90);
@@ -160,6 +162,15 @@ results.themeCard = await look();
 await page.locator(".veil.is-polaroid .play-btn").click({ force: true });
 await page.waitForTimeout(600);
 results.playAgain = await look();
+
+// And Watch last still runs the burial back instead of leaving the card up.
+await bury({ start: false });
+await page.locator('[data-qa="watch-last-over"]').click({ force: true });
+await page.waitForTimeout(700);
+results.watchLast = {
+  ...(await look()),
+  stop: !!(await page.locator(".watch-stop").count()),
+};
 
 console.log(JSON.stringify({ ...results, errors }, null, 2));
 
@@ -201,6 +212,8 @@ if (results.afterHome.card) fail.push("Home left the card up");
 if (!results.afterHome.marquee || results.afterHome.marquee.gone)
   fail.push("the title lost its marquee");
 if (results.playAgain.phase !== "playing") fail.push("Play again no longer plays again");
+if (results.watchLast.card) fail.push("Watch last left the card up");
+if (!results.watchLast.stop) fail.push("Watch last no longer runs the replay back");
 
 // A stored save always differs from what the server guessed, and every run here
 // starts from one, so the hydration grumble is noise. A real crash is not.
