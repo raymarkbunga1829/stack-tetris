@@ -2276,7 +2276,7 @@ export function TetrisApp() {
           >
             <canvas ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
-            <div className={`marquee${ui.phase === "over" || ui.phase === "paused" ? " is-dark" : ""}`}>
+            <div className="marquee">
               <span>
                 {ui.theme === "citrine"
                   ? "Citrine"
@@ -2471,15 +2471,13 @@ export function TetrisApp() {
                 <button
                   type="button"
                   className="veil-x"
-                  aria-label="Home"
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     goHome();
                   }}
                 >
-                  ×
-                  <em>Home</em>
+                  Home
                 </button>
                 <p className="veil-kicker">
                   {ui.epitaph ??
