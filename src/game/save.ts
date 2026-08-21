@@ -1,5 +1,6 @@
 import { ensureMissions, emptyBook, type MissionBook } from "./missions";
 import { manilaDateKey, utcShift, type ModeId } from "./modes";
+import { isStation, type StationId } from "./radio";
 import { emptyInv, type Inventory, type Receipt } from "./shop";
 import type { ThemeId } from "./themes";
 import type { PadMode } from "./device";
@@ -28,6 +29,7 @@ export type SaveData = {
   muted: boolean;
   musicVol: number;
   sfxVol: number;
+  station: StationId;
   drag: boolean;
   credits: number;
   inv: Inventory;
@@ -72,6 +74,7 @@ const DEFAULTS: SaveData = {
   muted: false,
   musicVol: 1,
   sfxVol: 1,
+  station: "auto",
   drag: true,
   credits: 80,
   inv: { zap: 1, slow: 1, shield: 0, quake: 0, pick: 1 },
@@ -145,6 +148,8 @@ export function loadSave(): SaveData {
           : parsed.muted
             ? 0
             : 1,
+      // A save from before the dial existed keeps hearing the mode it started.
+      station: isStation(parsed.station) ? parsed.station : "auto",
       credits: Math.max(0, parsed.credits ?? DEFAULTS.credits),
       inv: { ...emptyInv(), ...parsed.inv },
       receipts: Array.isArray(parsed.receipts) ? parsed.receipts : [],
