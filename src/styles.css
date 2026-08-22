@@ -1991,6 +1991,11 @@
   font: 500 0.68rem/1.4 var(--font-sans);
 }
 
+/* Auto sits across the top of the dial: it is the house pick, not the eleventh station. */
+.radio-dial button:first-child {
+  grid-column: 1 / -1;
+}
+
 .modes {
   display: grid;
   grid-template-columns: 1fr 1fr;

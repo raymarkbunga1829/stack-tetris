@@ -26,6 +26,7 @@ import {
   sfxTetris,
   setMusicPaused,
   setMusicTension,
+  setStation,
   startMusic,
   stopMusic,
   unlockAudio,
@@ -58,6 +59,7 @@ import { resizeCanvas } from "@/game/render";
 import { createViz } from "@/game/viz";
 import { createWell3d, type Well3d } from "@/game/well3d";
 import { loadSave, recordRun, writeSave, type HapticProfile, type SaveData } from "@/game/save";
+import type { StationId } from "@/game/radio";
 import { buyTheme, themeOf, type ThemeId } from "@/game/themes";
 import {
   advance,
@@ -124,6 +126,7 @@ type Ui = {
   muted: boolean;
   musicVol: number;
   sfxVol: number;
+  station: StationId;
   drag: boolean;
   standalone: boolean;
   credits: number;
@@ -333,6 +336,7 @@ export function TetrisApp() {
     muted: saveRef.current.muted,
     musicVol: saveRef.current.musicVol,
     sfxVol: saveRef.current.sfxVol,
+    station: saveRef.current.station,
     drag: saveRef.current.drag,
     standalone: false,
     credits: saveRef.current.credits,
@@ -458,6 +462,7 @@ export function TetrisApp() {
 
   useEffect(() => {
     setMix({ music: saveRef.current.musicVol, sfx: saveRef.current.sfxVol });
+    setStation(saveRef.current.station);
     armAudio();
     setHaptic(saveRef.current.haptic);
     setUi((p) => ({
@@ -1732,6 +1737,15 @@ export function TetrisApp() {
     syncUi({ musicVol: music, sfxVol: sfx, muted });
   }
 
+  function pickStation(id: StationId) {
+    unlockAudio();
+    setStation(id);
+    saveRef.current = { ...saveRef.current, station: id };
+    writeSave(saveRef.current);
+    haptic("select");
+    syncUi({ station: id });
+  }
+
   function openShop(wanted: PowerId | null = null) {
     unlockAudio();
     setWant(wanted);
@@ -2972,6 +2986,8 @@ export function TetrisApp() {
           musicVol={ui.musicVol}
           sfxVol={ui.sfxVol}
           onMix={setAudioMix}
+          station={ui.station}
+          onStation={pickStation}
         />
         <BoardSheet
           open={ui.board}

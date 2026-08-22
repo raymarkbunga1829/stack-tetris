@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { PadMode } from "@/game/device";
+import { STATIONS, stationOf, type StationId } from "@/game/radio";
 import type { HapticProfile } from "@/game/save";
 import { THEMES, ownsTheme, type ThemeId } from "@/game/themes";
 
@@ -38,6 +39,8 @@ type Props = {
   musicVol: number;
   sfxVol: number;
   onMix: (part: "music" | "sfx", value: number) => void;
+  station: StationId;
+  onStation: (id: StationId) => void;
 };
 
 export function SettingsSheet({
@@ -75,6 +78,8 @@ export function SettingsSheet({
   musicVol,
   sfxVol,
   onMix,
+  station,
+  onStation,
 }: Props) {
   if (!open) return null;
   return (
@@ -115,6 +120,21 @@ export function SettingsSheet({
           />
           <b>{Math.round(sfxVol * 100)}</b>
         </label>
+        <p className="shop-blurb">Radio</p>
+        <div className="shop-tabs radio-dial">
+          {STATIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={station === s.id ? "is-on" : ""}
+              data-qa={`station-${s.id}`}
+              onClick={() => onStation(s.id)}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+        <p className="shop-note">{stationOf(station).blurb}</p>
         <p className="shop-blurb">Haptics</p>
         <div className="shop-tabs">
           {(["full", "light", "lock", "off"] as const).map((p) => (

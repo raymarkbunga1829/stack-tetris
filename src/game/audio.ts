@@ -1,3 +1,5 @@
+import type { BedId, StationId } from "./radio";
+
 type Bus = {
   ctx: AudioContext;
   master: GainNode;
@@ -98,7 +100,7 @@ export function setMix(next: { music?: number; sfx?: number }) {
   if (next.sfx != null) sfxVol = clamp01(next.sfx);
   muted = isMuted();
   applyGains();
-  if (musicVol > 0 && musicMode && !musicRaf) {
+  if (musicVol > 0 && musicBed && !musicRaf) {
     musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
     musicRaf = requestAnimationFrame(pumpMusic);
   }
@@ -495,7 +497,7 @@ export function sfxPower(id: "zap" | "slow" | "shield" | "quake" | "pick") {
 
 type Bed = { bpm: number; lead: number[]; harm: number[]; bass: number[] };
 
-const BEDS: Record<string, Bed> = {
+const BEDS: Record<BedId, Bed> = {
   marathon: {
     bpm: 104,
     lead: [220, 262, 330, 294, 262, 247, 220, 0, 220, 262, 294, 330, 392, 330, 294, 262, 247, 294, 330, 0, 294, 262, 220, 196, 220, 262, 330, 294, 262, 220, 196, 220],
@@ -544,9 +546,26 @@ const BEDS: Record<string, Bed> = {
     harm: [196, 220, 247, 0, 220, 247, 294, 247, 262, 294, 330, 294, 247, 220, 196, 220, 185, 220, 247, 0, 220, 196, 165, 185, 196, 247, 220, 196, 185, 165, 147, 196],
     bass: [131, 0, 131, 0, 147, 0, 131, 0, 147, 0, 131, 0, 110, 0, 131, 0, 123, 0, 131, 0, 147, 0, 131, 0, 131, 0, 110, 0, 98, 0, 131, 0],
   },
+  ghost: {
+    bpm: 84,
+    lead: [220, 0, 262, 233, 220, 0, 196, 175, 196, 0, 220, 262, 294, 262, 220, 196, 175, 0, 196, 220, 233, 220, 196, 175, 147, 0, 175, 196, 220, 0, 196, 175],
+    harm: [165, 0, 196, 175, 165, 0, 147, 131, 147, 0, 165, 196, 220, 196, 165, 147, 131, 0, 147, 165, 175, 165, 147, 131, 110, 0, 131, 147, 165, 0, 147, 131],
+    bass: [110, 0, 0, 0, 110, 0, 98, 0, 87, 0, 0, 0, 110, 0, 98, 0, 73, 0, 0, 0, 87, 0, 98, 0, 110, 0, 0, 0, 98, 0, 87, 0],
+  },
+  lastcall: {
+    bpm: 92,
+    lead: [262, 294, 349, 294, 262, 233, 220, 233, 262, 0, 294, 262, 220, 196, 175, 196, 220, 262, 294, 0, 262, 220, 196, 175, 165, 196, 220, 262, 233, 220, 196, 175],
+    harm: [196, 220, 262, 220, 196, 175, 165, 175, 196, 0, 220, 196, 165, 147, 131, 147, 165, 196, 220, 0, 196, 165, 147, 131, 123, 147, 165, 196, 175, 165, 147, 131],
+    bass: [87, 0, 87, 0, 116, 0, 87, 0, 98, 0, 98, 0, 131, 0, 98, 0, 110, 0, 110, 0, 87, 0, 87, 0, 116, 0, 98, 0, 87, 0, 87, 0],
+  },
 };
 
-let musicMode: string | null = null;
+/** The mode the run asked for, kept so Auto can answer again when the dial moves. */
+let musicRun: string | null = null;
+/** The bed on the air. Null when the radio is off. */
+let musicBed: BedId | null = null;
+/** The station the player tuned to, or null while the dial sits on Auto. */
+let station: BedId | null = null;
 let musicStep = 0;
 let musicNext = 0;
 let musicRaf = 0;
@@ -580,7 +599,7 @@ function hum(freq: number, dur: number, when: number, vol = 0.22, bass = false) 
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   if (bass) osc.type = "triangle";
-  else osc.setPeriodicWave(musicMode === "classic" ? bus.pulse50 : bus.pulse25);
+  else osc.setPeriodicWave(musicBed === "classic" ? bus.pulse50 : bus.pulse25);
   osc.frequency.setValueAtTime(freq, when);
   g.gain.setValueAtTime(0.0001, when);
   g.gain.exponentialRampToValueAtTime(vol, when + 0.02);
@@ -593,8 +612,8 @@ function hum(freq: number, dur: number, when: number, vol = 0.22, bass = false) 
 
 function pumpMusic() {
   musicRaf = 0;
-  if (!bus || !musicMode || musicVol <= 0) return;
-  const spec = BEDS[musicMode] ?? BEDS.marathon!;
+  if (!bus || !musicBed || musicVol <= 0) return;
+  const spec = BEDS[musicBed];
   const bpm = spec.bpm * (musicTight ? 1.32 : 1);
   const step = 60 / bpm / 2;
   const now = bus.ctx.currentTime;
@@ -616,9 +635,32 @@ function pumpMusic() {
   musicRaf = requestAnimationFrame(pumpMusic);
 }
 
+function bedFor(mode: string): BedId {
+  if (station) return station;
+  return mode in BEDS ? (mode as BedId) : "marathon";
+}
+
+/**
+ * Turn the dial. Auto hands the choice back to the mode; anything else holds
+ * that bed for every run until the player says otherwise. A run already on the
+ * air swaps over on the spot, so the pick is something you hear, not something
+ * you take on faith.
+ */
+export function setStation(id: StationId) {
+  const next = id === "auto" ? null : id;
+  if (next === station) return;
+  station = next;
+  if (!musicRun) return;
+  musicBed = bedFor(musicRun);
+  musicStep = 0;
+  musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
+  if (musicVol > 0 && !musicRaf) musicRaf = requestAnimationFrame(pumpMusic);
+}
+
 export function startMusic(mode: string) {
   unlockAudio();
-  musicMode = mode;
+  musicRun = mode;
+  musicBed = bedFor(mode);
   musicStep = 0;
   musicPaused = false;
   musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
@@ -626,7 +668,8 @@ export function startMusic(mode: string) {
 }
 
 export function stopMusic() {
-  musicMode = null;
+  musicRun = null;
+  musicBed = null;
   musicPaused = false;
   musicTight = false;
   if (sirenId) {
@@ -640,7 +683,7 @@ export function stopMusic() {
 export function setMusicPaused(next: boolean) {
   musicPaused = next;
   applyGains();
-  if (!next && musicMode && musicVol > 0 && !musicRaf) {
+  if (!next && musicBed && musicVol > 0 && !musicRaf) {
     musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
     musicRaf = requestAnimationFrame(pumpMusic);
   }
