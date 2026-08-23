@@ -1,11 +1,17 @@
 /**
- * What is on the cabinet radio. Ten beds, all cut from the same pulse engine as
- * the rest of the sound, plus Auto — the dial every save sat on until now, where
- * the mode you started picks the tune for you.
+ * What is on the cabinet radio. Fifteen beds and Auto, the house pick, where the
+ * mode you started chooses for you. Five of the beds are cut on the modern rack —
+ * filtered saws, a kit, a delay — and ten come off the same pulse engine as the
+ * rest of the sound. Every note on the dial is ours.
  */
 
 /** A bed the music pump can play. The notes themselves live with the engine, in audio.ts. */
 export type BedId =
+  | "house"
+  | "lofi"
+  | "synthwave"
+  | "future"
+  | "garage"
   | "marathon"
   | "sprint"
   | "blitz"
@@ -30,6 +36,31 @@ export const STATIONS: Station[] = [
     id: "auto",
     name: "Auto",
     blurb: "House pick. Whichever bed the mode you started came with.",
+  },
+  {
+    id: "house",
+    name: "Back Room",
+    blurb: "Four on the floor, chords off the beat. The late set, not the arcade.",
+  },
+  {
+    id: "lofi",
+    name: "Rain Check",
+    blurb: "Warm keys played a hair late, soft kick, everything a little blurry.",
+  },
+  {
+    id: "synthwave",
+    name: "Coast Road",
+    blurb: "Dark saws over a bass that never stops. Headlights and wet asphalt.",
+  },
+  {
+    id: "future",
+    name: "Sky Deck",
+    blurb: "Wide, bright chords in half time. The loud, clean one.",
+  },
+  {
+    id: "garage",
+    name: "Two Step",
+    blurb: "Shuffled hats, sub underneath, stabs on the offbeat. Two in the morning.",
   },
   {
     id: "marathon",
