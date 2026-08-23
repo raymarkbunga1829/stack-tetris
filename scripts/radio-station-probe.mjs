@@ -144,7 +144,7 @@ const REDLINE = [466, 415, 155];
 const heard = (notes) => REDLINE.some((f) => notes.includes(f));
 
 const fail = [];
-if (results.namedStations.length !== 11) fail.push("the dial is not eleven picks wide");
+if (results.namedStations.length !== 16) fail.push("the dial is not sixteen picks wide");
 if (results.namedStations[0] !== "Auto") fail.push("Auto is not the first pick");
 if (results.namedStations.some((n) => /^Track \d/.test(n) || !n)) {
   fail.push("a station has no name");
