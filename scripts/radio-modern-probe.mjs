@@ -158,7 +158,16 @@ const heard = {};
 for (const [id, head] of Object.entries(HEADS)) heard[id] = await tune(id, head.ms);
 
 const names = await page
-  .locator(".radio-dial button")
+  .locator("[data-qa='radio-auto'] button, [data-qa='radio-now'] button, [data-qa='radio-cabinet'] button")
+  .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+const nowShelf = await page
+  .locator("[data-qa='radio-now'] button")
+  .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+const cabinetShelf = await page
+  .locator("[data-qa='radio-cabinet'] button")
+  .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+const shelfLabels = await page
+  .locator("[data-qa='radio-now'] .shop-kicker, [data-qa='radio-cabinet'] .shop-kicker")
   .evaluateAll((els) => els.map((e) => e.textContent.trim()));
 
 // Quiet still means quiet, kit or no kit.
@@ -183,7 +192,9 @@ await page.waitForTimeout(1000);
 // Mid-loop this time, so the window has to be wide enough for a whole pass of the bed.
 const afterReload = await listen(4200);
 
-console.log(JSON.stringify({ names, heard, quiet, litAfterReload, afterReload, errors }, null, 2));
+console.log(
+  JSON.stringify({ names, nowShelf, cabinetShelf, shelfLabels, heard, quiet, litAfterReload, afterReload, errors }, null, 2),
+);
 
 const MODERN = ["house", "lofi", "synthwave", "future", "garage"];
 const missing = (got, want) => want.filter((f) => !got.notes.includes(f));
@@ -211,7 +222,18 @@ if (heard.classic.waves.some((w) => w !== "custom" && w !== "triangle")) {
 }
 if (names.length !== 16) fail.push("the dial is not sixteen picks wide");
 if (names[0] !== "Auto") fail.push("Auto is not the first pick");
-for (const n of ["Back Room", "Rain Check", "Coast Road", "Sky Deck", "Two Step"]) {
+if (names.filter((n) => n === "Auto").length !== 1) fail.push("Auto is on the dial more than once");
+if (shelfLabels.join(" / ") !== "Now / Cabinet") {
+  fail.push("the shelves are not labeled Now and Cabinet");
+}
+const NOW_NAMES = ["Back Room", "Rain Check", "Coast Road", "Sky Deck", "Two Step"];
+if (JSON.stringify(nowShelf) !== JSON.stringify(NOW_NAMES)) {
+  fail.push("the Now shelf is not the five modern stations");
+}
+if (cabinetShelf.length !== 10 || cabinetShelf.some((n) => NOW_NAMES.includes(n))) {
+  fail.push("the Cabinet shelf mixed in a modern station");
+}
+for (const n of NOW_NAMES) {
   if (!names.includes(n)) fail.push(`${n} is not on the dial`);
 }
 if (quiet.notes.length || quiet.sources) fail.push("a modern bed played over a muted radio");

@@ -1,8 +1,8 @@
 /**
  * What is on the cabinet radio. Fifteen beds and Auto, the house pick, where the
- * mode you started chooses for you. Five of the beds are cut on the modern rack —
- * filtered saws, a kit, a delay — and ten come off the same pulse engine as the
- * rest of the sound. Every note on the dial is ours.
+ * mode you started chooses for you. Settings shelves them: five on the modern
+ * rack under Now, ten off the pulse engine under Cabinet. Every note on the
+ * dial is ours.
  */
 
 /** A bed the music pump can play. The notes themselves live with the engine, in audio.ts. */
@@ -121,3 +121,11 @@ export function stationOf(id: StationId | string | undefined): Station {
 export function isStation(id: unknown): id is StationId {
   return typeof id === "string" && STATIONS.some((s) => s.id === id);
 }
+
+/** The five beds cut on the modern rack. Settings shelves them under Now. */
+export function isNow(id: StationId): boolean {
+  return id === "house" || id === "lofi" || id === "synthwave" || id === "future" || id === "garage";
+}
+
+export const NOW = STATIONS.filter((s) => isNow(s.id));
+export const CABINET = STATIONS.filter((s) => s.id !== "auto" && !isNow(s.id));
