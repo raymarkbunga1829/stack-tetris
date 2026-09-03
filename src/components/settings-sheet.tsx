@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import type { PadMode } from "@/game/device";
-import { STATIONS, stationOf, type StationId } from "@/game/radio";
+import { CABINET, NOW, stationOf, type StationId } from "@/game/radio";
 import type { HapticProfile } from "@/game/save";
 import { THEMES, ownsTheme, type ThemeId } from "@/game/themes";
 
@@ -121,20 +121,51 @@ export function SettingsSheet({
           <b>{Math.round(sfxVol * 100)}</b>
         </label>
         <p className="shop-blurb">Radio</p>
-        <div className="shop-tabs radio-dial">
-          {STATIONS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={station === s.id ? "is-on" : ""}
-              data-qa={`station-${s.id}`}
-              onClick={() => onStation(s.id)}
-            >
-              {s.name}
-            </button>
-          ))}
+        <div className="shop-tabs radio-auto" data-qa="radio-auto">
+          <button
+            type="button"
+            className={station === "auto" ? "is-on" : ""}
+            data-qa="station-auto"
+            onClick={() => onStation("auto")}
+          >
+            {stationOf("auto").name}
+          </button>
         </div>
-        <p className="shop-note">{stationOf(station).blurb}</p>
+        <div className="radio-shelf" data-qa="radio-now">
+          <p className="shop-kicker">Now</p>
+          <div className="shop-tabs radio-dial">
+            {NOW.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={station === s.id ? "is-on" : ""}
+                data-qa={`station-${s.id}`}
+                onClick={() => onStation(s.id)}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="radio-shelf" data-qa="radio-cabinet">
+          <p className="shop-kicker">Cabinet</p>
+          <div className="shop-tabs radio-dial">
+            {CABINET.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={station === s.id ? "is-on" : ""}
+                data-qa={`station-${s.id}`}
+                onClick={() => onStation(s.id)}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="shop-note" data-qa="station-blurb">
+          {stationOf(station).blurb}
+        </p>
         <p className="shop-blurb">Haptics</p>
         <div className="shop-tabs">
           {(["full", "light", "lock", "off"] as const).map((p) => (

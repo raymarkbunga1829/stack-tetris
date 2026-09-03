@@ -98,14 +98,23 @@ results.autoNotes = await listen();
 
 await openSettings();
 results.namedStations = await page
-  .locator(".radio-dial button")
+  .locator("[data-qa='radio-auto'] button, [data-qa='radio-now'] button, [data-qa='radio-cabinet'] button")
+  .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+results.nowShelf = await page
+  .locator("[data-qa='radio-now'] button")
+  .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+results.cabinetShelf = await page
+  .locator("[data-qa='radio-cabinet'] button")
+  .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+results.shelfLabels = await page
+  .locator("[data-qa='radio-now'] .shop-kicker, [data-qa='radio-cabinet'] .shop-kicker")
   .evaluateAll((els) => els.map((e) => e.textContent.trim()));
 results.autoLitFirst = await lit("auto");
 
 await page.locator('[data-qa="station-blitz"]').click({ force: true });
 await page.waitForTimeout(200);
 results.pickedNotes = await listen();
-results.blurb = await page.locator(".shop-tabs.radio-dial + .shop-note").textContent();
+results.blurb = await page.locator("[data-qa='station-blurb']").textContent();
 results.saved = await page.evaluate(
   () => JSON.parse(localStorage.getItem("stack-tetris-v1")).station,
 );
@@ -125,6 +134,9 @@ console.log(
   JSON.stringify(
     {
       namedStations: results.namedStations,
+      nowShelf: results.nowShelf,
+      cabinetShelf: results.cabinetShelf,
+      shelfLabels: results.shelfLabels,
       autoLitFirst: results.autoLitFirst,
       blurb: results.blurb,
       saved: results.saved,
@@ -146,8 +158,33 @@ const heard = (notes) => REDLINE.some((f) => notes.includes(f));
 const fail = [];
 if (results.namedStations.length !== 16) fail.push("the dial is not sixteen picks wide");
 if (results.namedStations[0] !== "Auto") fail.push("Auto is not the first pick");
+if (results.namedStations.filter((n) => n === "Auto").length !== 1) {
+  fail.push("Auto is on the dial more than once");
+}
 if (results.namedStations.some((n) => /^Track \d/.test(n) || !n)) {
   fail.push("a station has no name");
+}
+if (results.shelfLabels?.join(" / ") !== "Now / Cabinet") {
+  fail.push("the shelves are not labeled Now and Cabinet");
+}
+const NOW = ["Back Room", "Rain Check", "Coast Road", "Sky Deck", "Two Step"];
+const CABINET = [
+  "Long Haul",
+  "Pace Car",
+  "Redline",
+  "Dawn Shift",
+  "Token Row",
+  "Old Cabinet",
+  "Still Water",
+  "Clean Hands",
+  "Ghost Light",
+  "Last Call",
+];
+if (JSON.stringify(results.nowShelf) !== JSON.stringify(NOW)) {
+  fail.push("the Now shelf is not the five modern stations");
+}
+if (JSON.stringify(results.cabinetShelf) !== JSON.stringify(CABINET)) {
+  fail.push("the Cabinet shelf is not the ten older stations");
 }
 if (!results.autoLitFirst) fail.push("an old save did not wake up on Auto");
 if (heard(results.autoNotes)) fail.push("Auto played a bed nobody asked for");
