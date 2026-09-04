@@ -40,6 +40,10 @@ export function nameRun(opts: {
   if (mode === "zen" && lines >= 40) return "The Long Sketch";
   if (mode === "siege" && won) return "Last Well Standing";
   if (mode === "siege") return "Buried by Eight";
+  if (mode === "watch" && combo >= 6) return "The Long Machine";
+  if (mode === "watch" && stacks >= 1) return "A Bot Tetris";
+  if (mode === "watch" && !won) return "The Bot Buried";
+  if (mode === "watch") return "Watched the Well";
   if (tspins > 0 && stacks > 0) return "Spins and Stacks";
   if (tspins >= 3) return "The Named Spins";
   if (tspins > 0) return "A Named Spin";
