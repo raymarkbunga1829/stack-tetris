@@ -27,8 +27,8 @@ const STEPS: {
     id: "hold",
     kicker: "3 of 4",
     title: "Park a piece",
-    hint: "Use the Hold button to park a piece.",
-    android: "Hold parks it. Soft is the down arrow.",
+    hint: "Tap Hold under the well. Parks this piece.",
+    android: "Tap Hold. Parks it. Soft is the down arrow.",
   },
   {
     id: "drop",

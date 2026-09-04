@@ -27,6 +27,7 @@ type Props = {
   shieldOn: boolean;
   slowOn: boolean;
   pickOn?: boolean;
+  armed?: PowerId | null;
 };
 
 export function PowerBar({
@@ -37,6 +38,7 @@ export function PowerBar({
   shieldOn,
   slowOn,
   pickOn,
+  armed,
 }: Props) {
   return (
     <div className="powers" role="group" aria-label="Power-ups">
@@ -49,14 +51,17 @@ export function PowerBar({
           (id === "shield" && shieldOn) ||
           (id === "slow" && slowOn) ||
           (id === "pick" && !!pickOn);
+        const asking = armed === id;
         return (
           <button
             key={id}
             type="button"
-            className={`pwr${lit ? " is-lit" : ""}${empty ? " is-empty" : ""}`}
+            className={`pwr${lit ? " is-lit" : ""}${empty ? " is-empty" : ""}${asking ? " is-ask" : ""}`}
             data-qa={`pwr-${id}`}
             aria-label={
-              empty
+              asking
+                ? `${LABEL[id]}, tap again to fire`
+                : empty
                 ? credits >= cost
                   ? `${LABEL[id]}, none left, buy one for ${cost} credits`
                   : `${LABEL[id]}, none left, ${cost} credits in the Store`
