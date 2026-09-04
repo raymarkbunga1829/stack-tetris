@@ -306,6 +306,28 @@
   display: none;
 }
 
+.sheet-bot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 2px 2px 8px;
+}
+
+.sheet-bot-row .text-btn {
+  flex: none;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+}
+
+.sheet-bot-row p {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-muted);
+  font: 500 0.68rem/1.3 var(--font-sans);
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1697,6 +1719,11 @@
 .text-btn:hover,
 .text-btn:focus-visible {
   color: var(--color-fg);
+}
+
+.text-btn.is-on {
+  background: var(--color-fg);
+  color: var(--color-bg);
 }
 
 .text-btn.install {

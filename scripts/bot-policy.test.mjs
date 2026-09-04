@@ -42,3 +42,8 @@ test("the table prefers a single over a Tetris", () => {
   const tetris = score({ ...base, eroded_cells: 4, lines_cleared: 4, is_tetris: 1 });
   assert.ok(single > tetris);
 });
+
+test("sprint bias rewards a clear more than a taller stack", () => {
+  const bias = (lines, height) => 1.8 * lines - 0.2 * height;
+  assert.ok(bias(1, 4) > bias(0, 1));
+});
