@@ -2,6 +2,7 @@ import { PIECE_IDS, type PieceId } from "./types";
 
 export type ModeId =
   | "marathon"
+  | "watch"
   | "sprint"
   | "blitz"
   | "daily"
@@ -34,6 +35,20 @@ export const MODES: ModeInfo[] = [
     look: "A pale twin waits on the floor. The well never ends.",
     tint: "#7eb4c8",
     carving: "Stack until the moon falls.",
+    lines: null,
+    seconds: null,
+    startLevel: 1,
+    ghost: true,
+    kicks: true,
+    rng: "bag",
+  },
+  {
+    id: "watch",
+    name: "Watch bot",
+    blurb: "Marathon, hands off. A bot slams every piece.",
+    look: "Same well. Same score. You sit. It plays.",
+    tint: "#8ec8b4",
+    carving: "Sit. The well plays itself.",
     lines: null,
     seconds: null,
     startLevel: 1,
@@ -194,6 +209,10 @@ export function streakLive(
   if (!streak || streak.count < 1) return 0;
   if (streak.last === today || streak.last === utcShift(-1, today)) return streak.count;
   return 0;
+}
+
+export function isMode(id: unknown): id is ModeId {
+  return typeof id === "string" && MODES.some((m) => m.id === id);
 }
 
 export function powersAllowed(id: ModeId): boolean {

@@ -48,6 +48,7 @@ import {
   sprintPace,
   type ModeId,
 } from "@/game/modes";
+import { armBot, botPulse, type BotHand } from "@/game/bot";
 import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { cheapTrail, gradeFinesse, gradeTitle } from "@/game/finesse";
 import { nameRun } from "@/game/run-name";
@@ -170,6 +171,7 @@ type Ui = {
   recap: {
     mode: ModeId;
     lines: number;
+    level: number;
     combo: number;
     tspins: number;
     stacks: number;
@@ -212,6 +214,7 @@ type Ui = {
   epitaph: string | null;
   cause: string | null;
   siege: import("@/game/siege").SiegeSnap | null;
+  watchPace: 1 | 2;
 };
 
 /** How long a spent run flashes "Insert coin" before the card comes up. */
@@ -410,6 +413,7 @@ export function TetrisApp() {
     epitaph: null,
     cause: null,
     siege: null,
+    watchPace: 1,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -432,6 +436,9 @@ export function TetrisApp() {
   const sawOmen = useRef(false);
   const uglySaid = useRef(false);
   const siegeRef = useRef<Siege | null>(null);
+  const botHand = useRef<BotHand | null>(null);
+  const botPace = useRef<1 | 2>(1);
+  const finishRunRef = useRef<(s: Sim) => void>(() => {});
 
   useEffect(() => onKeyboard(() => setViewW(window.innerWidth)), []);
   useEffect(() => {
@@ -571,6 +578,17 @@ export function TetrisApp() {
           vizAlive: () => vizRef.current.liveCount(),
           getCredits: () => saveRef.current.credits,
           getZap: () => saveRef.current.inv.zap,
+          getLines: () => simRef.current?.lines ?? 0,
+          getLevel: () => simRef.current?.level ?? 1,
+          getMode: () => simRef.current?.mode ?? uiRef.current.mode,
+          getHold: () => simRef.current?.hold ?? null,
+          topOut: () => {
+            const s = simRef.current;
+            if (!s) return;
+            s.phase = "over";
+            s.toppedOut = true;
+            finishRunRef.current(s);
+          },
         };
       }
 
@@ -678,6 +696,7 @@ export function TetrisApp() {
     sawOmen.current = false;
     uglySaid.current = false;
     siegeRef.current = mode === "siege" ? createSiege() : null;
+    botHand.current = null;
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 0.4;
@@ -702,7 +721,9 @@ export function TetrisApp() {
                     ? "Read"
                     : mode === "siege"
                       ? "8"
-                      : "Go";
+                      : mode === "watch"
+                        ? "Watch"
+                        : "Go";
     window.setTimeout(() => {
       if (uiRef.current.phase === "playing") syncUi({ intro: null });
     }, 1600);
@@ -721,7 +742,7 @@ export function TetrisApp() {
       clock: 0,
       timeLeft: sim.timeLeft,
       won: false,
-      coach: forceCoach() || !saveRef.current.onboarded ? "drag" : null,
+      coach: mode === "watch" ? null : forceCoach() || !saveRef.current.onboarded ? "drag" : null,
       picking: false,
       shop: false,
       settings: false,
@@ -803,6 +824,41 @@ export function TetrisApp() {
       brink: false,
       live: null,
     });
+  }
+
+  function botThink(): number {
+    const qa = typeof location !== "undefined" && new URLSearchParams(location.search).has("qa");
+    return qa ? 0 : 0.12 / botPace.current;
+  }
+
+  function botGap(): number {
+    const qa = typeof location !== "undefined" && new URLSearchParams(location.search).has("qa");
+    return qa ? 0 : 0.05 / botPace.current;
+  }
+
+  function takeBotPulse(sim: Sim, dt: number) {
+    if (sim.phase !== "playing" || !sim.piece) {
+      botHand.current = null;
+      return null;
+    }
+    if (!botHand.current) botHand.current = armBot(sim, botThink());
+    const hand = botHand.current;
+    if (!hand) return { hard: true };
+    hand.wait -= dt;
+    if (hand.wait > 0) return null;
+    const pulse = botPulse(sim, hand);
+    if (!pulse) return null;
+    if (pulse.hold) hand.held = true;
+    if (pulse.cw) {
+      hand.turns += 1;
+      if (hand.turns > 4) {
+        botHand.current = null;
+        return { hard: true };
+      }
+    }
+    if (pulse.hard) botHand.current = null;
+    else hand.wait = botGap();
+    return pulse;
   }
 
   function tick(dt: number) {
@@ -905,24 +961,26 @@ export function TetrisApp() {
       else if (just.hard) advanceCoach("hard");
     }
 
+    const watching = sim.mode === "watch";
     const falling = sim.piece;
     const ghostAt = falling ? ghostY(sim) : 0;
+    const pulse = watching ? takeBotPulse(sim, dt) : null;
     const ev = advance(sim, dt, {
-      heldLeft: held.left,
-      heldRight: held.right,
-      justLeft: just.left,
-      justRight: just.right,
-      softDrop: held.down,
-      justHard: just.hard,
-      justCw: just.cw,
-      justCcw: just.ccw,
-      justHold: just.hold,
-      justFlip: just.flip,
-      heldCw: held.cw,
-      heldCcw: held.ccw,
-      heldHold: held.hold,
-      heldFlip: held.flip,
-      nudge: input.takeNudge(),
+      heldLeft: watching ? false : held.left,
+      heldRight: watching ? false : held.right,
+      justLeft: watching ? !!pulse?.left : just.left,
+      justRight: watching ? !!pulse?.right : just.right,
+      softDrop: watching ? false : held.down,
+      justHard: watching ? !!pulse?.hard : just.hard,
+      justCw: watching ? !!pulse?.cw : just.cw,
+      justCcw: watching ? false : just.ccw,
+      justHold: watching ? !!pulse?.hold : just.hold,
+      justFlip: watching ? false : just.flip,
+      heldCw: watching ? false : held.cw,
+      heldCcw: watching ? false : held.ccw,
+      heldHold: watching ? false : held.hold,
+      heldFlip: watching ? false : held.flip,
+      nudge: watching ? 0 : input.takeNudge(),
       das: showPad(u.padMode) ? DAS_TOUCH : saveRef.current.dasMs / 1000,
       arr: saveRef.current.arrMs / 1000,
       sdf: saveRef.current.sdf,
@@ -1084,7 +1142,8 @@ export function TetrisApp() {
       if (
         lockN.current >= 20 &&
         !holdUsed.current &&
-        !saveRef.current.holdHinted
+        !saveRef.current.holdHinted &&
+        sim.mode !== "watch"
       ) {
         saveRef.current = { ...saveRef.current, holdHinted: true };
         writeSave(saveRef.current);
@@ -1133,7 +1192,7 @@ export function TetrisApp() {
       }
     }
 
-    if (sim.pendingCoins) {
+    if (sim.pendingCoins && sim.mode !== "watch") {
       saveRef.current = {
         ...saveRef.current,
         credits: saveRef.current.credits + sim.pendingCoins,
@@ -1228,6 +1287,7 @@ export function TetrisApp() {
   }
 
   function payMissions(ev: Parameters<typeof applyMissions>[1]) {
+    if (simRef.current?.mode === "watch") return;
     const { book, payout, done } = applyMissions(saveRef.current.missions, ev);
     const changed =
       payout > 0 ||
@@ -1384,6 +1444,7 @@ export function TetrisApp() {
       recap: {
         mode: sim.mode,
         lines: sim.lines,
+        level: sim.level,
         combo: sim.maxCombo,
         tspins: sim.tspins,
         stacks: sim.stacks,
@@ -1398,9 +1459,9 @@ export function TetrisApp() {
       },
       bagLine: false,
       tip:
-        !sim.won && !saveRef.current.tipSeen
-          ? "Hold saves a piece. Ghost shows the drop."
-          : null,
+        sim.mode === "watch" || sim.won || saveRef.current.tipSeen
+          ? null
+          : "Hold saves a piece. Ghost shows the drop.",
     });
     if (!sim.won && !saveRef.current.tipSeen) {
       saveRef.current = { ...saveRef.current, tipSeen: true };
@@ -1410,6 +1471,7 @@ export function TetrisApp() {
       if (uiRef.current.phase === "over") syncUi({ coinTake: false });
     }, COIN_FLASH);
   }
+  finishRunRef.current = finishRun;
 
   function stepReplay(dt: number) {
     const snaps = replayRef.current;
@@ -2228,6 +2290,7 @@ export function TetrisApp() {
       }
       return;
     }
+    if (uiRef.current.mode === "watch") return;
     if (e.type === "pointerdown") {
       e.preventDefault();
       dropGhostStrokes(e.currentTarget, e.pointerId);
@@ -2261,7 +2324,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${viewW < 720 ? " is-narrow" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${ui.mode === "watch" ? " is-watch" : ""}${viewW < 720 ? " is-narrow" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -2341,6 +2404,7 @@ export function TetrisApp() {
               aria-label="Hold piece"
               onPointerDown={(e) => {
                 e.preventDefault();
+                if (ui.mode === "watch") return;
                 unlockAudio();
                 inputRef.current?.tap({ hold: true });
                 holdUsed.current = true;
@@ -2425,6 +2489,21 @@ export function TetrisApp() {
                     Watch last
                   </button>
                 )}
+                {ui.mode !== "watch" && (
+                  <button
+                    type="button"
+                    className="text-btn"
+                    data-qa="watch-bot"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      unlockAudio();
+                      startGame("watch");
+                    }}
+                  >
+                    Watch bot
+                  </button>
+                )}
                 <button
                   type="button"
                   className="play-btn"
@@ -2436,11 +2515,13 @@ export function TetrisApp() {
                     startGame();
                   }}
                 >
-                  {ui.mode === "daily" &&
-                  saveRef.current.daily.date === manilaDateKey() &&
-                  saveRef.current.daily.score > 0
-                    ? "Try again"
-                    : "Start"}
+                  {ui.mode === "watch"
+                    ? "Watch"
+                    : ui.mode === "daily" &&
+                        saveRef.current.daily.date === manilaDateKey() &&
+                        saveRef.current.daily.score > 0
+                      ? "Try again"
+                      : "Start"}
                 </button>
               </div>
             )}
@@ -2599,6 +2680,10 @@ export function TetrisApp() {
                       <span>Lines</span>
                       <b>{ui.recap.lines}</b>
                     </li>
+                    <li>
+                      <span>Level</span>
+                      <b>{ui.recap.level}</b>
+                    </li>
                     {ui.recap.combo > 0 && (
                       <li>
                         <span>Best combo</span>
@@ -2663,7 +2748,7 @@ export function TetrisApp() {
                     startGame();
                   }}
                 >
-                  {replayRef.current ? "Play again" : "Retry"}
+                  {ui.mode === "watch" ? "Watch again" : replayRef.current ? "Play again" : "Retry"}
                 </button>
                 {ui.recap && (
                   <button
@@ -2846,6 +2931,7 @@ export function TetrisApp() {
             }}
           />
         )}
+        {ui.mode !== "watch" && (
         <TouchPad
           onHold={(key, down) => {
             unlockAudio();
@@ -2908,6 +2994,35 @@ export function TetrisApp() {
               : undefined
           }
         />
+        )}
+        {ui.mode === "watch" &&
+          (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
+            <div className="watch-bar" role="status" aria-label="Watch bot">
+              <span data-qa="watch-label">Watch bot</span>
+              <button
+                type="button"
+                data-qa="watch-pace"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  const next = botPace.current === 1 ? 2 : 1;
+                  botPace.current = next;
+                  syncUi({ watchPace: next });
+                }}
+              >
+                {ui.watchPace}×
+              </button>
+              <button
+                type="button"
+                data-qa="watch-leave"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  goHome();
+                }}
+              >
+                Leave
+              </button>
+            </div>
+          )}
 
         {ui.phase === "title" && (
           <ModeChips
@@ -3175,6 +3290,11 @@ declare global {
       vizAlive: () => number;
       getCredits: () => number;
       getZap: () => number;
+      getLines: () => number;
+      getLevel: () => number;
+      getMode: () => ModeId;
+      getHold: () => PieceId | null;
+      topOut: () => void;
     };
   }
 }

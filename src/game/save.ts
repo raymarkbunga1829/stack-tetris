@@ -1,5 +1,5 @@
 import { ensureMissions, emptyBook, type MissionBook } from "./missions";
-import { manilaDateKey, utcShift, type ModeId } from "./modes";
+import { isMode, manilaDateKey, utcShift, type ModeId } from "./modes";
 import { isStation, type StationId } from "./radio";
 import { emptyInv, type Inventory, type Receipt } from "./shop";
 import type { ThemeId } from "./themes";
@@ -170,7 +170,7 @@ export function loadSave(): SaveData {
       padSize: parsed.padSize === "huge" ? "huge" : "compact",
       marks: parsed.marks === true,
       holdRight: parsed.holdRight === true,
-      mode: parsed.mode ?? "marathon",
+      mode: isMode(parsed.mode) ? parsed.mode : "marathon",
       missions: ensureMissions(parsed.missions),
       scores: Array.isArray(parsed.scores) ? parsed.scores : [],
       daily: parsed.daily ?? { date: "", score: 0, lines: 0 },
@@ -219,7 +219,11 @@ export function recordRun(data: SaveData, row: ScoreRow): SaveData {
   const scores = [row, ...data.scores]
     .sort((a, b) => b.score - a.score || a.clock - b.clock)
     .slice(0, 30);
-  let next: SaveData = { ...data, scores, high: Math.max(data.high, row.score) };
+  let next: SaveData = {
+    ...data,
+    scores,
+    high: row.mode === "watch" ? data.high : Math.max(data.high, row.score),
+  };
   if (row.mode === "sprint" && row.won) {
     const best = next.sprintBest;
     if (best == null || row.clock < best) next = { ...next, sprintBest: row.clock };

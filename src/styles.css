@@ -264,6 +264,48 @@
   color: var(--color-bg);
 }
 
+.watch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 2px 4px;
+}
+
+.watch-bar span {
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-fg);
+  font: 600 0.72rem/1 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.watch-bar button {
+  flex: none;
+  min-height: 40px;
+  min-width: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-raised);
+  color: var(--color-fg);
+  font: 600 0.7rem/1 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.watch-bar button:active {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.cabinet.is-watch .pad {
+  display: none;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
