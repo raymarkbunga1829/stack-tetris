@@ -1807,6 +1807,26 @@
     0 0 12px color-mix(in oklab, var(--piece, var(--color-fg)) 28%, transparent);
 }
 
+.pwr.is-ask {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 0 0 2px color-mix(in oklab, #b8fff8 70%, transparent),
+    0 0 16px color-mix(in oklab, #b8fff8 40%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pwr.is-ask {
+    animation: power-ask 0.9s ease-in-out infinite;
+  }
+}
+
+@keyframes power-ask {
+  50% {
+    filter: brightness(1.35);
+    transform: scale(1.04);
+  }
+}
+
 .shop-veil {
   position: absolute;
   inset: 0;
@@ -2725,7 +2745,8 @@ html.is-ios .help-android {
   .combo-burst,
   .b2b-burst,
   .pred-chip,
-  .pwr.is-lit {
+  .pwr.is-lit,
+  .pwr.is-ask {
     animation: none !important;
     transition: none;
   }

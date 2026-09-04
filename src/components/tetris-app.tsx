@@ -204,6 +204,7 @@ type Ui = {
   levelPop: number;
   bagPop: number;
   dropAsk: boolean;
+  powerAsk: PowerId | null;
   intro: string | null;
   takeover: number;
   cinema: boolean;
@@ -310,6 +311,7 @@ export function TetrisApp() {
   const gestureT = useRef(0);
   const grabRef = useRef<number | null>(null);
   const hardArm = useRef(0);
+  const powerArm = useRef<{ id: PowerId | null; at: number }>({ id: null, at: 0 });
   const replayRef = useRef<Snap[] | null>(null);
   const replayI = useRef(0);
   const replayT = useRef(0);
@@ -400,6 +402,7 @@ export function TetrisApp() {
     levelPop: 0,
     bagPop: 0,
     dropAsk: false,
+    powerAsk: null,
     intro: null,
     takeover: 0,
     cinema: false,
@@ -655,6 +658,7 @@ export function TetrisApp() {
     shakeRef.current = 0;
     replayRef.current = null;
     hardArm.current = 0;
+    powerArm.current = { id: null, at: 0 };
     sfxStart();
     haptic("select");
     startMusic(mode);
@@ -738,6 +742,7 @@ export function TetrisApp() {
       lifting: false,
       coinTake: false,
       dropAsk: false,
+      powerAsk: null,
       intro,
       takeover: 0,
       cinema: false,
@@ -1359,10 +1364,13 @@ export function TetrisApp() {
     dying.current = false;
     failT.current = 0;
     coinAt.current = performance.now() + COIN_WAIT;
+    powerArm.current = { id: null, at: 0 };
     syncUi({
       phase: "over",
       failing: false,
       coinTake: true,
+      powerAsk: null,
+      dropAsk: false,
       streak: saveRef.current.streak,
       danger: false,
       brink: false,
@@ -1769,6 +1777,10 @@ export function TetrisApp() {
     if (!sim || (sim.phase !== "playing" && sim.phase !== "clearing")) return;
     if (!powersAllowed(sim.mode)) return;
     if (id === "pick") {
+      if (powerArm.current.id) {
+        powerArm.current = { id: null, at: 0 };
+        syncUi({ powerAsk: null });
+      }
       if (uiRef.current.picking) {
         syncUi({ picking: false });
         return;
@@ -1777,6 +1789,12 @@ export function TetrisApp() {
       flashBanner("Tap Next");
       syncUi({ picking: true });
       return;
+    }
+    if (id === "zap" || id === "quake") {
+      if (!wantPower(id)) return;
+    } else if (powerArm.current.id) {
+      powerArm.current = { id: null, at: 0 };
+      syncUi({ powerAsk: null });
     }
     const theme = themeOf(saveRef.current.theme);
     const marked =
@@ -1813,6 +1831,10 @@ export function TetrisApp() {
   /** Tapping an empty slot on the bar: spend credits on the spot, or go get some. */
   function stockPower(id: PowerId) {
     unlockAudio();
+    if (powerArm.current.id) {
+      powerArm.current = { id: null, at: 0 };
+      syncUi({ powerAsk: null });
+    }
     const next = buyWithCredits(saveRef.current, id);
     if (!next) {
       openShop(id);
@@ -1979,6 +2001,36 @@ export function TetrisApp() {
     window.setTimeout(() => {
       if (performance.now() - hardArm.current >= 470) syncUi({ dropAsk: false });
     }, 500);
+    return false;
+  }
+
+  function wantPower(id: "zap" | "quake"): boolean {
+    const sim = simRef.current;
+    if (!sim) return false;
+    const now = performance.now();
+    if (powerArm.current.id === id && now - powerArm.current.at < 900) {
+      powerArm.current = { id: null, at: 0 };
+      syncUi({ powerAsk: null });
+      return true;
+    }
+    const marked = dirtyRows(sim, id === "zap" ? 1 : 2);
+    if (!marked.length) {
+      flashBanner("Nothing to clear");
+      haptic("select");
+      return false;
+    }
+    powerArm.current = { id, at: now };
+    well3dRef.current?.sparkRows(marked, id === "zap" ? "#b8fff8" : "#d8c4a0");
+    flashBanner(id === "zap" ? "Zap? tap again" : "Quake? tap again");
+    haptic("select");
+    sfxSelect();
+    syncUi({ powerAsk: id });
+    window.setTimeout(() => {
+      if (powerArm.current.id === id && performance.now() - powerArm.current.at >= 880) {
+        powerArm.current = { id: null, at: 0 };
+        syncUi({ powerAsk: null });
+      }
+    }, 920);
     return false;
   }
 
@@ -2778,6 +2830,7 @@ export function TetrisApp() {
               onUse={usePower}
               onBuy={stockPower}
               pickOn={ui.picking}
+              armed={ui.powerAsk}
             />
           )
         )}
