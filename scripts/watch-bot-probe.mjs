@@ -110,11 +110,11 @@ try {
   if (playing.powers) errors.push("play: power bar is out on a watch run");
   if (playing.credits !== 80) errors.push(`play: credits moved to ${playing.credits}`);
 
-  const scoreAtPause = playing.score;
   await page.locator(".hud-pause").click({ force: true });
   await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "paused", {
     timeout: 4000,
   });
+  const scoreAtPause = await page.evaluate(() => window.__controlsTest?.getScore?.() ?? 0);
   await page.waitForTimeout(400);
   const paused = await look();
   if (paused.phase !== "paused") errors.push(`pause: phase is ${paused.phase}`);

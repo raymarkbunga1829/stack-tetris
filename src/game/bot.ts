@@ -1,15 +1,17 @@
-import { cellsOf } from "./pieces";
+import { modeOf, type ModeId } from "./modes";
+import { cellsOf, kicksFor } from "./pieces";
 import { cloneBoard } from "./replay";
-import { fits, pulseAction, type Board, type Sim } from "./sim";
+import { fits, pulseAction, type Board, type Piece, type Sim } from "./sim";
 import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
 
 /**
- * Watch-bot Marathon. One linear scorer, one real well.
+ * Watch-bot. One linear scorer, one real well, every mode that will have it.
  *
  * Every decision is a hard drop: a rotation, a column, and maybe Hold. The
- * piece never slides under a stack, never spins a T, never buys a Zap. The
- * weights prefer a clean floor that pays singles and doubles over a Tetris
- * well, and the points that land are the same Marathon table a thumb uses.
+ * piece never slides under a stack, never spins a T, never buys a Zap. Classic
+ * only rests where a NES rotate-and-shift can actually go. Sprint gets a
+ * nudge to finish forty instead of farming the clock. The points that land
+ * are still the mode's own table.
  */
 
 export type Placement = {
@@ -34,6 +36,9 @@ export const BOT_WEIGHTS = {
   hole_depth: -0.4356944860942823,
 } as const;
 
+/** Zen never tops out, so a bot run has to be told to sit. */
+export const ZEN_LOCK_CAP = 80;
+
 export type BotFeatures = {
   landing_height: number;
   eroded_cells: number;
@@ -55,6 +60,12 @@ export function scoreFeatures(f: BotFeatures): number {
     n += BOT_WEIGHTS[k] * f[k];
   });
   return n;
+}
+
+/** Sprint has to finish forty, not stack forever. Other modes keep the table. */
+export function modeBias(mode: ModeId, f: BotFeatures): number {
+  if (mode === "sprint") return 1.8 * f.lines_cleared - 0.2 * f.max_height;
+  return 0;
 }
 
 /** Drop `id` at `rot, x` onto a copy of the board. Null if it cannot rest. */
@@ -95,26 +106,71 @@ export function evaluateDrop(
   return { features, score: scoreFeatures(features) };
 }
 
+/**
+ * Can this piece rotate (cw, the way the bot actually turns) and shift to
+ * `rot, x` from where it is? Classic has no kicks, so a rest that needs a
+ * wall kick is not a rest.
+ */
+export function reachable(
+  board: Board,
+  from: Piece,
+  destRot: Rot,
+  destX: number,
+  kicks: boolean,
+): boolean {
+  let p: Piece = { ...from };
+  let turns = 0;
+  while (p.rot !== destRot && turns < 4) {
+    const to = (((p.rot + 1) % 4) + 4) % 4 as Rot;
+    const table = kicks ? kicksFor(p.id, p.rot, to) : [{ x: 0, y: 0 }];
+    let next: Piece | null = null;
+    for (const k of table) {
+      const cand: Piece = { id: p.id, rot: to, x: p.x + k.x, y: p.y - k.y };
+      if (fits(board, cand)) {
+        next = cand;
+        break;
+      }
+    }
+    if (!next) return false;
+    p = next;
+    turns += 1;
+  }
+  if (p.rot !== destRot) return false;
+  while (p.x < destX) {
+    const cand = { ...p, x: p.x + 1 };
+    if (!fits(board, cand)) return false;
+    p = cand;
+  }
+  while (p.x > destX) {
+    const cand = { ...p, x: p.x - 1 };
+    if (!fits(board, cand)) return false;
+    p = cand;
+  }
+  return restY(board, p.id, p.rot, p.x) != null;
+}
+
 export function pickPlacement(sim: Sim): Placement | null {
   const current = sim.piece;
   if (!current) return null;
+  const kicks = modeOf(sim.mode).kicks;
   let best: Placement | null = null;
 
-  const consider = (id: PieceId, hold: boolean) => {
+  const consider = (id: PieceId, hold: boolean, from: Piece) => {
     for (const rot of [0, 1, 2, 3] as Rot[]) {
       for (let x = -2; x <= 8; x++) {
+        if (!reachable(sim.board, from, rot, x, kicks)) continue;
         const hit = evaluateDrop(sim.board, id, rot, x);
         if (!hit) continue;
-        const score = hit.score - (hold ? 1e-6 : 0);
+        const score = hit.score + modeBias(sim.mode, hit.features) - (hold ? 1e-6 : 0);
         if (!best || score > best.score) best = { hold, rot, x, score };
       }
     }
   };
 
-  consider(current.id, false);
+  consider(current.id, false, current);
   if (sim.canHold) {
     const other = sim.hold ?? sim.next[0];
-    if (other) consider(other, true);
+    if (other) consider(other, true, { id: other, rot: 0, x: 3, y: 0 });
   }
   return best;
 }

@@ -219,6 +219,11 @@ export function powersAllowed(id: ModeId): boolean {
   return id === "marathon" || id === "zen" || id === "arcade" || id === "siege" || id === "blitz";
 }
 
+/** Finesse grades the path. A bot slamming drops is not a path. */
+export function botAllowed(id: ModeId): boolean {
+  return id !== "finesse";
+}
+
 export function utcShift(days: number, from = utcDateKey()): string {
   const d = new Date(`${from}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + days);
