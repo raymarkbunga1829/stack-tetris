@@ -74,7 +74,7 @@ export function evaluateDrop(
   id: PieceId,
   rot: Rot,
   x: number,
-): { features: BotFeatures; score: number } | null {
+): { features: BotFeatures; score: number; board: Board } | null {
   const y = restY(board, id, rot, x);
   if (y == null) return null;
   const placed = cellsOf(id, rot, x, y).filter((c) => c.y >= 0 && c.y < ROWS && c.x >= 0 && c.x < COLS);
@@ -103,7 +103,7 @@ export function evaluateDrop(
     max_height: heights.reduce((n, h) => Math.max(n, h), 0),
     hole_depth,
   };
-  return { features, score: scoreFeatures(features) };
+  return { features, score: scoreFeatures(features), board: cleared };
 }
 
 /**
@@ -149,20 +149,20 @@ export function reachable(
   return restY(board, p.id, p.rot, p.x) != null;
 }
 
-export function pickPlacement(sim: Sim): Placement | null {
+export function listPlacements(sim: Sim): Placement[] {
   const current = sim.piece;
-  if (!current) return null;
+  if (!current) return [];
   const kicks = modeOf(sim.mode).kicks;
-  let best: Placement | null = null;
+  const out: Placement[] = [];
 
   const consider = (id: PieceId, hold: boolean, from: Piece) => {
     for (const rot of [0, 1, 2, 3] as Rot[]) {
-      for (let x = -2; x <= 8; x++) {
+      for (let x = -2; x <= 11; x++) {
         if (!reachable(sim.board, from, rot, x, kicks)) continue;
         const hit = evaluateDrop(sim.board, id, rot, x);
         if (!hit) continue;
         const score = hit.score + modeBias(sim.mode, hit.features) - (hold ? 1e-6 : 0);
-        if (!best || score > best.score) best = { hold, rot, x, score };
+        out.push({ hold, rot, x, score });
       }
     }
   };
@@ -172,6 +172,13 @@ export function pickPlacement(sim: Sim): Placement | null {
     const other = sim.hold ?? sim.next[0];
     if (other) consider(other, true, { id: other, rot: 0, x: 3, y: 0 });
   }
+  return out;
+}
+
+export function pickPlacement(sim: Sim): Placement | null {
+  const all = listPlacements(sim);
+  let best: Placement | null = null;
+  for (const p of all) if (!best || p.score > best.score) best = p;
   return best;
 }
 

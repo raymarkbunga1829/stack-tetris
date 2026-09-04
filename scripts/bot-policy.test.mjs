@@ -44,6 +44,16 @@ test("the table prefers a single over a Tetris", () => {
 });
 
 test("sprint bias rewards a clear more than a taller stack", () => {
-  const bias = (lines, height) => 1.8 * lines - 0.2 * height;
-  assert.ok(bias(1, 4) > bias(0, 1));
+  const clear = 1.8 * 1 - 0.2 * 4;
+  const tall = 1.8 * 0 - 0.2 * 10;
+  assert.ok(clear > tall);
+});
+
+test("action index is hold*56 + rot*14 + x+2", () => {
+  const idx = (hold, rot, x) =>
+    (hold ? 1 : 0) * 56 + (rot % 4) * 14 + Math.max(0, Math.min(13, x + 2));
+  assert.equal(idx(false, 0, -2), 0);
+  assert.equal(idx(false, 1, 3), 19);
+  assert.equal(idx(true, 0, -2), 56);
+  assert.equal(idx(true, 3, 11), 111);
 });
