@@ -1,0 +1,132 @@
+{
+  "score": 504150,
+  "lines": 282,
+  "level": 29,
+  "seed": 505,
+  "mcts_sims": 48,
+  "generations": 5,
+  "method": "AlphaZero (PUCT-MCTS + MLP policy/value), Dellacherie/ES prior blend bootstrap",
+  "hit_100k": true,
+  "eval5_mean_score": 501620.0,
+  "eval5_max_score": 504150,
+  "eval5_mean_lines": 274.0,
+  "eval5_mean_tetrises": 0.0,
+  "eval5": [
+    {
+      "score": 500350,
+      "lines": 275,
+      "level": 28,
+      "pieces": 698,
+      "tetrises": 0,
+      "seed": 101,
+      "topped_out": false
+    },
+    {
+      "score": 500950,
+      "lines": 279,
+      "level": 28,
+      "pieces": 707,
+      "tetrises": 0,
+      "seed": 202,
+      "topped_out": false
+    },
+    {
+      "score": 501250,
+      "lines": 277,
+      "level": 28,
+      "pieces": 697,
+      "tetrises": 0,
+      "seed": 303,
+      "topped_out": false
+    },
+    {
+      "score": 501400,
+      "lines": 257,
+      "level": 26,
+      "pieces": 644,
+      "tetrises": 0,
+      "seed": 404,
+      "topped_out": false
+    },
+    {
+      "score": 504150,
+      "lines": 282,
+      "level": 29,
+      "pieces": 712,
+      "tetrises": 0,
+      "seed": 505,
+      "topped_out": false
+    }
+  ],
+  "dell_blend_eval": 0.45,
+  "wall_sec": 2890.3512527942657,
+  "finished_at": "2026-09-04 22:58:11 AEST",
+  "architecture": {
+    "state_dim": 274,
+    "action_size": 112,
+    "hidden": 256,
+    "layers": "Linear(274,256)-ReLU x3 + policy(112) + value(1)",
+    "mcts": "PUCT c_puct=1.5",
+    "value_target": "tanh(score/80000)"
+  },
+  "checkpoint": "/workspace/stack-rl-az/weights/best.pt",
+  "export": "/workspace/stack-rl-az/exports/policy.json",
+  "browser_export": "exports/policy.json + exports/infer.ts",
+  "vs_es_dellacherie": {
+    "es_eval5_mean_score": 1001270.0,
+    "es_eval5_max_score": 1003700,
+    "es_eval5_mean_tetrises": 0.0,
+    "es_eval5": [
+      {
+        "score": 1000650,
+        "lines": 397,
+        "level": 40,
+        "pieces": 998,
+        "tetrises": 0,
+        "seed": 101,
+        "topped_out": false
+      },
+      {
+        "score": 1000450,
+        "lines": 397,
+        "level": 40,
+        "pieces": 994,
+        "tetrises": 0,
+        "seed": 202,
+        "topped_out": false
+      },
+      {
+        "score": 1000400,
+        "lines": 378,
+        "level": 38,
+        "pieces": 948,
+        "tetrises": 0,
+        "seed": 303,
+        "topped_out": false
+      },
+      {
+        "score": 1001150,
+        "lines": 383,
+        "level": 39,
+        "pieces": 958,
+        "tetrises": 0,
+        "seed": 404,
+        "topped_out": false
+      },
+      {
+        "score": 1003700,
+        "lines": 388,
+        "level": 39,
+        "pieces": 971,
+        "tetrises": 0,
+        "seed": 505,
+        "topped_out": false
+      }
+    ],
+    "az_eval5_mean_score": 501620.0,
+    "az_eval5_max_score": 504150,
+    "az_eval5_mean_tetrises": 0.0,
+    "note": "ES Dellacherie linear bot (stack-rl): greedy feature policy, typically multi-100k\u20131M under caps with ~0 tetrises. AZ: neural policy/value + PUCT MCTS; on this CPU budget eval keeps ~0.45 ES-prior blend so MCTS stays strong while the net learns. Tetris rate stays low in v1."
+  },
+  "fallback_note": "If pure-net (blend\u21920) is weak, that is expected at 16\u201348 sims / ~1\u20132h CPU; the delivered agent is AlphaZero-shaped (self-play+MCTS+\u03c0/v) with ES prior bootstrap, not a silent revert to ES-only greedy."
+}
