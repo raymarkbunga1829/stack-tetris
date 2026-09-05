@@ -1,6 +1,7 @@
 import { modeOf, type ModeId } from "./modes";
 import { cellsOf, kicksFor } from "./pieces";
 import { cloneBoard } from "./replay";
+import { garbageFor } from "./siege";
 import { fits, pulseAction, type Board, type Piece, type Sim } from "./sim";
 import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
 
@@ -91,41 +92,54 @@ export function modeBias(mode: ModeId, f: BotFeatures): number {
   if (mode === "blitz")
     return 1.6 * f.is_tetris + 1.1 * f.lines_cleared + 0.55 * f.eroded_cells - 0.18 * f.max_height;
   if (mode === "siege")
-    return 1.8 * f.lines_cleared + 0.7 * f.eroded_cells + 0.6 * f.is_tetris - 0.22 * f.max_height;
+    return 3.2 * f.lines_cleared + 1.4 * f.eroded_cells + 1.6 * f.is_tetris - 0.7 * f.max_height;
   if (mode === "arcade" || mode === "classic") return 0.35 * f.lines_cleared;
   return 0.2 * f.is_tetris;
 }
 
-type Juice = { combo: number; b2b: boolean; incoming: number };
+type Juice = { combo: number; b2b: boolean; incoming: number; hunters: number };
 
-function juiceOf(sim: Sim, incoming = 0): Juice {
-  return { combo: sim.combo, b2b: sim.b2b, incoming };
+function juiceOf(sim: Sim, incoming = 0, hunters = 0): Juice {
+  return { combo: sim.combo, b2b: sim.b2b, incoming, hunters };
 }
 
 /** Keep a live combo / B2B instead of a greedy bump. Send if garbage is coming. */
-function juiceBonus(f: BotFeatures, juice: Juice, id: PieceId, spin: boolean): number {
+function juiceBonus(f: BotFeatures, juice: Juice, id: PieceId, spin: boolean, mode: ModeId): number {
   let n = 0;
   if (juice.combo >= 0) {
     if (f.lines_cleared > 0) n += 1.2 + 0.42 * juice.combo;
-    else n -= 1.7 + 0.28 * Math.max(0, juice.combo);
+    else n -= mode === "siege" ? 0.35 : 1.7 + 0.28 * Math.max(0, juice.combo);
   }
   if (juice.b2b) {
     const keep = f.is_tetris === 1 || (id === "T" && spin && f.lines_cleared > 0);
     if (keep) n += 2.3;
-    else if (f.lines_cleared > 0) n -= 2.7;
+    else if (f.lines_cleared > 0 && juice.incoming === 0 && mode !== "siege") n -= 2.7;
   }
-  if (juice.incoming > 0 && f.lines_cleared > 0) n += 0.65 * Math.min(4, juice.incoming);
+  if (juice.incoming > 0 && f.lines_cleared > 0) n += 1.15 * Math.min(6, juice.incoming);
   if (f.holes >= 3 && f.lines_cleared > 0) n += 0.5 * f.eroded_cells;
+  if (mode === "siege" && f.lines_cleared > 0) {
+    const tspin = id === "T" && spin;
+    n += 1.1 * garbageFor(
+      f.lines_cleared,
+      tspin,
+      !!(juice.b2b && (f.is_tetris === 1 || tspin)),
+      Math.max(0, juice.combo),
+      false,
+      0,
+      Math.max(1, juice.hunters),
+    );
+  }
   return n;
 }
 
 function afterJuice(juice: Juice, f: BotFeatures, id: PieceId, spin: boolean): Juice {
-  if (f.lines_cleared <= 0) return { combo: -1, b2b: juice.b2b, incoming: juice.incoming };
+  if (f.lines_cleared <= 0) return { combo: -1, b2b: juice.b2b, incoming: juice.incoming, hunters: juice.hunters };
   const difficult = f.is_tetris === 1 || (id === "T" && spin);
   return {
     combo: juice.combo < 0 ? 0 : juice.combo + 1,
     b2b: difficult,
     incoming: Math.max(0, juice.incoming - f.lines_cleared),
+    hunters: juice.hunters,
   };
 }
 
@@ -140,6 +154,7 @@ export function evaluateDrop(
   x: number,
   y?: number,
   pathSpin = false,
+  mode?: ModeId,
 ): { features: BotFeatures; score: number; board: Board } | null {
   const rest = y ?? restY(board, id, rot, x);
   if (rest == null) return null;
@@ -171,7 +186,7 @@ export function evaluateDrop(
     hole_depth,
   };
   const spin = spinBonus(board, id, rot, x, rest, full.length, pathSpin);
-  const setup = setupBonus(cleared, id, features.max_height);
+  const setup = mode === "siege" ? 0 : setupBonus(cleared, id, features.max_height);
   return { features, score: scoreFeatures(features) + spin + setup, board: cleared };
 }
 
@@ -218,11 +233,11 @@ export function reachable(
   return restY(board, p.id, p.rot, p.x) != null;
 }
 
-export function pickPlacement(sim: Sim, incoming = 0): Placement | null {
+export function pickPlacement(sim: Sim, incoming = 0, hunters = 0): Placement | null {
   const current = sim.piece;
   if (!current) return null;
   const kicks = modeOf(sim.mode).kicks;
-  const juice = juiceOf(sim, incoming);
+  const juice = juiceOf(sim, incoming, hunters);
   const ply0 = collectDrops(sim.board, current, false, kicks, sim.mode, true, juice);
   if (sim.canHold) {
     const other = sim.hold ?? sim.next[0];
@@ -294,8 +309,8 @@ export type BotHand = Placement & {
   das: boolean;
 };
 
-export function armBot(sim: Sim, think: number, incoming = 0): BotHand | null {
-  const pick = pickPlacement(sim, incoming);
+export function armBot(sim: Sim, think: number, incoming = 0, hunters = 0): BotHand | null {
+  const pick = pickPlacement(sim, incoming, hunters);
   if (!pick) return null;
   return { ...pick, wait: think, held: false, turns: 0, i: 0, das: false };
 }
@@ -313,7 +328,8 @@ export function playStep(sim: Sim, hand: BotHand): ReturnType<typeof pulseAction
   }
   if (path[hand.i]!.down) {
     const restDown = path.slice(hand.i).every((s) => s.down);
-    const sonic = restDown && (sim.lockT > 0 || sim.level >= 8);
+    const sonic =
+      restDown && (sim.lockT > 0 || sim.level >= 8 || sim.mode === "siege" || sim.mode === "sprint" || sim.mode === "blitz");
     if (sonic) {
       let moved = false;
       while (hand.i < path.length && path[hand.i]!.down) {
@@ -335,6 +351,7 @@ export function playStep(sim: Sim, hand: BotHand): ReturnType<typeof pulseAction
 /** Gap before the next input. Zero in qa so probes stay fast. */
 export function nextGap(hand: BotHand, sim: Sim, qa: boolean): number {
   if (qa) return 0;
+  if (sim.mode === "siege" || sim.mode === "sprint" || sim.mode === "blitz") return 0;
   const step = hand.path?.[hand.i];
   if (!step || step.hard) return 0;
   if (sim.lockT > 0) return 0;
@@ -465,11 +482,11 @@ function collectDrops(
 ): Drop[] {
   const before = colHeights(board);
   const well = maxWell(before);
-  const danger = before.reduce((n, h) => Math.max(n, h), 0) >= 14;
+  const danger = before.reduce((n, h) => Math.max(n, h), 0) >= (mode === "siege" ? 9 : 14);
   const out: Drop[] = [];
   const rests = paths ? searchRests(board, from, kicks, paths === true ? 520 : 240) : hardRests(board, from, kicks);
   for (const rest of rests) {
-    const hit = evaluateDrop(board, from.id, rest.rot, rest.x, rest.y, rest.spin);
+    const hit = evaluateDrop(board, from.id, rest.rot, rest.x, rest.y, rest.spin, mode);
     if (!hit) continue;
     const after = colHeights(hit.board);
     out.push({
@@ -483,9 +500,9 @@ function collectDrops(
         hit.score +
         modeBias(mode, hit.features) +
         greedTax(mode, from.id, hit.features, well, danger) +
-        juiceBonus(hit.features, juice, from.id, rest.spin) +
+        juiceBonus(hit.features, juice, from.id, rest.spin, mode) +
         wellKeep(mode, before, after, hit.features) -
-        (hold ? 0.55 : 0),
+        (hold ? (mode === "siege" ? 0.1 : 0.55) : 0),
       board: hit.board,
       features: hit.features,
     });
@@ -659,9 +676,9 @@ function greedTax(
   if (danger) return f.lines_cleared > 0 ? 1.1 * f.lines_cleared : 0;
   if (mode === "siege") {
     let n = 0;
-    if (f.is_tetris) n += 1.5;
-    if (f.lines_cleared >= 2) n += 0.6 * f.lines_cleared;
-    if (id === "I" && f.lines_cleared > 0 && f.lines_cleared < 4 && well >= 3) n -= 1.5;
+    if (f.is_tetris) n += 2.4;
+    if (f.lines_cleared > 0) n += 1.4 * f.lines_cleared;
+    if (danger && f.lines_cleared > 0) n += 2.2;
     return n;
   }
   let n = 0;
@@ -703,7 +720,7 @@ function wellCol(h: number[]): number {
 
 /** Keep a 9-0 Tetris well. Filling it for a single is the leftover greed. */
 function wellKeep(mode: ModeId, before: number[], after: number[], f: BotFeatures): number {
-  if (mode === "sprint") return 0;
+  if (mode === "sprint" || mode === "siege") return 0;
   const peak = before.reduce((n, h) => Math.max(n, h), 0);
   const col = peak <= 2 ? COLS - 1 : wellCol(before);
   const depth = wellDepth(before, col);
@@ -712,7 +729,6 @@ function wellKeep(mode: ModeId, before: number[], after: number[], f: BotFeature
   else if (depth >= 2 && after[col]! > before[col]!) n -= 2.3;
   if (wellCol(after) === col) n += 0.35;
   else if (peak >= 4) n -= 0.4;
-  if (mode === "siege") n *= 0.55;
   return n;
 }
 
