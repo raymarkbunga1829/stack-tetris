@@ -45,9 +45,12 @@ export function speakClear(opts: {
   perfect: boolean;
   wasB2b: boolean;
   combo: number;
+  pts?: number;
 }): Callout {
   const rank = rankClear(opts);
   const bits: string[] = [];
+  const shout = rank === "tspin" || rank === "tst" || rank === "tetris" || rank === "pc" || rank === "mini";
+  if (shout && opts.pts && opts.pts > 0) bits.push(`+${opts.pts.toLocaleString()}`);
   if (opts.perfect) bits.push("The well is empty.");
   if (opts.wasB2b && (opts.lines === 4 || opts.tspin || opts.perfect)) bits.push("B2B x2");
   if (opts.combo >= 2) bits.push(`combo ${opts.combo}`);

@@ -9,9 +9,9 @@ import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
  *
  * ES grades a rest. A 2-ply beam (this piece + Hold + NEXT) picks the rest.
  * The current piece is a path: slides, sonic drops, kicks, T-spins. NEXT is
- * still hard-drop only so a phone spawn frame stays cheap. Patience tax keeps
- * the I for a Tetris. Setup bias leaves a 3-corner for the T so Watch builds
- * the slot, not only takes one that lucked in. No Zap, no 4-wide, no net.
+ * still hard-drop only so a phone spawn frame stays cheap, except a T — ply-1
+ * peeks twists so Watch holds the T for the slot. Patience tax keeps the I
+ * for a Tetris. Setup bias leaves a 3-corner for the T. No Zap, no 4-wide, no net.
  */
 
 export type Step = {
@@ -441,10 +441,20 @@ function followState(sim: Sim, held: boolean): Follow {
 
 function peekNext(drop: Drop, follow: Follow, kicks: boolean, mode: ModeId): number {
   if (!follow.falling) return drop.score;
-  const ply1 = collectDrops(drop.board, spawnOf(follow.falling), false, kicks, mode, false);
+  const ply1 = collectDrops(
+    drop.board,
+    spawnOf(follow.falling),
+    false,
+    kicks,
+    mode,
+    follow.falling === "T",
+  );
   if (follow.canHold) {
     const other = follow.hold ?? follow.queue[0];
-    if (other) ply1.push(...collectDrops(drop.board, spawnOf(other), true, kicks, mode, false));
+    if (other)
+      ply1.push(
+        ...collectDrops(drop.board, spawnOf(other), true, kicks, mode, other === "T"),
+      );
   }
   if (ply1.length === 0) return drop.score - 48;
   let leaf = ply1[0]!.score;

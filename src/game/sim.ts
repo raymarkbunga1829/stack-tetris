@@ -760,6 +760,24 @@ function handleShift(sim: Sim, input: InputFrame, dt: number) {
   }
 }
 
+export function previewClearPts(sim: Sim): number {
+  const n = sim.clearRows.length;
+  if (n <= 0 && !sim.tSpin) return 0;
+  const tspin = sim.tSpin;
+  const mini = sim.tSpin && sim.tSpinMini;
+  let pts = (LINE_SCORE[n] ?? 0) * sim.level;
+  if (tspin) {
+    pts = mini
+      ? (T_SPIN_MINI_SCORE[n] ?? T_SPIN_MINI_SCORE[0]!) * sim.level
+      : (T_SPIN_SCORE[n] ?? T_SPIN_SCORE[0]!) * sim.level;
+  }
+  const difficult = n === 4 || !!tspin;
+  if (difficult && sim.b2b) pts = Math.floor(pts * 1.5);
+  const combo = sim.combo + 1;
+  if (combo > 0) pts += COMBO_SCORE * combo * sim.level;
+  return pts;
+}
+
 export function tickClock(sim: Sim, dt: number): "win" | null {
   if (sim.phase !== "playing" && sim.phase !== "clearing") return null;
   const capped = Math.min(dt, 0.1);
