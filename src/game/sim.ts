@@ -122,8 +122,10 @@ export type InputFrame = {
   das?: number;
   arr?: number;
   sdf?: number;
-  /** Hold the clock, gravity and the lock timer. The player still moves. */
+  /** Hold gravity and the lock timer. The player still moves. */
   freeze?: boolean;
+  /** Hold the mode clock too (first-run coach). Bot freeze must not. */
+  freezeClock?: boolean;
 };
 
 export type StepEvent =
@@ -758,6 +760,23 @@ function handleShift(sim: Sim, input: InputFrame, dt: number) {
   }
 }
 
+export function tickClock(sim: Sim, dt: number): "win" | null {
+  if (sim.phase !== "playing" && sim.phase !== "clearing") return null;
+  const capped = Math.min(dt, 0.1);
+  sim.clock += capped;
+  if (sim.timeLeft != null) {
+    sim.timeLeft -= capped;
+    if (sim.timeLeft <= 0) {
+      sim.timeLeft = 0;
+      sim.phase = "over";
+      sim.won = true;
+      sim.lastClear = "TIME";
+      return "win";
+    }
+  }
+  return null;
+}
+
 export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   const capped = Math.min(dt, 0.1);
   if (sim.slowT > 0) sim.slowT = Math.max(0, sim.slowT - capped);
@@ -765,18 +784,9 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
   if (sim.phase === "over" || sim.phase === "paused" || sim.phase === "title") {
     return "none";
   }
-  if (sim.phase === "playing" && !input.freeze) {
-    sim.clock += capped;
-    if (sim.timeLeft != null) {
-      sim.timeLeft -= capped;
-      if (sim.timeLeft <= 0) {
-        sim.timeLeft = 0;
-        sim.phase = "over";
-        sim.won = true;
-        sim.lastClear = "TIME";
-        return "win";
-      }
-    }
+  if (!input.freezeClock) {
+    const timed = tickClock(sim, dt);
+    if (timed === "win") return "win";
   }
 
   if (sim.phase === "clearing") {
