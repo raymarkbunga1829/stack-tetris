@@ -180,6 +180,10 @@
   position: relative;
 }
 
+.hud-cell.is-clock {
+  flex: none;
+}
+
 .hud-cell.is-score > b {
   font-size: 1.05rem;
   letter-spacing: -0.03em;
@@ -609,11 +613,13 @@
 
 .play-btn {
   margin-top: 10px;
-  min-height: 50px;
-  min-width: 160px;
+  min-height: 52px;
+  min-width: min(240px, 86%);
+  width: min(260px, 88%);
   padding: 0 24px;
   border: 0;
   border-radius: 999px;
+  white-space: nowrap;
   background:
     linear-gradient(180deg, #fff 0%, var(--piece, var(--color-fg)) 42%, color-mix(in oklab, var(--piece, var(--color-fg)) 70%, #1a140c) 100%);
   color: #12110e;
@@ -2571,6 +2577,15 @@ html.is-ios .help-android {
   .cabinet.is-play .stage {
     grid-column: 1;
     grid-row: 2 / 4;
+    grid-template-columns: 92px minmax(0, 1fr) 92px;
+    gap: 0;
+  }
+  .cabinet.is-play .rail {
+    padding: 12px 8px;
+    background: color-mix(in oklab, var(--color-well) 72%, var(--color-surface));
+  }
+  .cabinet.is-play .well {
+    border-radius: 0;
   }
   .cabinet.is-play .pad {
     grid-column: 2;
@@ -2584,7 +2599,7 @@ html.is-ios .help-android {
   .cabinet.is-play.is-keys {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    width: min(980px, calc(100vw - 28px));
+    width: min(760px, calc(100vw - 28px));
   }
   .cabinet.is-play.is-keys .stage {
     grid-column: 1;
@@ -2631,6 +2646,9 @@ html.is-ios .help-android {
   .cabinet {
     width: min(1080px, calc(100vw - 40px));
     height: min(920px, calc(100dvh - 32px));
+  }
+  .cabinet.is-play.is-keys {
+    width: min(840px, calc(100vw - 40px));
   }
 }
 
