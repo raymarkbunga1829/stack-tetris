@@ -49,7 +49,7 @@ import {
   botAllowed,
   type ModeId,
 } from "@/game/modes";
-import { armBot, botPulse, ZEN_LOCK_CAP, type BotHand } from "@/game/bot";
+import { armBot, playPlacement, ZEN_LOCK_CAP, type BotHand } from "@/game/bot";
 import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { cheapTrail, gradeFinesse, gradeTitle } from "@/game/finesse";
 import { nameRun } from "@/game/run-name";
@@ -844,12 +844,11 @@ export function TetrisApp() {
 
   function botThink(): number {
     const qa = typeof location !== "undefined" && new URLSearchParams(location.search).has("qa");
-    return qa ? 0 : 0.12 / botPace.current;
-  }
-
-  function botGap(): number {
-    const qa = typeof location !== "undefined" && new URLSearchParams(location.search).has("qa");
-    return qa ? 0 : 0.05 / botPace.current;
+    if (qa) return 0;
+    const sim = simRef.current;
+    // High gravity / lock window: never wait. A drip dies mid-move.
+    if (sim && (sim.level >= 10 || sim.lockT > 0)) return 0;
+    return 0.12 / botPace.current;
   }
 
   function isBotRun() {
@@ -876,22 +875,16 @@ export function TetrisApp() {
     }
     if (!botHand.current) botHand.current = armBot(sim, botThink());
     const hand = botHand.current;
-    if (!hand) return { hard: true };
+    if (!hand) {
+      playPlacement(sim, { hold: false, rot: sim.piece.rot, x: sim.piece.x, score: 0 });
+      return null;
+    }
     hand.wait -= dt;
     if (hand.wait > 0) return null;
-    const pulse = botPulse(sim, hand);
-    if (!pulse) return null;
-    if (pulse.hold) hand.held = true;
-    if (pulse.cw) {
-      hand.turns += 1;
-      if (hand.turns > 4) {
-        botHand.current = null;
-        return { hard: true };
-      }
-    }
-    if (pulse.hard) botHand.current = null;
-    else hand.wait = botGap();
-    return pulse;
+    // One shot: hold → rotate → shift → hard on this tick. Gravity cannot bury a drip.
+    botHand.current = null;
+    playPlacement(sim, hand);
+    return null;
   }
 
   function tick(dt: number) {
@@ -3298,8 +3291,8 @@ function botDriving(ui: Pick<Ui, "botPlay" | "mode">): boolean {
 }
 
 function botHudLabel(mode: ModeId): string {
-  if (mode === "watch") return "Watch bot";
-  return `Bot · ${modeOf(mode).name}`;
+  if (mode === "watch") return "ES bot";
+  return `ES · ${modeOf(mode).name}`;
 }
 
 function botStartLabel(mode: ModeId): string {
