@@ -26,6 +26,7 @@ const SAVE = {
   a2hs: true,
   mode: "marathon",
   credits: 80,
+  botPlay: true,
 };
 
 try {

@@ -417,7 +417,7 @@ export function TetrisApp() {
     cause: null,
     siege: null,
     watchPace: 1,
-    botPlay: false,
+    botPlay: saveRef.current.botPlay,
   });
   const uiRef = useRef(ui);
   uiRef.current = ui;
@@ -445,7 +445,7 @@ export function TetrisApp() {
   const botDoneLock = useRef(-1);
   const botUiAt = useRef(0);
   const botPace = useRef<1 | 2>(1);
-  const botPlayRef = useRef(false);
+  const botPlayRef = useRef(saveRef.current.botPlay);
   const introGen = useRef(0);
   const introUntil = useRef(0);
   const wellGenRef = useRef(0);
@@ -797,6 +797,10 @@ export function TetrisApp() {
     botDoneLock.current = -1;
     const bot = mode === "watch" || botPlayRef.current;
     botPlayRef.current = bot;
+    if (bot !== saveRef.current.botPlay) {
+      saveRef.current = { ...saveRef.current, botPlay: bot };
+      writeSave(saveRef.current);
+    }
     if (bot) requestWellRebuild(true);
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
@@ -962,6 +966,8 @@ export function TetrisApp() {
     }
     botPlayRef.current = next;
     if (!next) botHand.current = null;
+    saveRef.current = { ...saveRef.current, botPlay: next };
+    writeSave(saveRef.current);
     sfxSelect();
     haptic("select");
     syncUi({ botPlay: next });
@@ -2339,7 +2345,7 @@ export function TetrisApp() {
       botPlay = true;
       botPlayRef.current = true;
     }
-    saveRef.current = { ...saveRef.current, mode: id };
+    saveRef.current = { ...saveRef.current, mode: id, botPlay };
     writeSave(saveRef.current);
     well3dRef.current?.setClear(
       saveRef.current.clearWell || id === "sprint" || id === "daily",
@@ -2720,22 +2726,7 @@ export function TetrisApp() {
                     Watch last
                   </button>
                 )}
-                {ui.mode !== "watch" && (
-                  <button
-                    type="button"
-                    className={`text-btn${ui.botPlay ? " is-on" : ""}`}
-                    data-qa="bot-plays"
-                    aria-pressed={ui.botPlay}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleBotPlay();
-                    }}
-                  >
-                    {ui.botPlay ? "Bot on" : "Bot plays"}
-                  </button>
-                )}
-                {ui.mode !== "watch" && (
+                {ui.botPlay && ui.mode !== "watch" && botAllowed(ui.mode) && (
                   <button
                     type="button"
                     className="text-btn"
@@ -3370,24 +3361,6 @@ export function TetrisApp() {
                 streak={ui.streak}
                 onPick={pickMode}
               />
-              <div className="sheet-bot-row">
-                <button
-                  type="button"
-                  className={`text-btn${ui.botPlay ? " is-on" : ""}`}
-                  data-qa="sheet-bot-plays"
-                  aria-pressed={ui.botPlay}
-                  onClick={() => toggleBotPlay()}
-                >
-                  {ui.botPlay ? "Bot on" : "Bot plays"}
-                </button>
-                <p>
-                  {ui.mode === "finesse"
-                    ? "The bot does not play Finesse."
-                    : ui.botPlay
-                      ? `The bot will play ${ui.mode === "watch" ? "Marathon" : modeOf(ui.mode).name}.`
-                      : "Watch bot is Marathon. Bot plays works on every other mode."}
-                </p>
-              </div>
               <MissionRow book={ui.missions} />
             </div>
           </div>
