@@ -804,8 +804,9 @@ export function TetrisApp() {
     bestStill.current = null;
     wipePit();
     well3dRef.current?.setClear(saveRef.current.clearWell || mode === "sprint" || mode === "daily");
-    const intro =
-      mode === "sprint"
+    const intro = bot
+      ? null
+      : mode === "sprint"
         ? "40"
         : mode === "blitz"
           ? "2:00"
@@ -821,16 +822,18 @@ export function TetrisApp() {
                     ? "Read"
                     : mode === "siege"
                       ? "8"
-                      : mode === "watch"
-                        ? "Watch"
-                        : "Go";
-    introGen.current += 1;
-    const gen = introGen.current;
-    introUntil.current = performance.now() + 1600;
-    window.setTimeout(() => {
-      if (introGen.current !== gen) return;
-      dismissIntro();
-    }, 1600);
+                      : "Go";
+    if (intro) {
+      introGen.current += 1;
+      const gen = introGen.current;
+      introUntil.current = performance.now() + 1600;
+      window.setTimeout(() => {
+        if (introGen.current !== gen) return;
+        dismissIntro();
+      }, 1600);
+    } else {
+      introUntil.current = 0;
+    }
     syncUi({
       phase: "playing",
       banner: null,
@@ -996,8 +999,10 @@ export function TetrisApp() {
 
     if (
       u.intro &&
-      introUntil.current > 0 &&
-      performance.now() >= introUntil.current
+      (isBotRun() ||
+        u.lines > 0 ||
+        u.level > 1 ||
+        (introUntil.current > 0 && performance.now() >= introUntil.current))
     ) {
       dismissIntro();
     }
@@ -2678,9 +2683,13 @@ export function TetrisApp() {
                 {modeOf(ui.mode).carving}
               </p>
             )}
-            {ui.intro && (ui.phase === "playing" || ui.phase === "clearing") && (
+            {ui.intro &&
+              !botDriving(ui) &&
+              ui.lines === 0 &&
+              ui.level <= 1 &&
+              (ui.phase === "playing" || ui.phase === "clearing") && (
               <div className="intro" data-qa="mode-intro" aria-hidden="true">
-                <em>{botDriving(ui) ? botHudLabel(ui.mode) : modeOf(ui.mode).name}</em>
+                <em>{modeOf(ui.mode).name}</em>
                 <b>{ui.intro}</b>
                 <p>{modeOf(ui.mode).carving}</p>
               </div>

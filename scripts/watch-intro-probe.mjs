@@ -2,12 +2,11 @@
 /**
  * Does Watch bot keep the well bright, and does the Watch intro stay gone?
  *
- * Live ES bot used to leave ui.intro stuck on "Watch" because the 1.6s dismiss
- * was not urgent and skipped while the sim was clearing. Every playing↔clearing
- * remount painted the dark Watch card over the well. Calm skip-bloom also left
- * the pit looking unlit. This starts Watch on a phone, checks the intro is
- * only a start card, then jumps to lv30 and asks that Watch does not come
- * back and the well still has light in it.
+ * The Watch start card used to remount on every line clear (stuck ui.intro +
+ * playing↔clearing), and skip-bloom left the pit looking unlit. Watch bot
+ * no longer paints that card at all — the HUD already says ES bot. This
+ * starts Watch on a phone, asserts the overlay never appears, jumps to
+ * lv30, and asks that the well still has cells and light.
  * Usage: node scripts/watch-intro-probe.mjs [url]
  */
 import { chromium } from "playwright";
@@ -64,22 +63,17 @@ try {
     text: (await introText(page)).trim(),
     hook: await page.evaluate(() => window.__controlsTest?.getIntro?.() ?? null),
   };
-  if (!atStart.intro) errors.push("start: Watch intro never showed");
-  if (atStart.text && atStart.text !== "Watch") {
-    errors.push(`start: intro said "${atStart.text}" instead of Watch`);
-  }
-  if (atStart.hook != null && atStart.hook !== "Watch") {
-    errors.push(`start: getIntro is ${atStart.hook}`);
-  }
+  if (atStart.intro) errors.push(`start: Watch intro showed "${atStart.text}"`);
+  if (atStart.hook) errors.push(`start: getIntro is ${atStart.hook}`);
 
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1600);
   const afterCard = {
     intro: await introVisible(page),
     hook: await page.evaluate(() => window.__controlsTest?.getIntro?.() ?? null),
     phase: await page.evaluate(() => window.__controlsTest?.getPhase?.() ?? ""),
   };
-  if (afterCard.intro) errors.push("after 1.6s: Watch intro is still on the well");
-  if (afterCard.hook) errors.push(`after 1.6s: getIntro is still ${afterCard.hook}`);
+  if (afterCard.intro) errors.push("after start: Watch intro is on the well");
+  if (afterCard.hook) errors.push(`after start: getIntro is still ${afterCard.hook}`);
 
   await page.waitForFunction(() => (window.__controlsTest?.getScore?.() ?? 0) > 0, {
     timeout: 12000,
@@ -117,7 +111,7 @@ try {
     errors.push(`lv30: well drew 0 cells (${JSON.stringify(after.well)})`);
   }
   const luma = after.well?.luma ?? 0;
-  if (luma > 0 && luma < 12) {
+  if (luma > 0 && luma < 18) {
     errors.push(`lv30: well luma ${luma.toFixed(1)} is too dark`);
   }
 } catch (err) {

@@ -117,7 +117,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   renderer.shadowMap.enabled = false;
 
   const EXPOSURE = 1.18;
-  const EXPOSURE_CALM = 1.92;
   const HEMI_I = 0.62;
   const KEY_I = 1.7;
   const FILL_I = 0.38;
@@ -987,7 +986,36 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
 
     lastCells = n;
-    if (calm) shaft.intensity *= 1.75;
+    if (calm) {
+      renderer.toneMapping = THREE.NoToneMapping;
+      renderer.toneMappingExposure = 1.22;
+      hemi.intensity = 1.28;
+      key.intensity = 2.85;
+      fill.intensity = 0.9;
+      rim.intensity = 1.5;
+      scene.environmentIntensity = reduce ? 0.8 : 1.5;
+      solidMat.emissiveIntensity = 0.82;
+      solidMat.metalness = 0.08;
+      if (scene.fog instanceof THREE.FogExp2) scene.fog.density = 0.0028;
+      shaft.intensity *= 2.05;
+      jewel.intensity = 20;
+      bounce.intensity = 18;
+      godMat.opacity = reduce ? 0.12 : 0.24;
+      hazeMat.opacity = 0.12;
+    } else {
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = EXPOSURE;
+      hemi.intensity = HEMI_I;
+      key.intensity = KEY_I;
+      fill.intensity = FILL_I;
+      rim.intensity = RIM_I;
+      scene.environmentIntensity = ENV_I;
+      solidMat.emissiveIntensity = EMISSIVE_I;
+      solidMat.metalness = 0.32;
+      if (scene.fog instanceof THREE.FogExp2) scene.fog.density = FOG_D;
+      jewel.intensity = 8;
+      bounce.intensity = 8;
+    }
     if (calm || !useComposer) renderer.render(scene, camera);
     else composer.render();
     } catch {
@@ -1504,18 +1532,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         nodT = 0;
       }
       calm = on;
-      renderer.toneMappingExposure = on ? EXPOSURE_CALM : EXPOSURE;
-      hemi.intensity = on ? 1.12 : HEMI_I;
-      key.intensity = on ? 2.55 : KEY_I;
-      fill.intensity = on ? 0.7 : FILL_I;
-      rim.intensity = on ? 1.35 : RIM_I;
-      scene.environmentIntensity = on ? (reduce ? 0.7 : 1.35) : ENV_I;
-      solidMat.emissiveIntensity = on ? 0.55 : EMISSIVE_I;
-      if (scene.fog instanceof THREE.FogExp2) scene.fog.density = on ? 0.004 : FOG_D;
-      godMat.opacity = (reduce ? 0.06 : 0.12) * (on ? 2 : 1);
-      jewel.intensity = on ? 16 : 8;
-      bounce.intensity = on ? 14 : 8;
-      hazeMat.opacity = on ? 0.1 : 0.06;
     },
     dispose,
   };
