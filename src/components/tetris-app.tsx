@@ -556,8 +556,9 @@ export function TetrisApp() {
         if (!document.hidden) {
           resumeAudio();
           if (simRef.current?.phase === "playing") setMusicPaused(false);
-        } else if (simRef.current?.phase === "playing") {
+        } else if (simRef.current?.phase === "playing" || simRef.current?.phase === "clearing") {
           simRef.current.phase = "paused";
+          botHand.current = null;
           setMusicPaused(true);
           syncUi();
         }
@@ -1042,12 +1043,12 @@ export function TetrisApp() {
         syncUi({ shop: false, settings: false, board: false });
         return;
       }
-      if (u.phase === "playing" || u.phase === "clearing" || u.phase === "paused") {
-        if (simRef.current) {
-          pauseToggle(simRef.current);
-          setMusicPaused(simRef.current.phase === "paused");
-          syncUi({ phase: simRef.current.phase });
-        }
+      if (u.phase === "playing" || u.phase === "clearing") {
+        if (haltPlay()) syncUi({ phase: "paused" });
+      } else if (u.phase === "paused" && simRef.current) {
+        resumePlay(simRef.current);
+        setMusicPaused(false);
+        syncUi({ phase: simRef.current.phase });
       }
     }
 
@@ -1061,6 +1062,9 @@ export function TetrisApp() {
     }
 
     const sim = simRef.current;
+    if (u.phase === "paused" && sim && (sim.phase === "playing" || sim.phase === "clearing")) {
+      haltPlay();
+    }
     if (u.phase === "title" && u.watching) {
       if (attractOn.current && performance.now() > attractUntil.current) {
         attractOn.current = false;
@@ -2414,22 +2418,26 @@ export function TetrisApp() {
     syncUi(extra);
   }
 
+  function haltPlay() {
+    const sim = simRef.current;
+    if (!sim) return false;
+    if (sim.phase !== "playing" && sim.phase !== "clearing") return false;
+    sim.phase = "paused";
+    botHand.current = null;
+    setMusicPaused(true);
+    return true;
+  }
+
   function openSettings() {
     unlockAudio();
-    if (simRef.current?.phase === "playing") {
-      simRef.current.phase = "paused";
-      setMusicPaused(true);
-      syncUi({ phase: "paused", settings: true });
-    } else syncUi({ settings: true });
+    if (haltPlay()) syncUi({ phase: "paused", settings: true });
+    else syncUi({ settings: true });
   }
 
   function openBoard() {
     unlockAudio();
-    if (simRef.current?.phase === "playing") {
-      simRef.current.phase = "paused";
-      setMusicPaused(true);
-      syncUi({ phase: "paused", board: true });
-    } else syncUi({ board: true });
+    if (haltPlay()) syncUi({ phase: "paused", board: true });
+    else syncUi({ board: true });
   }
 
   function setProfile(p: HapticProfile) {
@@ -2655,9 +2663,7 @@ export function TetrisApp() {
                   e.preventDefault();
                   unlockAudio();
                   if (simRef.current) {
-                    pauseToggle(simRef.current);
-                    setMusicPaused(simRef.current.phase === "paused");
-                    syncUi({ phase: simRef.current.phase });
+                    if (haltPlay()) syncUi({ phase: "paused" });
                   }
                 }}
               >

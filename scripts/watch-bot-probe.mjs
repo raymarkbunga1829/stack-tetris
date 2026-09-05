@@ -124,10 +124,13 @@ try {
     timeout: 4000,
   });
   const scoreAtPause = await page.evaluate(() => window.__controlsTest?.getScore?.() ?? 0);
-  await page.waitForTimeout(400);
+  const linesAtPause = await page.evaluate(() => window.__controlsTest?.getLines?.() ?? 0);
+  await page.waitForTimeout(900);
   const paused = await look();
   if (paused.phase !== "paused") errors.push(`pause: phase is ${paused.phase}`);
   if (paused.score !== scoreAtPause) errors.push("pause: the bot still scored while paused");
+  const linesNow = await page.evaluate(() => window.__controlsTest?.getLines?.() ?? 0);
+  if (linesNow !== linesAtPause) errors.push("pause: lines still moved while paused");
   await page.locator('[data-qa="pause-settings"]').click({ force: true });
   await page.waitForSelector('[data-qa="set-bot"]', { timeout: 4000 });
   const botOn = (await page.locator('[data-qa="set-bot"] b').innerText()).trim();
