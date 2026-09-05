@@ -556,6 +556,8 @@
   width: 100%;
   height: 100%;
   max-width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .well .viz {
@@ -564,6 +566,183 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+/*
+ * Siege hull — HOLD / well / NEXT as one ship. Plume and climb live on the
+ * keel. Not TETR.IO: Stack's bezel, Stack's fire.
+ */
+.cabinet.is-siege.is-play .stage.is-hull {
+  gap: 0;
+  grid-template-columns: 50px minmax(0, 1fr) 50px;
+}
+
+.cabinet.is-siege.is-play .stage.is-hull .well {
+  border-radius: 2px 2px 16px 16px;
+  box-shadow:
+    inset 0 0 0 7px var(--bezel, #2a2e3a),
+    0 18px 28px color-mix(in oklab, #081018 70%, transparent);
+  overflow: hidden;
+}
+
+.cabinet.is-siege.is-play .stage.is-hull .rail {
+  padding: 10px 4px 8px;
+  background: color-mix(in oklab, var(--bezel, #2a2e3a) 82%, #000);
+  border: 1px solid var(--color-line);
+}
+
+.cabinet.is-siege.is-play .stage.is-hull .rail:first-of-type {
+  border-radius: 14px 0 0 10px;
+  border-right: 0;
+  justify-content: flex-start;
+  padding-top: 18%;
+}
+
+.cabinet.is-siege.is-play .stage.is-hull .rail-next {
+  border-radius: 0 14px 10px 0;
+  border-left: 0;
+}
+
+.cabinet.is-siege.is-play .stage.is-hull .pocket {
+  background: #0c1018;
+}
+
+.hull-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 22%, #d8e8ff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 40% 8%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 70%, #c8d8ff 50%, transparent 51%),
+    radial-gradient(1px 1px at 22% 62%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 64% 84%, #e8f0ff 50%, transparent 51%);
+}
+
+.hull-in {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 4;
+  min-width: 22px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #c44040;
+  color: #fff;
+  font: 700 0.72rem/1 var(--font-display);
+  pointer-events: none;
+}
+
+.plume {
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  bottom: -2px;
+  height: 22%;
+  z-index: 3;
+  pointer-events: none;
+  filter: blur(0.4px);
+}
+
+.plume i {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 42%;
+  height: 70%;
+  transform: translateX(-50%);
+  border-radius: 40% 40% 48% 48%;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    #f7fbff 0%,
+    #8ee4ff 28%,
+    #3a7cff 58%,
+    transparent 78%
+  );
+  opacity: 0.55;
+}
+
+.plume i:nth-child(2) {
+  width: 64%;
+  height: 100%;
+  opacity: 0.32;
+}
+
+.plume i:nth-child(3) {
+  width: 22%;
+  height: 48%;
+  opacity: 0.8;
+}
+
+.plume.is-hot,
+.cabinet.is-slam .plume,
+.cabinet.is-tint .plume {
+  height: 34%;
+}
+
+.plume.is-hot i,
+.cabinet.is-slam .plume i,
+.cabinet.is-tint .plume i {
+  opacity: 0.95;
+}
+
+.climb {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 4;
+  margin: 0;
+  transform: translateX(-50%);
+  color: #dff6ff;
+  font: 700 0.95rem/1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 0 #000, 0 0 12px #3a7cff;
+  pointer-events: none;
+}
+
+.climb small {
+  margin-left: 2px;
+  font: 600 0.58rem/1 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ad0e8;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .plume i {
+    animation: plume-lick 0.32s ease-in-out infinite alternate;
+  }
+  .plume i:nth-child(2) {
+    animation-duration: 0.44s;
+    animation-delay: -0.1s;
+  }
+  .plume i:nth-child(3) {
+    animation-duration: 0.22s;
+  }
+  .cabinet.is-siege.is-play.is-slam .stage.is-hull {
+    animation: hull-kick 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@keyframes plume-lick {
+  from {
+    transform: translateX(-50%) scaleY(0.88) scaleX(1.05);
+  }
+  to {
+    transform: translateX(-50%) scaleY(1.12) scaleX(0.94);
+  }
+}
+
+@keyframes hull-kick {
+  0% {
+    transform: translateY(5px);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 .veil {
