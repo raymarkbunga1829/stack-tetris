@@ -22,11 +22,16 @@ export function rankClear(opts: {
   return "single";
 }
 
-export function titleFor(rank: CallRank): string {
+export function titleFor(rank: CallRank, lines = 0): string {
   if (rank === "pc") return "ALL CLEAR";
-  if (rank === "mini") return "MINI";
-  if (rank === "tst") return "TST";
-  if (rank === "tspin") return "T-SPIN";
+  if (rank === "mini") return lines > 0 ? "MINI T-SPIN" : "MINI";
+  if (rank === "tst") return "T-SPIN TRIPLE";
+  if (rank === "tspin") {
+    if (lines >= 3) return "T-SPIN TRIPLE";
+    if (lines === 2) return "T-SPIN DOUBLE";
+    if (lines === 1) return "T-SPIN SINGLE";
+    return "T-SPIN";
+  }
   if (rank === "tetris") return "TETRIS";
   if (rank === "triple") return "TRIPLE";
   if (rank === "double") return "DOUBLE";
@@ -47,7 +52,7 @@ export function speakClear(opts: {
   if (opts.wasB2b && (opts.lines === 4 || opts.tspin || opts.perfect)) bits.push("B2B x2");
   if (opts.combo >= 2) bits.push(`combo ${opts.combo}`);
   return {
-    title: titleFor(rank),
+    title: titleFor(rank, opts.lines),
     sub: bits.length ? bits.join(" · ") : rank === "pc" ? "The well is empty." : null,
     rank,
   };

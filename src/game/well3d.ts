@@ -1137,7 +1137,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sweepT =
       kind === "single" ? 0.18 : kind === "double" ? 0.24 : kind === "triple" ? 0.3 : kind === "clear" ? 0.22 : 0.36;
     punchCam(
-      kind === "stack" ? 0.22 : kind === "tspin" ? 0.2 : kind === "triple" ? 0.14 : kind === "double" ? 0.1 : 0.06,
+      kind === "tspin" ? 0.38 : kind === "stack" ? 0.34 : kind === "triple" ? 0.14 : kind === "double" ? 0.1 : 0.06,
     );
   }
 

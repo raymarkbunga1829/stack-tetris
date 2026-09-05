@@ -694,6 +694,9 @@ export function TetrisApp() {
       extra.failing === true ||
       extra.watching === false ||
       extra.botPlay != null ||
+      extra.callout != null ||
+      extra.banner != null ||
+      extra.b2bPop != null ||
       "intro" in extra;
     if (
       isBotRun() &&
@@ -1813,25 +1816,25 @@ export function TetrisApp() {
     noteStill(sim, spoken);
     const beat = kind === "single" ? "double" : kind;
     engine.punch(
-      beat === "stack" ? 0.28 : beat === "tspin" ? 0.24 : beat === "triple" ? 0.16 : 0.1,
+      beat === "tspin" ? 0.48 : beat === "stack" ? 0.42 : beat === "triple" ? 0.2 : 0.1,
     );
     const tint =
       beat === "stack"
         ? "#f7f4ee"
         : beat === "tspin"
-          ? "#c9d6ea"
+          ? "#d4c4f0"
           : beat === "triple"
             ? "#d4c4f0"
             : "#e8d4a0";
     engine.sparkRows(sim.clearRows, tint);
     engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(beat);
-    if (beat === "stack" || beat === "tspin") engine.nod(0.42);
+    if (beat === "stack" || beat === "tspin") engine.nod(0.58);
     else if (beat === "triple") engine.nod(0.18);
     sfxLine(spoken.rank);
     if (beat === "triple" || beat === "stack" || beat === "tspin") sfxShatter();
     if (beat === "stack" || beat === "tspin") {
-      shakeRef.current = beat === "stack" ? 8 : 6;
+      shakeRef.current = beat === "tspin" ? 11 : 9;
       bangTint();
     } else if (beat === "triple") {
       shakeRef.current = 4;
@@ -1876,7 +1879,12 @@ export function TetrisApp() {
   }
 
   function showCallout(next: Callout) {
-    calloutT.current = next.rank === "pc" || next.rank === "tetris" ? 1.4 : next.rank === "single" ? 0.7 : 1.05;
+    calloutT.current =
+      next.rank === "pc" || next.rank === "tetris" || next.rank === "tspin" || next.rank === "tst"
+        ? 1.75
+        : next.rank === "single"
+          ? 0.7
+          : 1.05;
     syncUi({ callout: next });
   }
 
@@ -3087,8 +3095,18 @@ export function TetrisApp() {
                 B2B
               </p>
             )}
-            {ui.phase === "playing" && ui.callout && (
-              <p className={`callout is-${ui.callout.rank}`} aria-live="polite">
+            {(ui.phase === "playing" || ui.phase === "clearing") && ui.callout && (
+              <p
+                className={`callout is-${ui.callout.rank}${
+                  ui.callout.rank === "tetris" ||
+                  ui.callout.rank === "tspin" ||
+                  ui.callout.rank === "tst" ||
+                  ui.callout.rank === "pc"
+                    ? " is-shout"
+                    : ""
+                }`}
+                aria-live="polite"
+              >
                 <b>{ui.callout.title}</b>
                 {ui.callout.sub && <em>{ui.callout.sub}</em>}
               </p>

@@ -382,11 +382,13 @@ export function sfxMini() {
   pulse(1175, 0.08, 0.045, 12, 0.2);
 }
 export function sfxTspin() {
-  duckMusic(0.48, 0.22);
-  pulse(311, 0.06, 0, 25, 0.28);
-  pulse(392, 0.07, 0.05, 25, 0.3);
-  pulse(523, 0.12, 0.1, 12, 0.24);
-  noiseBurst(0.08, 0.02, 0.12, 1800, 0.7, true);
+  duckMusic(0.62, 0.2);
+  noiseBurst(0.1, 0, 0.16, 1600, 0.72, true);
+  pulse(311, 0.07, 0, 25, 0.3);
+  pulse(392, 0.08, 0.05, 25, 0.32);
+  pulse(523, 0.12, 0.1, 12, 0.26);
+  pulse(784, 0.14, 0.16, 12, 0.22);
+  slide(196, 392, 0.16, 0.02, "triangle", 0.16);
 }
 export function sfxTst() {
   duckMusic(0.58, 0.18);
