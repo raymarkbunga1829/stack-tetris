@@ -22,6 +22,7 @@ export type Siege = {
   incoming: number;
   hunters: number;
   dumpT: number;
+  t: number;
 };
 
 const TINTS = ["#6ee0e4", "#e87870", "#e8c46a", "#b08ad4", "#78c47c", "#e09852", "#7eb4c8", "#ff8ad4"];
@@ -36,8 +37,7 @@ export function createSiege(): Siege {
       badges: i === 3 || i === 6 ? 1 : 0,
       // One hunter at the start. The rest acquire you once the stack is high.
       aimPlayer: i === 0,
-      // First dump after a few placements, not on the first lock.
-      cd: 5.8 + i * 0.65,
+      cd: 7.2 + i * 2.1,
       dead: false,
       tint: TINTS[i]!,
     };
@@ -50,6 +50,7 @@ export function createSiege(): Siege {
     incoming: 0,
     hunters: rivals.filter((r) => r.aimPlayer).length,
     dumpT: 0,
+    t: 0,
   };
 }
 
@@ -125,19 +126,58 @@ export function sendGarbage(s: Siege, amount: number): number {
   return kos;
 }
 
+/** How many guns can look at you. Time and KOs raise the cap — never eight at once. */
+function hunterCap(s: Siege): number {
+  const live = s.rivals.filter((r) => !r.dead).length;
+  const byTime = s.t < 20 ? 1 : s.t < 40 ? 2 : s.t < 65 ? 3 : s.t < 95 ? 4 : 5;
+  const byKos = s.kos < 1 ? 1 : s.kos < 3 ? 2 : s.kos < 6 ? 3 : s.kos < 10 ? 4 : 5;
+  return Math.min(live, Math.max(byTime, byKos));
+}
+
 export function tickSiege(s: Siege, dt: number, stackHigh: boolean): number {
+  s.t += dt;
+  const cap = hunterCap(s);
+  let hunters = s.rivals.filter((r) => !r.dead && r.aimPlayer).length;
   let incoming = 0;
   for (const r of s.rivals) {
     if (r.dead) continue;
-    if (stackHigh && Math.random() < dt * 0.15) r.aimPlayer = true;
+    if (r.aimPlayer && hunters > cap) {
+      r.aimPlayer = false;
+      hunters -= 1;
+    } else if (!r.aimPlayer && hunters < cap && Math.random() < dt * (stackHigh ? 0.07 : 0.022)) {
+      r.aimPlayer = true;
+      hunters += 1;
+    }
     r.cd -= dt;
     if (r.cd > 0) continue;
-    r.cd = 2.2 + Math.random() * 2.4;
-    const shot = Math.random() < 0.55 ? (Math.random() < 0.25 ? 4 : Math.random() < 0.5 ? 2 : 1) : 0;
-    if (shot > 0 && r.aimPlayer) incoming += Math.max(1, Math.floor(shot * (1 + badgeBoost(r.badges))));
-    if (Math.random() < 0.35) r.aimPlayer = !r.aimPlayer;
+    r.cd = s.t < 28 ? 5.4 + Math.random() * 2.4 : s.t < 55 ? 3.8 + Math.random() * 2.0 : 2.6 + Math.random() * 1.8;
+    if (!r.aimPlayer) continue;
+    const roll = Math.random();
+    const shot =
+      s.t < 22
+        ? roll < 0.42
+          ? 1
+          : roll < 0.55
+            ? 2
+            : 0
+        : s.t < 50
+          ? roll < 0.38
+            ? 1
+            : roll < 0.6
+              ? 2
+              : roll < 0.68
+                ? 3
+                : 0
+          : roll < 0.32
+            ? 1
+            : roll < 0.58
+              ? 2
+              : roll < 0.74
+                ? 4
+                : 0;
+    if (shot > 0) incoming += Math.max(1, Math.floor(shot * (1 + badgeBoost(r.badges) * 0.45)));
   }
-  s.incoming += incoming;
+  s.incoming = Math.min(8, s.incoming + incoming);
   s.hunters = s.rivals.filter((r) => !r.dead && r.aimPlayer).length;
   return incoming;
 }
