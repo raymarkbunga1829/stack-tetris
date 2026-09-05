@@ -2820,7 +2820,7 @@ export function TetrisApp() {
               </button>
             )}
             {ui.phase === "paused" && (
-              <div className="veil is-pause">
+              <div className={`veil is-pause${ui.modesOpen ? " is-under-sheet" : ""}`}>
                 <div className="pause-card">
                   <p className="veil-kicker">Still here</p>
                   <p className="veil-title">Paused</p>

@@ -691,6 +691,10 @@
   -webkit-backdrop-filter: none;
 }
 
+.veil.is-pause.is-under-sheet {
+  background: transparent;
+}
+
 .pause-card {
   z-index: 21;
 }
