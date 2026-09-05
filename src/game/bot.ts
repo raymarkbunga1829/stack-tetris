@@ -7,11 +7,10 @@ import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
 /**
  * Watch-bot. One linear scorer, one real well, every mode that will have it.
  *
- * Every decision is a hard drop: a rotation, a column, and maybe Hold. The
- * piece never slides under a stack, never spins a T, never buys a Zap. Classic
- * only rests where a NES rotate-and-shift can actually go. Sprint gets a
- * nudge to finish forty instead of farming the clock. The points that land
- * are still the mode's own table.
+ * ES still grades a rest. A 2-ply beam (this piece + Hold + NEXT) picks the
+ * rest that leaves the next piece a good board, not just the greedy slam.
+ * Hard-drop only: no tucks, no Zap, no 4-wide, no net. Classic only rests
+ * where a NES rotate-and-shift can actually go. Sprint still finishes forty.
  */
 
 export type Placement = {
@@ -36,6 +35,9 @@ export const BOT_WEIGHTS = {
   max_height: -0.8653253123445759,
   hole_depth: -0.3055007700091851,
 } as const;
+
+/** Keep the beam inside one spawn frame on a phone. */
+export const BEAM_WIDTH = 8;
 
 /** Zen never tops out, so a bot run has to be told to sit. */
 export const ZEN_LOCK_CAP = 80;
@@ -69,13 +71,15 @@ export function modeBias(mode: ModeId, f: BotFeatures): number {
   return 0;
 }
 
+type Drop = Placement & { board: Board; features: BotFeatures };
+
 /** Drop `id` at `rot, x` onto a copy of the board. Null if it cannot rest. */
 export function evaluateDrop(
   board: Board,
   id: PieceId,
   rot: Rot,
   x: number,
-): { features: BotFeatures; score: number } | null {
+): { features: BotFeatures; score: number; board: Board } | null {
   const y = restY(board, id, rot, x);
   if (y == null) return null;
   const placed = cellsOf(id, rot, x, y).filter((c) => c.y >= 0 && c.y < ROWS && c.x >= 0 && c.x < COLS);
@@ -104,7 +108,8 @@ export function evaluateDrop(
     max_height: heights.reduce((n, h) => Math.max(n, h), 0),
     hole_depth,
   };
-  return { features, score: scoreFeatures(features) };
+  const spin = spinBonus(board, id, rot, x, y, full.length);
+  return { features, score: scoreFeatures(features) + spin, board: cleared };
 }
 
 /**
@@ -154,24 +159,23 @@ export function pickPlacement(sim: Sim): Placement | null {
   const current = sim.piece;
   if (!current) return null;
   const kicks = modeOf(sim.mode).kicks;
-  let best: Placement | null = null;
-
-  const consider = (id: PieceId, hold: boolean, from: Piece) => {
-    for (const rot of [0, 1, 2, 3] as Rot[]) {
-      for (let x = -2; x <= 8; x++) {
-        if (!reachable(sim.board, from, rot, x, kicks)) continue;
-        const hit = evaluateDrop(sim.board, id, rot, x);
-        if (!hit) continue;
-        const score = hit.score + modeBias(sim.mode, hit.features) - (hold ? 1e-6 : 0);
-        if (!best || score > best.score) best = { hold, rot, x, score };
-      }
-    }
-  };
-
-  consider(current.id, false, current);
+  const ply0 = collectDrops(sim.board, current, false, kicks, sim.mode);
   if (sim.canHold) {
     const other = sim.hold ?? sim.next[0];
-    if (other) consider(other, true, { id: other, rot: 0, x: 3, y: 0 });
+    if (other) ply0.push(...collectDrops(sim.board, spawnOf(other), true, kicks, sim.mode));
+  }
+  if (ply0.length === 0) return null;
+
+  const beam = topK(ply0, BEAM_WIDTH);
+  let best: Placement | null = null;
+  let bestLeaf = -Infinity;
+  for (const drop of beam) {
+    const follow = followState(sim, drop.hold);
+    const leaf = peekNext(drop, follow, kicks, sim.mode);
+    if (leaf > bestLeaf) {
+      bestLeaf = leaf;
+      best = { hold: drop.hold, rot: drop.rot, x: drop.x, score: leaf };
+    }
   }
   return best;
 }
@@ -229,6 +233,95 @@ export function botPulse(
   if (p.x < hand.x) return { right: true };
   if (p.x > hand.x) return { left: true };
   return { hard: true };
+}
+
+function spawnOf(id: PieceId): Piece {
+  return { id, rot: 0, x: 3, y: 0 };
+}
+
+function rotsOf(id: PieceId): Rot[] {
+  if (id === "O") return [0];
+  if (id === "I" || id === "S" || id === "Z") return [0, 1];
+  return [0, 1, 2, 3];
+}
+
+function collectDrops(
+  board: Board,
+  from: Piece,
+  hold: boolean,
+  kicks: boolean,
+  mode: ModeId,
+): Drop[] {
+  const out: Drop[] = [];
+  for (const rot of rotsOf(from.id)) {
+    for (let x = -2; x <= 8; x++) {
+      if (!reachable(board, from, rot, x, kicks)) continue;
+      const hit = evaluateDrop(board, from.id, rot, x);
+      if (!hit) continue;
+      out.push({
+        hold,
+        rot,
+        x,
+        score: hit.score + modeBias(mode, hit.features) - (hold ? 1e-6 : 0),
+        board: hit.board,
+        features: hit.features,
+      });
+    }
+  }
+  return out;
+}
+
+function topK(drops: Drop[], k: number): Drop[] {
+  if (drops.length <= k) return drops;
+  return drops.sort((a, b) => b.score - a.score).slice(0, k);
+}
+
+type Follow = {
+  falling: PieceId | null;
+  hold: PieceId | null;
+  canHold: boolean;
+  queue: PieceId[];
+};
+
+function followState(sim: Sim, held: boolean): Follow {
+  const q = sim.next;
+  const current = sim.piece!.id;
+  if (!held) {
+    return { falling: q[0] ?? null, hold: sim.hold, canHold: true, queue: q.slice(1) };
+  }
+  if (sim.hold) {
+    return { falling: q[0] ?? null, hold: current, canHold: false, queue: q.slice(1) };
+  }
+  return { falling: q[1] ?? null, hold: current, canHold: false, queue: q.slice(2) };
+}
+
+function peekNext(drop: Drop, follow: Follow, kicks: boolean, mode: ModeId): number {
+  if (!follow.falling) return drop.score;
+  const ply1 = collectDrops(drop.board, spawnOf(follow.falling), false, kicks, mode);
+  if (follow.canHold) {
+    const other = follow.hold ?? follow.queue[0];
+    if (other) ply1.push(...collectDrops(drop.board, spawnOf(other), true, kicks, mode));
+  }
+  if (ply1.length === 0) return drop.score - 48;
+  let leaf = ply1[0]!.score;
+  for (let i = 1; i < ply1.length; i++) {
+    const s = ply1[i]!.score;
+    if (s > leaf) leaf = s;
+  }
+  return leaf + 0.2 * drop.score;
+}
+
+/** A T that hard-drops into a 3-corner slot and clears is worth taking. No pathfinder. */
+function spinBonus(board: Board, id: PieceId, rot: Rot, x: number, y: number, lines: number): number {
+  if (id !== "T" || lines < 1) return 0;
+  const solid = (cx: number, cy: number) => {
+    if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) return true;
+    return board[cy]![cx] !== null;
+  };
+  const corners =
+    Number(solid(x, y)) + Number(solid(x + 2, y)) + Number(solid(x, y + 2)) + Number(solid(x + 2, y + 2));
+  if (corners < 3) return 0;
+  return lines >= 2 ? 2.2 : 1.1;
 }
 
 function restY(board: Board, id: PieceId, rot: Rot, x: number): number | null {
