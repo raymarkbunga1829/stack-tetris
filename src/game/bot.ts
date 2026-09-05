@@ -14,8 +14,8 @@ import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
  * for a Tetris. Setup bias leaves a 3-corner for the T.
  *
  * Mode brains: Sprint dumps, Blitz farms B2B, Siege sends, Marathon keeps
- * the well. Combo and B2B juice stop it plastering a live chain. No Zap,
- * no 4-wide, no net.
+ * the well. Combo and B2B juice stop it plastering a live chain. A 9-0 well
+ * sticks. Hold costs. NEXT tucks S/Z when a lip is there. No Zap, no 4-wide, no net.
  */
 
 export type Step = {
@@ -96,13 +96,13 @@ export function modeBias(mode: ModeId, f: BotFeatures): number {
   return 0.2 * f.is_tetris;
 }
 
-type Juice = { combo: number; b2b: boolean };
+type Juice = { combo: number; b2b: boolean; incoming: number };
 
-function juiceOf(sim: Sim): Juice {
-  return { combo: sim.combo, b2b: sim.b2b };
+function juiceOf(sim: Sim, incoming = 0): Juice {
+  return { combo: sim.combo, b2b: sim.b2b, incoming };
 }
 
-/** Keep a live combo / B2B instead of a greedy bump. */
+/** Keep a live combo / B2B instead of a greedy bump. Send if garbage is coming. */
 function juiceBonus(f: BotFeatures, juice: Juice, id: PieceId, spin: boolean): number {
   let n = 0;
   if (juice.combo >= 0) {
@@ -114,13 +114,19 @@ function juiceBonus(f: BotFeatures, juice: Juice, id: PieceId, spin: boolean): n
     if (keep) n += 2.3;
     else if (f.lines_cleared > 0) n -= 2.7;
   }
+  if (juice.incoming > 0 && f.lines_cleared > 0) n += 0.65 * Math.min(4, juice.incoming);
+  if (f.holes >= 3 && f.lines_cleared > 0) n += 0.5 * f.eroded_cells;
   return n;
 }
 
 function afterJuice(juice: Juice, f: BotFeatures, id: PieceId, spin: boolean): Juice {
-  if (f.lines_cleared <= 0) return { combo: -1, b2b: juice.b2b };
+  if (f.lines_cleared <= 0) return { combo: -1, b2b: juice.b2b, incoming: juice.incoming };
   const difficult = f.is_tetris === 1 || (id === "T" && spin);
-  return { combo: juice.combo < 0 ? 0 : juice.combo + 1, b2b: difficult };
+  return {
+    combo: juice.combo < 0 ? 0 : juice.combo + 1,
+    b2b: difficult,
+    incoming: Math.max(0, juice.incoming - f.lines_cleared),
+  };
 }
 
 type Drop = Placement & { board: Board; features: BotFeatures };
@@ -212,11 +218,11 @@ export function reachable(
   return restY(board, p.id, p.rot, p.x) != null;
 }
 
-export function pickPlacement(sim: Sim): Placement | null {
+export function pickPlacement(sim: Sim, incoming = 0): Placement | null {
   const current = sim.piece;
   if (!current) return null;
   const kicks = modeOf(sim.mode).kicks;
-  const juice = juiceOf(sim);
+  const juice = juiceOf(sim, incoming);
   const ply0 = collectDrops(sim.board, current, false, kicks, sim.mode, true, juice);
   if (sim.canHold) {
     const other = sim.hold ?? sim.next[0];
@@ -288,8 +294,8 @@ export type BotHand = Placement & {
   das: boolean;
 };
 
-export function armBot(sim: Sim, think: number): BotHand | null {
-  const pick = pickPlacement(sim);
+export function armBot(sim: Sim, think: number, incoming = 0): BotHand | null {
+  const pick = pickPlacement(sim, incoming);
   if (!pick) return null;
   return { ...pick, wait: think, held: false, turns: 0, i: 0, das: false };
 }
@@ -371,7 +377,7 @@ function hardRests(board: Board, from: Piece, kicks: boolean): Rest[] {
   return out;
 }
 
-function searchRests(board: Board, from: Piece, kicks: boolean): Rest[] {
+function searchRests(board: Board, from: Piece, kicks: boolean, cap = 520): Rest[] {
   const start: Piece = { id: from.id, rot: from.rot, x: from.x, y: from.y };
   if (!fits(board, start)) return hardRests(board, from, kicks);
   const keyOf = (x: number, y: number, rot: number) => ((y + 4) * 16 + (x + 3)) * 4 + rot;
@@ -402,7 +408,7 @@ function searchRests(board: Board, from: Piece, kicks: boolean): Rest[] {
     return null;
   };
 
-  for (let i = 0; i < q.length && i < 520; i++) {
+  for (let i = 0; i < q.length && i < cap; i++) {
     const n = q[i]!;
     const p: Piece = { id: from.id, rot: n.rot, x: n.x, y: n.y };
     const grounded = !fits(board, { ...p, y: p.y + 1 });
@@ -454,17 +460,18 @@ function collectDrops(
   hold: boolean,
   kicks: boolean,
   mode: ModeId,
-  paths: boolean,
+  paths: boolean | "tuck",
   juice: Juice,
 ): Drop[] {
   const before = colHeights(board);
   const well = maxWell(before);
   const danger = before.reduce((n, h) => Math.max(n, h), 0) >= 14;
   const out: Drop[] = [];
-  const rests = paths ? searchRests(board, from, kicks) : hardRests(board, from, kicks);
+  const rests = paths ? searchRests(board, from, kicks, paths === true ? 520 : 240) : hardRests(board, from, kicks);
   for (const rest of rests) {
     const hit = evaluateDrop(board, from.id, rest.rot, rest.x, rest.y, rest.spin);
     if (!hit) continue;
+    const after = colHeights(hit.board);
     out.push({
       hold,
       rot: rest.rot,
@@ -476,8 +483,9 @@ function collectDrops(
         hit.score +
         modeBias(mode, hit.features) +
         greedTax(mode, from.id, hit.features, well, danger) +
-        juiceBonus(hit.features, juice, from.id, rest.spin) -
-        (hold ? 1e-6 : 0),
+        juiceBonus(hit.features, juice, from.id, rest.spin) +
+        wellKeep(mode, before, after, hit.features) -
+        (hold ? 0.55 : 0),
       board: hit.board,
       features: hit.features,
     });
@@ -511,20 +519,26 @@ function followState(sim: Sim, held: boolean): Follow {
 
 function peekNext(drop: Drop, follow: Follow, kicks: boolean, mode: ModeId, juice: Juice): number {
   if (!follow.falling) return drop.score;
+  const lip = hasLip(colHeights(drop.board));
+  const pathsFor = (id: PieceId): boolean | "tuck" => {
+    if (id === "T") return true;
+    if (lip && (id === "S" || id === "Z" || id === "J" || id === "L")) return "tuck";
+    return false;
+  };
   const ply1 = collectDrops(
     drop.board,
     spawnOf(follow.falling),
     false,
     kicks,
     mode,
-    follow.falling === "T",
+    pathsFor(follow.falling),
     juice,
   );
   if (follow.canHold) {
     const other = follow.hold ?? follow.queue[0];
     if (other)
       ply1.push(
-        ...collectDrops(drop.board, spawnOf(other), true, kicks, mode, other === "T", juice),
+        ...collectDrops(drop.board, spawnOf(other), true, kicks, mode, pathsFor(other), juice),
       );
   }
   if (ply1.length === 0) return drop.score - 48;
@@ -662,12 +676,51 @@ function greedTax(
 function maxWell(heights: number[]): number {
   let m = 0;
   for (let x = 0; x < heights.length; x++) {
-    const left = x === 0 ? 99 : heights[x - 1]!;
-    const right = x === heights.length - 1 ? 99 : heights[x + 1]!;
-    const d = Math.min(left, right) - heights[x]!;
+    const d = wellDepth(heights, x);
     if (d > m) m = d;
   }
   return m;
+}
+
+function wellDepth(h: number[], col: number): number {
+  const left = col === 0 ? 99 : h[col - 1]!;
+  const right = col === h.length - 1 ? 99 : h[col + 1]!;
+  return Math.min(left, right) - h[col]!;
+}
+
+function wellCol(h: number[]): number {
+  let best = COLS - 1;
+  let bestD = -1;
+  for (let x = 0; x < h.length; x++) {
+    const d = wellDepth(h, x);
+    if (d > bestD || (d === bestD && x > best)) {
+      bestD = d;
+      best = x;
+    }
+  }
+  return best;
+}
+
+/** Keep a 9-0 Tetris well. Filling it for a single is the leftover greed. */
+function wellKeep(mode: ModeId, before: number[], after: number[], f: BotFeatures): number {
+  if (mode === "sprint") return 0;
+  const peak = before.reduce((n, h) => Math.max(n, h), 0);
+  const col = peak <= 2 ? COLS - 1 : wellCol(before);
+  const depth = wellDepth(before, col);
+  let n = 0;
+  if (f.is_tetris) n += 1.2;
+  else if (depth >= 2 && after[col]! > before[col]!) n -= 2.3;
+  if (wellCol(after) === col) n += 0.35;
+  else if (peak >= 4) n -= 0.4;
+  if (mode === "siege") n *= 0.55;
+  return n;
+}
+
+function hasLip(h: number[]): boolean {
+  for (let i = 0; i < h.length - 1; i++) {
+    if (Math.abs(h[i]! - h[i + 1]!) >= 2) return true;
+  }
+  return false;
 }
 
 function restY(board: Board, id: PieceId, rot: Rot, x: number): number | null {

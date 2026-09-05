@@ -1009,7 +1009,7 @@ export function TetrisApp() {
     }
     // One arm/slam per falling piece. think=0 must not fire every rAF on the same lock.
     if (botDoneLock.current === sim.locks) return null;
-    if (!botHand.current) botHand.current = armBot(sim, botThink());
+    if (!botHand.current) botHand.current = armBot(sim, botThink(), siegeRef.current?.incoming ?? 0);
     const hand = botHand.current;
     if (!hand) {
       const key = sim.locks;
