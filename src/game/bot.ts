@@ -10,7 +10,8 @@ import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
  * ES grades a rest. A 2-ply beam (this piece + Hold + NEXT) picks the rest.
  * The current piece is a path: slides, sonic drops, kicks, T-spins. NEXT is
  * still hard-drop only so a phone spawn frame stays cheap. Patience tax keeps
- * the I for a Tetris. No Zap, no 4-wide, no net.
+ * the I for a Tetris. Setup bias leaves a 3-corner for the T so Watch builds
+ * the slot, not only takes one that lucked in. No Zap, no 4-wide, no net.
  */
 
 export type Step = {
@@ -126,7 +127,8 @@ export function evaluateDrop(
     hole_depth,
   };
   const spin = spinBonus(board, id, rot, x, rest, full.length, pathSpin);
-  return { features, score: scoreFeatures(features) + spin, board: cleared };
+  const setup = setupBonus(cleared, id, features.max_height);
+  return { features, score: scoreFeatures(features) + spin + setup, board: cleared };
 }
 
 /**
@@ -474,6 +476,80 @@ function spinBonus(
   if (pathSpin) return lines >= 2 ? 4.8 : lines === 1 ? 2.6 : 0.35;
   if (lines < 1) return 0;
   return lines >= 2 ? 2.2 : 1.1;
+}
+
+/**
+ * Leave a 3-corner for the T. One TSD cavity beats plastering the bump.
+ * Under the ceiling, just survive.
+ */
+function setupBonus(board: Board, placed: PieceId, maxHeight: number): number {
+  if (maxHeight >= 14) return 0;
+  const slot = bestTSlot(board);
+  if (!slot) return 0;
+  const keep = placed === "T" ? 0.28 : 1;
+  if (slot >= 2) return 1.7 * keep;
+  return 0.55 * keep;
+}
+
+function bestTSlot(board: Board): 0 | 1 | 2 {
+  const heights = colHeights(board);
+  let peak = 0;
+  for (const h of heights) if (h > peak) peak = h;
+  if (peak < 2) return 0;
+  const yMin = Math.max(0, ROWS - peak - 4);
+  let best: 0 | 1 | 2 = 0;
+  for (let x = -1; x <= 8; x++) {
+    for (let y = yMin; y < ROWS - 1; y++) {
+      const n = tSlotAt(board, x, y);
+      if (n > best) {
+        best = n;
+        if (best >= 2) return 2;
+      }
+    }
+  }
+  return best;
+}
+
+function tSlotAt(board: Board, x: number, y: number): 0 | 1 | 2 {
+  const solid = (cx: number, cy: number) => {
+    if (cx < 0 || cx >= COLS || cy >= ROWS) return true;
+    if (cy < 0) return false;
+    return board[cy]![cx] !== null;
+  };
+  const corners =
+    Number(solid(x, y)) + Number(solid(x + 2, y)) + Number(solid(x, y + 2)) + Number(solid(x + 2, y + 2));
+  if (corners < 3) return 0;
+  let best: 0 | 1 | 2 = 0;
+  for (let r = 0; r < 4; r++) {
+    const rot = r as Rot;
+    const p = { id: "T" as const, rot, x, y };
+    if (!fits(board, p)) continue;
+    if (fits(board, { ...p, y: y + 1 })) continue;
+    const cells = cellsOf("T", rot, x, y);
+    const rows = new Set<number>();
+    for (const c of cells) rows.add(c.y);
+    let lines = 0;
+    for (const ry of rows) {
+      if (ry < 0 || ry >= ROWS) continue;
+      let filled = 0;
+      for (let cx = 0; cx < COLS; cx++) {
+        if (board[ry]![cx]) {
+          filled += 1;
+          continue;
+        }
+        for (const c of cells) {
+          if (c.x === cx && c.y === ry) {
+            filled += 1;
+            break;
+          }
+        }
+      }
+      if (filled === COLS) lines += 1;
+    }
+    if (lines >= 2) return 2;
+    if (lines === 1) best = 1;
+  }
+  return best;
 }
 
 /** Sprint / Blitz / Finesse need to finish. Other modes wait for a Tetris. */
