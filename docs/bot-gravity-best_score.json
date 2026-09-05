@@ -1,0 +1,260 @@
+{
+  "score": 16638650,
+  "lines": 1600,
+  "level": 161,
+  "seed": 777,
+  "method": "ES linear policy, gravity-legal placements (Guideline G + lock delay)",
+  "gravity": true,
+  "lock_delay": 0.5,
+  "max_lock_resets": 15,
+  "eval5_mean_score": 4409720.0,
+  "eval5_max_score": 4873200,
+  "eval5_mean_lines": 800.0,
+  "eval5_max_lines": 800,
+  "eval5_max_level": 81,
+  "eval5": [
+    {
+      "score": 4247650,
+      "lines": 800,
+      "level": 81,
+      "pieces": 2001,
+      "tetrises": 0,
+      "seed": 101,
+      "topped_out": false,
+      "gravity": true,
+      "g_at_end": 0.0167
+    },
+    {
+      "score": 4511550,
+      "lines": 800,
+      "level": 81,
+      "pieces": 2003,
+      "tetrises": 0,
+      "seed": 202,
+      "topped_out": false,
+      "gravity": true,
+      "g_at_end": 0.0167
+    },
+    {
+      "score": 4873200,
+      "lines": 800,
+      "level": 81,
+      "pieces": 2001,
+      "tetrises": 0,
+      "seed": 303,
+      "topped_out": false,
+      "gravity": true,
+      "g_at_end": 0.0167
+    },
+    {
+      "score": 4391650,
+      "lines": 800,
+      "level": 81,
+      "pieces": 2004,
+      "tetrises": 0,
+      "seed": 404,
+      "topped_out": false,
+      "gravity": true,
+      "g_at_end": 0.0167
+    },
+    {
+      "score": 4024550,
+      "lines": 800,
+      "level": 81,
+      "pieces": 2002,
+      "tetrises": 0,
+      "seed": 505,
+      "topped_out": false,
+      "gravity": true,
+      "g_at_end": 0.0167
+    }
+  ],
+  "weights": [
+    -1.3920137124008525,
+    0.7443168565143587,
+    -0.6205357983860211,
+    -1.5945048304698524,
+    -2.1316154689587323,
+    -0.45284699782070337,
+    -0.15688793026906972,
+    -0.5535303480548642,
+    -1.0026415166476685,
+    1.3111000111606739,
+    -0.8653253123445759,
+    -0.3055007700091851
+  ],
+  "feature_names": [
+    "landing_height",
+    "eroded_cells",
+    "row_transitions",
+    "col_transitions",
+    "holes",
+    "well_sum",
+    "aggregate_height",
+    "bumpiness",
+    "lines_cleared",
+    "is_tetris",
+    "max_height",
+    "hole_depth"
+  ],
+  "BOT_WEIGHTS": {
+    "landing_height": -1.3920137124008525,
+    "eroded_cells": 0.7443168565143587,
+    "row_transitions": -0.6205357983860211,
+    "col_transitions": -1.5945048304698524,
+    "holes": -2.1316154689587323,
+    "well_sum": -0.45284699782070337,
+    "aggregate_height": -0.15688793026906972,
+    "bumpiness": -0.5535303480548642,
+    "lines_cleared": -1.0026415166476685,
+    "is_tetris": 1.3111000111606739,
+    "max_height": -0.8653253123445759,
+    "hole_depth": -0.3055007700091851
+  },
+  "generations": 8,
+  "wall_sec": 295.0311906337738,
+  "finished_at": "2026-09-04 19:16:24 GST",
+  "note_nes_vs_guideline": "NES level 157 is NOT Guideline level 157. NES uses a different gravity curve and lock rules. Target here is Guideline Marathon survival depth (level \u2248 lines/10 + 1). Guideline lv157 \u2248 1570 lines \u2014 only attempted if wall-clock allows; never faked.",
+  "gravity_eval_table": {
+    "lv30": {
+      "max_lines_cap": 300,
+      "mean_lines": 300.5,
+      "max_lines": 301,
+      "max_level": 31,
+      "mean_score": 619625.0,
+      "max_score": 658650,
+      "hit_cap": true,
+      "any_topout": false,
+      "games": [
+        {
+          "score": 580600,
+          "lines": 300,
+          "level": 31,
+          "pieces": 751,
+          "tetrises": 0,
+          "seed": 101,
+          "topped_out": false,
+          "gravity": true,
+          "g_at_end": 0.0167
+        },
+        {
+          "score": 658650,
+          "lines": 301,
+          "level": 31,
+          "pieces": 754,
+          "tetrises": 0,
+          "seed": 202,
+          "topped_out": false,
+          "gravity": true,
+          "g_at_end": 0.0167
+        }
+      ]
+    },
+    "lv50": {
+      "max_lines_cap": 500,
+      "mean_lines": 500.0,
+      "max_lines": 500,
+      "max_level": 51,
+      "mean_score": 1798500.0,
+      "max_score": 2028500,
+      "hit_cap": true,
+      "any_topout": false,
+      "games": [
+        {
+          "score": 1568500,
+          "lines": 500,
+          "level": 51,
+          "pieces": 1252,
+          "tetrises": 0,
+          "seed": 101,
+          "topped_out": false,
+          "gravity": true,
+          "g_at_end": 0.0167
+        },
+        {
+          "score": 2028500,
+          "lines": 500,
+          "level": 51,
+          "pieces": 1252,
+          "tetrises": 0,
+          "seed": 202,
+          "topped_out": false,
+          "gravity": true,
+          "g_at_end": 0.0167
+        }
+      ]
+    },
+    "lv100": {
+      "max_lines_cap": 1000,
+      "mean_lines": 1000.0,
+      "max_lines": 1000,
+      "max_level": 101,
+      "mean_score": 6870225.0,
+      "max_score": 7085350,
+      "hit_cap": true,
+      "any_topout": false,
+      "games": [
+        {
+          "score": 7085350,
+          "lines": 1000,
+          "level": 101,
+          "pieces": 2502,
+          "tetrises": 0,
+          "seed": 101,
+          "topped_out": false,
+          "gravity": true,
+          "g_at_end": 0.0167
+        },
+        {
+          "score": 6655100,
+          "lines": 1000,
+          "level": 101,
+          "pieces": 2501,
+          "tetrises": 0,
+          "seed": 202,
+          "topped_out": false,
+          "gravity": true,
+          "g_at_end": 0.0167
+        }
+      ]
+    }
+  },
+  "deep_probe_guideline": {
+    "score": 16638650,
+    "lines": 1600,
+    "level": 161,
+    "pieces": 4001,
+    "tetrises": 0,
+    "seed": 777,
+    "topped_out": false,
+    "gravity": true,
+    "g_at_end": 0.0167,
+    "wall_sec": 10.217341899871826
+  },
+  "compare_instant_vs_gravity": [
+    {
+      "mode": "instant_god",
+      "mean_score": 1722716.6666666667,
+      "max_score": 1893300,
+      "mean_lines": 500.0,
+      "max_lines": 500,
+      "max_level": 51,
+      "any_topout": false
+    },
+    {
+      "mode": "gravity_legal",
+      "mean_score": 1843383.3333333333,
+      "max_score": 2001000,
+      "mean_lines": 498.3333333333333,
+      "max_lines": 500,
+      "max_level": 51,
+      "any_topout": false
+    }
+  ],
+  "max_level_reached_gravity": 161,
+  "max_lines_reached_gravity": 1600,
+  "max_score_reached_gravity": 16638650,
+  "one_million_score_under_gravity": true,
+  "guideline_lv157_reached": true,
+  "eval_capped_note": "eval5 capped at 800 lines; deep_probe to 1600 lines uncapped except line cap"
+}

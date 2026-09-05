@@ -21,19 +21,20 @@ export type Placement = {
   score: number;
 };
 
+/** Gravity-hardened ES weights (stack-rl-gravity). Same features, trained under Guideline G + lock delay. */
 export const BOT_WEIGHTS = {
-  landing_height: -0.7544288236196715,
-  eroded_cells: 0.33132371302193947,
-  row_transitions: -0.38525028399783123,
-  col_transitions: 0.14146498841370764,
-  holes: -0.8539411071984753,
-  well_sum: -0.14270427262999635,
-  aggregate_height: -0.45732763742593724,
-  bumpiness: -0.8760059238343398,
-  lines_cleared: -0.7669060000039435,
-  is_tetris: 0.586012856355073,
-  max_height: -0.4893630706798514,
-  hole_depth: -0.4356944860942823,
+  landing_height: -1.3920137124008525,
+  eroded_cells: 0.7443168565143587,
+  row_transitions: -0.6205357983860211,
+  col_transitions: -1.5945048304698524,
+  holes: -2.1316154689587323,
+  well_sum: -0.45284699782070337,
+  aggregate_height: -0.15688793026906972,
+  bumpiness: -0.5535303480548642,
+  lines_cleared: -1.0026415166476685,
+  is_tetris: 1.3111000111606739,
+  max_height: -0.8653253123445759,
+  hole_depth: -0.3055007700091851,
 } as const;
 
 /** Zen never tops out, so a bot run has to be told to sit. */
