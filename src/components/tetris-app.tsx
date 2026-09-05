@@ -49,7 +49,7 @@ import {
   botAllowed,
   type ModeId,
 } from "@/game/modes";
-import { armBot, playStep, ZEN_LOCK_CAP, type BotHand } from "@/game/bot";
+import { armBot, nextGap, playStep, ZEN_LOCK_CAP, type BotHand } from "@/game/bot";
 import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { cheapTrail, gradeFinesse, gradeTitle } from "@/game/finesse";
 import { nameRun } from "@/game/run-name";
@@ -60,7 +60,6 @@ import { REPLAY_STEP, takeSnap, type Snap } from "@/game/replay";
 import { resizeCanvas } from "@/game/render";
 import { createViz } from "@/game/viz";
 import { createWell3d, type Well3d } from "@/game/well3d";
-import { createPlume, type Plume } from "@/game/plume";
 import { loadSave, recordRun, writeSave, type HapticProfile, type SaveData } from "@/game/save";
 import type { StationId } from "@/game/radio";
 import { buyTheme, themeOf, type ThemeId } from "@/game/themes";
@@ -333,9 +332,6 @@ export function TetrisApp() {
   const coinAt = useRef(0);
   const dangerSaid = useRef(false);
   const holdPeekT = useRef(0);
-  const plumeCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const plumeRef = useRef<Plume | null>(null);
-  const plumeHot = useRef(0);
 
   const [ui, setUi] = useState<Ui>({
     phase: "title",
@@ -926,8 +922,6 @@ export function TetrisApp() {
     wipePit();
     requestWellRebuild(true);
     botHand.current = null;
-    plumeRef.current = null;
-    plumeHot.current = 0;
     if (simRef.current) {
       simRef.current.phase = "title";
       simRef.current.hold = null;
@@ -977,13 +971,14 @@ export function TetrisApp() {
   function botThink(): number {
     const qa = typeof location !== "undefined" && new URLSearchParams(location.search).has("qa");
     const pace = botPace.current;
-    // Even at 20G, wait a couple of frames so the well can present. Gravity
-    // is frozen during that wait, so the piece is not buried. think=0 used to
-    // slam a fresh spawn every rAF and that blanked the canvas around lv17.
-    if (qa) return 0.02;
     const sim = simRef.current;
+    const mode = sim?.mode ?? uiRef.current.mode;
+    if (qa) return 0.02;
+    const race = mode === "sprint" || mode === "blitz";
+    if (race) return (sim && sim.level >= 10 ? 0.03 : 0.055) / pace;
     if (sim && sim.level >= 10) return Math.max(0.04, 0.064 / pace);
-    return 0.12 / pace;
+    if (sim && sim.level >= 5) return 0.09 / pace;
+    return 0.16 / pace;
   }
 
   function isBotRun() {
@@ -1030,6 +1025,9 @@ export function TetrisApp() {
     if (!sim.piece || sim.locks !== key) {
       botHand.current = null;
       botDoneLock.current = key;
+    } else {
+      const qa = typeof location !== "undefined" && new URLSearchParams(location.search).has("qa");
+      hand.wait = nextGap(hand, sim, qa);
     }
     return ev;
   }
@@ -1745,7 +1743,6 @@ export function TetrisApp() {
       engine.punch(0.4, true);
       engine.nod(0.5, true);
       engine.hardStreak(falling, destY, col);
-      plumeHot.current = Math.min(1, plumeHot.current + 0.45);
       if (isBotRun()) {
         if ((simRef.current?.level ?? 1) < 10) sfxHard();
         return;
@@ -1862,7 +1859,6 @@ export function TetrisApp() {
     const hit =
       beat === "tspin" ? 0.48 : beat === "stack" ? 0.42 : beat === "triple" ? 0.2 : 0.1;
     engine.punch(bot ? hit * 0.55 : hit);
-    plumeHot.current = Math.min(1, plumeHot.current + (beat === "tspin" || beat === "stack" ? 1 : 0.55));
     const tint =
       beat === "stack"
         ? "#f7f4ee"
@@ -2037,13 +2033,6 @@ export function TetrisApp() {
       uiRef.current.ghost && modeOf(uiRef.current.mode).ghost,
       uiRef.current.marks,
     );
-    const pc = plumeCanvasRef.current;
-    if (pc && uiRef.current.mode === "siege") {
-      if (!plumeRef.current) plumeRef.current = createPlume(pc);
-      plumeRef.current.resize();
-      plumeHot.current = Math.max(0, plumeHot.current - dt * 1.8);
-      plumeRef.current.step(dt, plumeHot.current);
-    }
     const vizCanvas = vizCanvasRef.current;
     const well = wellRef.current;
     if (vizCanvas && well) {
@@ -2702,10 +2691,7 @@ export function TetrisApp() {
           </div>
         )}
 
-        <div
-          className={`hull-wrap${ui.mode === "siege" && (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") ? " is-on" : ""}`}
-        >
-        <div className={`stage${ui.holdRight ? " is-flip" : ""}${ui.mode === "siege" && (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") ? " is-hull" : ""}`}>
+        <div className={`stage${ui.holdRight ? " is-flip" : ""}`}>
           <aside className="rail">
             <p className="rail-label">Hold</p>
             <div
@@ -3195,13 +3181,6 @@ export function TetrisApp() {
             {ui.gesture && ui.phase === "playing" && (
               <p className="gchip">{ui.gesture}</p>
             )}
-            {ui.mode === "siege" &&
-              (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") &&
-              (ui.siege?.incoming ?? 0) > 0 && (
-                <b className="hull-in" aria-label={`${ui.siege!.incoming} incoming`}>
-                  {ui.siege!.incoming}
-                </b>
-              )}
           </div>
 
           <aside className="rail rail-next">
@@ -3238,17 +3217,6 @@ export function TetrisApp() {
               </div>
             )}
           </aside>
-        </div>
-        {ui.mode === "siege" &&
-          (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
-            <div className="keel" aria-hidden="true">
-              <canvas ref={plumeCanvasRef} className="plume-canvas" />
-              <p className="climb-bar" data-qa="climb">
-                <b>{siegeClimb(ui).toLocaleString()}</b>
-                <small>m</small>
-              </p>
-            </div>
-          )}
         </div>
 
         {ui.coach && ui.phase === "playing" ? (
@@ -3565,10 +3533,6 @@ function botStartLabel(mode: ModeId): string {
     siege: "Siege",
   };
   return `Watch ${short[mode] ?? modeOf(mode).name}`;
-}
-
-function siegeClimb(ui: Pick<Ui, "siege" | "lines">): number {
-  return (ui.siege?.kos ?? 0) * 80 + ui.lines * 12;
 }
 
 /**
