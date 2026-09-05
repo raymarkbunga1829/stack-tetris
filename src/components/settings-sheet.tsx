@@ -4,6 +4,12 @@ import { CABINET, NOW, stationOf, type StationId } from "@/game/radio";
 import type { HapticProfile } from "@/game/save";
 import { THEMES, ownsTheme, type ThemeId } from "@/game/themes";
 
+const HANDLING_PRESETS = [
+  { name: "Relaxed", dasMs: 220, arrMs: 50, sdf: 10 },
+  { name: "Classic", dasMs: 167, arrMs: 33, sdf: 20 },
+  { name: "Fast", dasMs: 100, arrMs: 16, sdf: 40 },
+] as const;
+
 type Props = {
   open: boolean;
   haptic: HapticProfile;
@@ -230,6 +236,29 @@ export function SettingsSheet({
           <b>{clearWell ? "On" : "Off"}</b>
         </button>
         <p className="shop-blurb">Handling</p>
+        <div className="shop-tabs" role="group" aria-label="Control speed presets">
+          {HANDLING_PRESETS.map((preset) => {
+            const active = dasMs === preset.dasMs && arrMs === preset.arrMs && sdf === preset.sdf;
+            return (
+              <button
+                key={preset.name}
+                type="button"
+                className={active ? "is-on" : ""}
+                aria-pressed={active}
+                onClick={() => {
+                  onHandling("dasMs", preset.dasMs);
+                  onHandling("arrMs", preset.arrMs);
+                  onHandling("sdf", preset.sdf);
+                }}
+              >
+                {preset.name}
+              </button>
+            );
+          })}
+        </div>
+        <p className="shop-note">
+          Choose a control speed, or fine-tune below. Classic restores the original settings.
+        </p>
         <label className="mix-row">
           <span>DAS</span>
           <input
@@ -238,10 +267,13 @@ export function SettingsSheet({
             max={300}
             step={1}
             value={dasMs}
+            aria-label="Movement repeat delay"
+            aria-valuetext={`${dasMs} milliseconds`}
             onChange={(e) => onHandling("dasMs", Number(e.target.value))}
           />
           <b>{dasMs}</b>
         </label>
+        <p className="shop-note">DAS: delay before a held direction repeats. Lower starts moving sooner. The on-screen pad uses its own fixed delay.</p>
         <label className="mix-row">
           <span>ARR</span>
           <input
@@ -250,10 +282,13 @@ export function SettingsSheet({
             max={80}
             step={1}
             value={arrMs}
+            aria-label="Movement repeat interval"
+            aria-valuetext={arrMs === 0 ? "Instant movement to the wall" : `${arrMs} milliseconds`}
             onChange={(e) => onHandling("arrMs", Number(e.target.value))}
           />
           <b>{arrMs}</b>
         </label>
+        <p className="shop-note">ARR: time between repeated moves. Zero moves instantly to the wall.</p>
         <label className="mix-row">
           <span>SDF</span>
           <input
@@ -262,10 +297,13 @@ export function SettingsSheet({
             max={40}
             step={1}
             value={sdf}
+            aria-label="Soft drop speed multiplier"
+            aria-valuetext={`${sdf} times gravity`}
             onChange={(e) => onHandling("sdf", Number(e.target.value))}
           />
           <b>{sdf}</b>
         </label>
+        <p className="shop-note">SDF: soft drop speed multiplier. Higher drops faster while you hold down.</p>
         <p className="shop-blurb">On-screen pad</p>
         <div className="shop-tabs">
           {(["auto", "on", "off"] as const).map((m) => (

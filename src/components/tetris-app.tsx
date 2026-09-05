@@ -3650,6 +3650,8 @@ declare global {
       getMode: () => ModeId;
       getHold: () => PieceId | null;
       getBot: () => boolean;
+      getClock: () => number;
+      getTimeLeft: () => number | null;
       getBanner: () => string | null;
       getIntro: () => string | null;
       setLevel: (n: number) => void;
@@ -3658,4 +3660,3 @@ declare global {
     };
   }
 }
-

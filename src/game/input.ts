@@ -120,14 +120,20 @@ export function createInput() {
   const clearKeys = () => {
     keys.clear();
     touch = blank();
+    prev = blank();
+    inject = blank();
+    skipJust = blank();
+    nudgeAcc = 0;
+    powerQ.length = 0;
+  };
+  const onVisibilityChange = () => {
+    if (document.hidden) clearKeys();
   };
 
   window.addEventListener("keydown", onKeyDown, { passive: false });
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("blur", clearKeys);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) clearKeys();
-  });
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   function poll(): Pad {
     const p = blank();
@@ -236,6 +242,9 @@ export function createInput() {
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", clearKeys);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    clearKeys();
+    onPulse = null;
   }
 
   return { sample, tap, setTouch, setPulse, nudge, takeNudge, takePower, setKeys, dispose };
