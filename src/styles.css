@@ -962,11 +962,24 @@
 .callout.is-single b { font-size: 0.82rem; letter-spacing: 0.16em; color: var(--color-muted); }
 .callout.is-double b { font-size: 0.95rem; }
 .callout.is-triple b { font-size: 1.15rem; }
-.callout.is-tetris b { font-size: 1.45rem; letter-spacing: 0.12em; }
+.callout.is-tetris b { font-size: 1.7rem; letter-spacing: 0.14em; }
 .callout.is-mini b { font-size: 0.95rem; color: #c9d6ea; }
-.callout.is-tspin b { font-size: 1.2rem; color: #c9d6ea; }
-.callout.is-tst b { font-size: 1.4rem; color: #d4c4f0; }
-.callout.is-pc b { font-size: 1.35rem; letter-spacing: 0.14em; }
+.callout.is-tspin b { font-size: 1.55rem; letter-spacing: 0.12em; color: #e8d8ff; }
+.callout.is-tst b { font-size: 1.65rem; letter-spacing: 0.12em; color: #f0e4ff; }
+.callout.is-pc b { font-size: 1.5rem; letter-spacing: 0.14em; }
+
+.callout.is-shout {
+  left: 50%;
+  top: 40%;
+  max-width: 88%;
+  align-items: center;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.callout.is-shout em {
+  color: var(--color-fg);
+}
 
 .hole-hint {
   position: absolute;
@@ -985,6 +998,9 @@
   .callout {
     animation: call-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+  .callout.is-shout {
+    animation: call-bang 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 }
 
 @keyframes call-in {
@@ -995,6 +1011,21 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes call-bang {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.38);
+  }
+  24% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
