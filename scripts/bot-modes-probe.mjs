@@ -88,18 +88,39 @@ const look = () =>
     };
   });
 
+const armBot = async () => {
+  await page.locator('button[aria-label="Settings"]').click({ force: true });
+  await page.waitForSelector('[data-qa="set-bot"]', { timeout: 4000 });
+  if ((await page.locator('[data-qa="set-bot"] b').innerText()).trim() !== "On") {
+    await page.locator('[data-qa="set-bot"]').click({ force: true });
+  }
+  await page.locator(".shop-x").click({ force: true });
+  await page.waitForTimeout(150);
+};
+
 try {
   await start("title");
-  if (!(await page.locator('[data-qa="bot-plays"]').isVisible()))
-    errors.push("title: Bot plays is not on the title");
+  if (await page.locator('[data-qa="bot-plays"]').count())
+    errors.push("title: Bot plays should live in Settings, not on the well");
+  if (await page.locator('[data-qa="watch-bot"]').isVisible())
+    errors.push("title: Watch bot showed with ES bot off");
+  await page.locator('button[aria-label="Settings"]').click({ force: true });
+  await page.waitForSelector('[data-qa="set-bot"]', { timeout: 4000 });
+  await page.locator('[data-qa="set-bot"]').click({ force: true });
+  await page.locator(".shop-x").click({ force: true });
+  await page.waitForTimeout(200);
   if (!(await page.locator('[data-qa="watch-bot"]').isVisible()))
-    errors.push("title: Watch bot is not on the title");
+    errors.push("title: Watch bot did not appear after ES bot On");
+  await page.locator('[data-qa="mode-more"]').click({ force: true });
+  await page.waitForSelector('[data-qa="sheet-mode-finesse"]', { timeout: 4000 });
+  if (await page.locator('[data-qa="sheet-bot-plays"]').count())
+    errors.push("modes: Bot on should not sit under the mode list");
+  await page.locator(".shop-veil.is-modes .shop-x").click({ force: true });
   await page.context().close();
 
   await start("sprint");
   await page.locator('[data-qa="mode-sprint"]').click({ force: true });
-  await page.locator('[data-qa="bot-plays"]').click({ force: true });
-  await page.waitForTimeout(200);
+  await armBot();
   const armed = await look();
   if (!armed.start.toLowerCase().includes("sprint") && !armed.start.toLowerCase().includes("watch"))
     errors.push(`sprint title: Start says "${armed.start}", wanted Watch Sprint`);
@@ -159,12 +180,11 @@ try {
   await page.context().close();
 
   await start("finesse");
-  await page.locator('[data-qa="bot-plays"]').click({ force: true });
-  await page.waitForTimeout(150);
+  await armBot();
   await page.locator('[data-qa="mode-more"]').click({ force: true });
   await page.waitForSelector('[data-qa="sheet-mode-finesse"]', { timeout: 4000 });
-  if (!(await page.locator('[data-qa="sheet-bot-plays"]').isVisible()))
-    errors.push("finesse: Modes sheet is missing Bot plays");
+  if (await page.locator('[data-qa="sheet-bot-plays"]').count())
+    errors.push("finesse: Modes sheet still has Bot plays");
   await page.locator('[data-qa="sheet-mode-finesse"]').click({ force: true });
   await page.waitForTimeout(300);
   const skipped = await look();
@@ -173,10 +193,17 @@ try {
   const msg = `${skipped.skip} ${skipped.banner}`.toLowerCase();
   if (msg.indexOf("finesse") < 0)
     errors.push(`finesse: no skip message ("${skipped.skip}" / "${skipped.banner}")`);
-  await page.locator('[data-qa="bot-plays"]').click({ force: true });
-  await page.waitForTimeout(250);
+  await page.locator('button[aria-label="Settings"]').click({ force: true });
+  await page.waitForSelector('[data-qa="set-bot"]', { timeout: 4000 });
+  const finesseRow = page.locator('[data-qa="set-bot"]');
+  if (await finesseRow.isEnabled()) {
+    await finesseRow.click({ force: true });
+    await page.waitForTimeout(200);
+  }
+  const refusedOn = (await page.locator('[data-qa="set-bot"] b').innerText()).trim();
+  await page.locator(".shop-x").click({ force: true });
   const refused = await look();
-  if (refused.bot) errors.push("finesse: Bot plays turned on in Finesse");
+  if (refused.bot || refusedOn === "On") errors.push("finesse: ES bot turned on in Finesse");
   if (refused.phase !== "title") errors.push(`finesse refuse: phase is ${refused.phase}`);
   await page.context().close();
 
@@ -185,7 +212,7 @@ try {
   await page.waitForSelector('[data-qa="sheet-mode-classic"]', { timeout: 4000 });
   await page.locator('[data-qa="sheet-mode-classic"]').click({ force: true });
   await page.waitForTimeout(150);
-  await page.locator('[data-qa="bot-plays"]').click({ force: true });
+  await armBot();
   await page.locator('[data-qa="play"]').click({ force: true });
   await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", {
     timeout: 8000,

@@ -86,8 +86,17 @@ const look = () =>
 
 try {
   await start("watch");
+  if (await page.locator('[data-qa="bot-plays"]').count())
+    errors.push("title: Bot plays should live in Settings, not on the well");
+  if (await page.locator('[data-qa="watch-bot"]').isVisible())
+    errors.push("title: Watch bot showed with ES bot off");
+  await page.locator('button[aria-label="Settings"]').click({ force: true });
+  await page.waitForSelector('[data-qa="set-bot"]', { timeout: 4000 });
+  await page.locator('[data-qa="set-bot"]').click({ force: true });
+  await page.locator(".shop-x").click({ force: true });
+  await page.waitForTimeout(200);
   const title = await page.locator('[data-qa="watch-bot"]').isVisible();
-  if (!title) errors.push("title: Watch bot is not on the title");
+  if (!title) errors.push("title: Watch bot is not on the title after ES bot On");
   await page.locator('[data-qa="watch-bot"]').click({ force: true });
   await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", {
     timeout: 8000,

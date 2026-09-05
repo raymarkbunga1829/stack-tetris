@@ -66,6 +66,7 @@ export type SaveData = {
   dailyPrev: { date: string; rows: ScoreRow[] };
   seenDay: string;
   streak: { count: number; last: string };
+  botPlay: boolean;
 };
 
 const DEFAULTS: SaveData = {
@@ -111,6 +112,7 @@ const DEFAULTS: SaveData = {
   dailyPrev: { date: "", rows: [] },
   seenDay: "",
   streak: { count: 0, last: "" },
+  botPlay: false,
 };
 
 function clampMs(n: unknown, min: number, max: number, fallback: number): number {
@@ -195,6 +197,7 @@ export function loadSave(): SaveData {
       dailyPrev: parsed.dailyPrev ?? { date: "", rows: [] },
       seenDay: typeof parsed.seenDay === "string" ? parsed.seenDay : "",
       streak: parsed.streak ?? { count: 0, last: "" },
+      botPlay: parsed.botPlay === true,
     };
   } catch {
     return { ...DEFAULTS, inv: { ...DEFAULTS.inv }, missions: ensureMissions(undefined) };
