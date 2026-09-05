@@ -89,6 +89,9 @@ export type Well3d = {
     clientX: number,
     clientY: number,
   ) => { col: number; row: number };
+  lost: () => boolean;
+  cellsDrawn: () => number;
+  setCalm: (on: boolean) => void;
   dispose: () => void;
 };
 
@@ -111,6 +114,21 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.18;
   renderer.shadowMap.enabled = false;
+
+  let dead = false;
+  let lastCells = 0;
+  let calm = false;
+  let useComposer = true;
+  let drawN = 0;
+  const onContextLost = (e: Event) => {
+    e.preventDefault();
+    dead = true;
+  };
+  const onContextRestored = () => {
+    dead = true;
+  };
+  canvas.addEventListener("webglcontextlost", onContextLost);
+  canvas.addEventListener("webglcontextrestored", onContextRestored);
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -508,6 +526,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     squash = 1,
     ox = 0,
   ) {
+    const cap = mesh.instanceMatrix.array.length / 16;
+    if (i < 0 || i >= cap) return;
     const p = cellPos(col, row, z);
     dummy.position.set(p.x + ox, p.y - (1 - squash) * 0.18, p.z);
     dummy.rotation.set(0, 0, 0);
@@ -519,6 +539,19 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   }
 
   function draw(sim: Sim | null, shake: number, theme: Theme, showGhost = true, showMarks = false) {
+    if (dead) return;
+    try {
+    if ((++drawN & 31) === 0) {
+      try {
+        if (renderer.getContext().isContextLost()) {
+          dead = true;
+          return;
+        }
+      } catch {
+        dead = true;
+        return;
+      }
+    }
     if (theme.id !== lastThemeId) {
       lastThemeId = theme.id;
       lastBg = "";
@@ -942,10 +975,21 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       shieldMat.opacity = 0.07 + p * 0.08;
     }
 
-    composer.render();
+    lastCells = n;
+    if (calm || !useComposer) renderer.render(scene, camera);
+    else composer.render();
+    } catch {
+      try {
+        useComposer = false;
+        renderer.render(scene, camera);
+      } catch {
+        dead = true;
+      }
+    }
   }
 
   function punchCam(amount: number, force = false) {
+    if (calm && !force) return;
     if (reduce && !force) return;
     punch = Math.min(1.25, punch + amount);
   }
@@ -956,7 +1000,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   }
 
   function sparkRows(boardRows: number[], hexCol: string) {
-    if (reduce) return;
+    if (reduce || calm) return;
     const c = hex(hexCol);
     for (const by of boardRows) {
       const row = by - HIDDEN_ROWS;
@@ -1022,7 +1066,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   }
 
   function shatter(sim: Sim, theme: Theme) {
-    if (reduce) return;
+    if (reduce || calm) return;
     for (const by of sim.clearRows) {
       const row = by - HIDDEN_ROWS;
       if (row < 0 || row >= VISIBLE_ROWS) continue;
@@ -1048,7 +1092,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   }
 
   function sweep(kind: "stack" | "tspin" | "clear" | "single" | "double" | "triple") {
-    if (reduce) return;
+    if (reduce || calm) return;
     sweepKind = kind;
     sweepT =
       kind === "single" ? 0.18 : kind === "double" ? 0.24 : kind === "triple" ? 0.3 : kind === "clear" ? 0.22 : 0.36;
@@ -1062,6 +1106,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     toY: number,
     hexCol: string,
   ) {
+    if (calm) return;
     const steps = Math.min(8, Math.max(2, Math.floor((toY - piece.y) / 2) || 2));
     for (let s = 1; s <= steps; s++) {
       const y = piece.y + ((toY - piece.y) * s) / (steps + 1);
@@ -1323,6 +1368,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   }
 
   function dispose() {
+    canvas.removeEventListener("webglcontextlost", onContextLost);
+    canvas.removeEventListener("webglcontextrestored", onContextRestored);
     composer.dispose();
     renderer.dispose();
     envTex.dispose();
@@ -1397,6 +1444,25 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     teachTrail,
     failBeat,
     clientToCell,
+    lost: () => {
+      if (dead) return true;
+      try {
+        return renderer.getContext().isContextLost();
+      } catch {
+        return true;
+      }
+    },
+    cellsDrawn: () => lastCells,
+    setCalm: (on: boolean) => {
+      if (on && !calm) {
+        sparks.length = 0;
+        shardList.length = 0;
+        streakList.length = 0;
+        punch = 0;
+        nodT = 0;
+      }
+      calm = on;
+    },
     dispose,
   };
 }

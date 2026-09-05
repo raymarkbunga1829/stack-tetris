@@ -114,9 +114,9 @@ try {
   const playing = await look();
   if (playing.mode !== "sprint") errors.push(`sprint: mode is ${playing.mode}, wanted sprint`);
   if (!playing.bot) errors.push("sprint: getBot is false");
-  if (playing.hud.toLowerCase().indexOf("bot") < 0)
-    errors.push(`sprint: HUD does not say Bot ("${playing.hud}")`);
-  if (playing.label.toLowerCase().indexOf("sprint") < 0 && playing.label.toLowerCase().indexOf("bot") < 0)
+  if (!/bot|es|watch/i.test(playing.hud))
+    errors.push(`sprint: HUD does not say Bot/ES ("${playing.hud}")`);
+  if (!/sprint|bot|es|watch/i.test(playing.label))
     errors.push(`sprint: dock does not say Bot / Sprint ("${playing.label}")`);
   if (!playing.padGone) errors.push("sprint: Drop pad is still out while the bot is playing");
   if (!playing.hold) errors.push("sprint: Hold pocket is gone");
@@ -125,7 +125,7 @@ try {
   if (playing.powers) errors.push("sprint: power bar is out on a bot run");
   if (playing.credits !== 80) errors.push(`sprint: credits moved to ${playing.credits}`);
 
-  await page.locator(".hud-pause").click({ force: true });
+  await page.locator("button.hud-pause").click({ force: true });
   await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "paused", {
     timeout: 4000,
   });

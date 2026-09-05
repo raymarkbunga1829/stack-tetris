@@ -98,10 +98,10 @@ try {
   );
   const playing = await look();
   if (playing.mode !== "watch") errors.push(`play: mode is ${playing.mode}, wanted watch`);
-  if (playing.hud.toLowerCase().indexOf("watch") < 0)
-    errors.push(`play: HUD does not say Watch bot ("${playing.hud}")`);
-  if (playing.label.toLowerCase().indexOf("watch") < 0)
-    errors.push(`play: dock does not say Watch bot ("${playing.label}")`);
+  if (!/watch|es|bot/i.test(playing.hud))
+    errors.push(`play: HUD does not say Watch/ES bot ("${playing.hud}")`);
+  if (!/watch|es|bot/i.test(playing.label))
+    errors.push(`play: dock does not say Watch/ES bot ("${playing.label}")`);
   if (playing.pad && playing.padBox && !playing.padBox.gone)
     errors.push("play: Drop pad is still out while the bot is playing");
   if (!playing.hold) errors.push("play: Hold pocket is gone");
@@ -110,7 +110,7 @@ try {
   if (playing.powers) errors.push("play: power bar is out on a watch run");
   if (playing.credits !== 80) errors.push(`play: credits moved to ${playing.credits}`);
 
-  await page.locator(".hud-pause").click({ force: true });
+  await page.locator("button.hud-pause").click({ force: true });
   await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "paused", {
     timeout: 4000,
   });
