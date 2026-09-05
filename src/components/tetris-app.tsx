@@ -1110,7 +1110,7 @@ export function TetrisApp() {
     const driven = isBotRun();
     const falling = sim.piece;
     const ghostAt = falling ? ghostY(sim) : 0;
-    well3dRef.current?.setCalm(driven);
+    well3dRef.current?.setCalm(false);
     const idle = {
       heldLeft: false,
       heldRight: false,
@@ -1692,16 +1692,15 @@ export function TetrisApp() {
     const cells = cellsOf(falling.id, falling.rot, falling.x, destY);
     const col = themeOf(saveRef.current.theme).fill[falling.id];
     if (hard) {
-      if (isBotRun()) {
-        engine.lockThump(cells, col, false);
-        if ((simRef.current?.level ?? 1) < 10) sfxHard();
-        return;
-      }
-      haptic("tetris");
       engine.lockThump(cells, col, true);
       engine.punch(0.4, true);
       engine.nod(0.5, true);
       engine.hardStreak(falling, destY, col);
+      if (isBotRun()) {
+        if ((simRef.current?.level ?? 1) < 10) sfxHard();
+        return;
+      }
+      haptic("tetris");
       sfxHard();
       shakeRef.current = Math.max(shakeRef.current, 10);
       syncUi({ lockPop: uiRef.current.lockPop + 1 });
@@ -1796,10 +1795,6 @@ export function TetrisApp() {
     });
     showCallout(spoken);
     noteStill(sim, spoken);
-    if (isBotRun()) {
-      sfxLine(spoken.rank);
-      return;
-    }
     const beat = kind === "single" ? "double" : kind;
     engine.punch(
       beat === "stack" ? 0.28 : beat === "tspin" ? 0.24 : beat === "triple" ? 0.16 : 0.1,
@@ -1912,20 +1907,16 @@ export function TetrisApp() {
     const patch: Partial<Ui> = {};
     if (combo > 0 && combo > comboSeen.current) {
       sfxCombo(combo);
-      if (!isBotRun()) {
-        well3dRef.current?.punch(0.16 + Math.min(0.22, combo * 0.04));
-        patch.comboPop = uiRef.current.comboPop + 1;
-      }
+      well3dRef.current?.punch(0.16 + Math.min(0.22, combo * 0.04));
+      patch.comboPop = uiRef.current.comboPop + 1;
     }
     comboSeen.current = sim.combo;
     if (sim.b2b) {
       const hit = difficult && b2bSeen.current;
       if (hit || !b2bSeen.current) {
         sfxB2b();
-        if (!isBotRun()) {
-          well3dRef.current?.punch(hit ? 0.34 : 0.2);
-          patch.b2bPop = uiRef.current.b2bPop + 1;
-        }
+        well3dRef.current?.punch(hit ? 0.34 : 0.2);
+        patch.b2bPop = uiRef.current.b2bPop + 1;
       }
     }
     b2bSeen.current = sim.b2b;

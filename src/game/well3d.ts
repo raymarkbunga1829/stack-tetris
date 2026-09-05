@@ -1496,7 +1496,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sampleLuma: () => {
       if (dead) return 0;
       try {
-        renderer.render(scene, camera);
+        if (calm || !useComposer) renderer.render(scene, camera);
+        else composer.render();
         const gl = renderer.getContext();
         const w = gl.drawingBufferWidth;
         const h = gl.drawingBufferHeight;
