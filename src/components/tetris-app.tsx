@@ -797,6 +797,7 @@ export function TetrisApp() {
     botDoneLock.current = -1;
     const bot = mode === "watch" || botPlayRef.current;
     botPlayRef.current = bot;
+    if (bot) requestWellRebuild(true);
     bagN.current = sim.bag.length;
     splitSeen.current = 0;
     quietT.current = 0.4;
@@ -804,8 +805,9 @@ export function TetrisApp() {
     bestStill.current = null;
     wipePit();
     well3dRef.current?.setClear(saveRef.current.clearWell || mode === "sprint" || mode === "daily");
-    const intro =
-      mode === "sprint"
+    const intro = bot
+      ? null
+      : mode === "sprint"
         ? "40"
         : mode === "blitz"
           ? "2:00"
@@ -821,16 +823,18 @@ export function TetrisApp() {
                     ? "Read"
                     : mode === "siege"
                       ? "8"
-                      : mode === "watch"
-                        ? "Watch"
-                        : "Go";
-    introGen.current += 1;
-    const gen = introGen.current;
-    introUntil.current = performance.now() + 1600;
-    window.setTimeout(() => {
-      if (introGen.current !== gen) return;
-      dismissIntro();
-    }, 1600);
+                      : "Go";
+    if (intro) {
+      introGen.current += 1;
+      const gen = introGen.current;
+      introUntil.current = performance.now() + 1600;
+      window.setTimeout(() => {
+        if (introGen.current !== gen) return;
+        dismissIntro();
+      }, 1600);
+    } else {
+      introUntil.current = 0;
+    }
     syncUi({
       phase: "playing",
       banner: null,
@@ -996,8 +1000,10 @@ export function TetrisApp() {
 
     if (
       u.intro &&
-      introUntil.current > 0 &&
-      performance.now() >= introUntil.current
+      (isBotRun() ||
+        u.lines > 0 ||
+        u.level > 1 ||
+        (introUntil.current > 0 && performance.now() >= introUntil.current))
     ) {
       dismissIntro();
     }
@@ -1105,7 +1111,7 @@ export function TetrisApp() {
     const driven = isBotRun();
     const falling = sim.piece;
     const ghostAt = falling ? ghostY(sim) : 0;
-    well3dRef.current?.setCalm(driven);
+    well3dRef.current?.setCalm(false);
     const idle = {
       heldLeft: false,
       heldRight: false,
@@ -1687,16 +1693,15 @@ export function TetrisApp() {
     const cells = cellsOf(falling.id, falling.rot, falling.x, destY);
     const col = themeOf(saveRef.current.theme).fill[falling.id];
     if (hard) {
-      if (isBotRun()) {
-        engine.lockThump(cells, col, false);
-        if ((simRef.current?.level ?? 1) < 10) sfxHard();
-        return;
-      }
-      haptic("tetris");
       engine.lockThump(cells, col, true);
       engine.punch(0.4, true);
       engine.nod(0.5, true);
       engine.hardStreak(falling, destY, col);
+      if (isBotRun()) {
+        if ((simRef.current?.level ?? 1) < 10) sfxHard();
+        return;
+      }
+      haptic("tetris");
       sfxHard();
       shakeRef.current = Math.max(shakeRef.current, 10);
       syncUi({ lockPop: uiRef.current.lockPop + 1 });
@@ -1791,10 +1796,6 @@ export function TetrisApp() {
     });
     showCallout(spoken);
     noteStill(sim, spoken);
-    if (isBotRun()) {
-      sfxLine(spoken.rank);
-      return;
-    }
     const beat = kind === "single" ? "double" : kind;
     engine.punch(
       beat === "stack" ? 0.28 : beat === "tspin" ? 0.24 : beat === "triple" ? 0.16 : 0.1,
@@ -1907,20 +1908,16 @@ export function TetrisApp() {
     const patch: Partial<Ui> = {};
     if (combo > 0 && combo > comboSeen.current) {
       sfxCombo(combo);
-      if (!isBotRun()) {
-        well3dRef.current?.punch(0.16 + Math.min(0.22, combo * 0.04));
-        patch.comboPop = uiRef.current.comboPop + 1;
-      }
+      well3dRef.current?.punch(0.16 + Math.min(0.22, combo * 0.04));
+      patch.comboPop = uiRef.current.comboPop + 1;
     }
     comboSeen.current = sim.combo;
     if (sim.b2b) {
       const hit = difficult && b2bSeen.current;
       if (hit || !b2bSeen.current) {
         sfxB2b();
-        if (!isBotRun()) {
-          well3dRef.current?.punch(hit ? 0.34 : 0.2);
-          patch.b2bPop = uiRef.current.b2bPop + 1;
-        }
+        well3dRef.current?.punch(hit ? 0.34 : 0.2);
+        patch.b2bPop = uiRef.current.b2bPop + 1;
       }
     }
     b2bSeen.current = sim.b2b;
@@ -2678,9 +2675,13 @@ export function TetrisApp() {
                 {modeOf(ui.mode).carving}
               </p>
             )}
-            {ui.intro && (ui.phase === "playing" || ui.phase === "clearing") && (
+            {ui.intro &&
+              !botDriving(ui) &&
+              ui.lines === 0 &&
+              ui.level <= 1 &&
+              (ui.phase === "playing" || ui.phase === "clearing") && (
               <div className="intro" data-qa="mode-intro" aria-hidden="true">
-                <em>{botDriving(ui) ? botHudLabel(ui.mode) : modeOf(ui.mode).name}</em>
+                <em>{modeOf(ui.mode).name}</em>
                 <b>{ui.intro}</b>
                 <p>{modeOf(ui.mode).carving}</p>
               </div>
