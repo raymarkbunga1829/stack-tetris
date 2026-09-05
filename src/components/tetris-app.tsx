@@ -49,7 +49,7 @@ import {
   botAllowed,
   type ModeId,
 } from "@/game/modes";
-import { armBot, playPlacement, ZEN_LOCK_CAP, type BotHand } from "@/game/bot";
+import { armBot, playStep, ZEN_LOCK_CAP, type BotHand } from "@/game/bot";
 import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { cheapTrail, gradeFinesse, gradeTitle } from "@/game/finesse";
 import { nameRun } from "@/game/run-name";
@@ -996,9 +996,11 @@ export function TetrisApp() {
     hand.wait -= dt;
     if (hand.wait > 0) return null;
     const key = sim.locks;
-    botHand.current = null;
-    const ev = playPlacement(sim, hand);
-    if (!sim.piece || sim.locks !== key) botDoneLock.current = key;
+    const ev = playStep(sim, hand);
+    if (!sim.piece || sim.locks !== key) {
+      botHand.current = null;
+      botDoneLock.current = key;
+    }
     return ev;
   }
 
@@ -1150,7 +1152,7 @@ export function TetrisApp() {
       } else {
         const slam = takeBotSlam(sim, dt);
         if (slam) {
-          botHard = true;
+          botHard = slam === "lock" || slam === "over" || slam === "clear" || slam === "tetris" || slam === "tspin" || slam === "win";
           const timed = tickClock(sim, dt);
           ev = timed ?? slam;
         } else {

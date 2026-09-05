@@ -7,17 +7,31 @@ import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
 /**
  * Watch-bot. One linear scorer, one real well, every mode that will have it.
  *
- * ES still grades a rest. A 2-ply beam (this piece + Hold + NEXT) picks the
- * rest that leaves the next piece a good board. Patience tax: keep the I for
- * a Tetris, skip cheap singles that eat the well. Hard-drop only: no tucks,
- * no Zap, no 4-wide, no net.
+ * ES grades a rest. A 2-ply beam (this piece + Hold + NEXT) picks the rest.
+ * The current piece is a path: slides, sonic drops, kicks, T-spins. NEXT is
+ * still hard-drop only so a phone spawn frame stays cheap. Patience tax keeps
+ * the I for a Tetris. No Zap, no 4-wide, no net.
  */
+
+export type Step = {
+  hold?: boolean;
+  left?: boolean;
+  right?: boolean;
+  cw?: boolean;
+  ccw?: boolean;
+  flip?: boolean;
+  down?: boolean;
+  hard?: boolean;
+};
 
 export type Placement = {
   hold: boolean;
   rot: Rot;
   x: number;
+  y?: number;
   score: number;
+  path?: Step[];
+  spin?: boolean;
 };
 
 /** Gravity-hardened ES weights (stack-rl-gravity). Same features, trained under Guideline G + lock delay. */
@@ -73,16 +87,19 @@ export function modeBias(mode: ModeId, f: BotFeatures): number {
 
 type Drop = Placement & { board: Board; features: BotFeatures };
 
-/** Drop `id` at `rot, x` onto a copy of the board. Null if it cannot rest. */
+/** Drop `id` at `rot, x` (or a known `y` rest). Null if it cannot rest. */
 export function evaluateDrop(
   board: Board,
   id: PieceId,
   rot: Rot,
   x: number,
+  y?: number,
+  pathSpin = false,
 ): { features: BotFeatures; score: number; board: Board } | null {
-  const y = restY(board, id, rot, x);
-  if (y == null) return null;
-  const placed = cellsOf(id, rot, x, y).filter((c) => c.y >= 0 && c.y < ROWS && c.x >= 0 && c.x < COLS);
+  const rest = y ?? restY(board, id, rot, x);
+  if (rest == null) return null;
+  if (!fits(board, { id, rot, x, y: rest })) return null;
+  const placed = cellsOf(id, rot, x, rest).filter((c) => c.y >= 0 && c.y < ROWS && c.x >= 0 && c.x < COLS);
   if (placed.length === 0) return null;
   const next = cloneBoard(board);
   for (const c of placed) next[c.y]![c.x] = id;
@@ -108,7 +125,7 @@ export function evaluateDrop(
     max_height: heights.reduce((n, h) => Math.max(n, h), 0),
     hole_depth,
   };
-  const spin = spinBonus(board, id, rot, x, y, full.length);
+  const spin = spinBonus(board, id, rot, x, rest, full.length, pathSpin);
   return { features, score: scoreFeatures(features) + spin, board: cleared };
 }
 
@@ -159,10 +176,10 @@ export function pickPlacement(sim: Sim): Placement | null {
   const current = sim.piece;
   if (!current) return null;
   const kicks = modeOf(sim.mode).kicks;
-  const ply0 = collectDrops(sim.board, current, false, kicks, sim.mode);
+  const ply0 = collectDrops(sim.board, current, false, kicks, sim.mode, true);
   if (sim.canHold) {
     const other = sim.hold ?? sim.next[0];
-    if (other) ply0.push(...collectDrops(sim.board, spawnOf(other), true, kicks, sim.mode));
+    if (other) ply0.push(...collectDrops(sim.board, spawnOf(other), true, kicks, sim.mode, true));
   }
   if (ply0.length === 0) return null;
 
@@ -174,7 +191,15 @@ export function pickPlacement(sim: Sim): Placement | null {
     const leaf = peekNext(drop, follow, kicks, sim.mode);
     if (leaf > bestLeaf) {
       bestLeaf = leaf;
-      best = { hold: drop.hold, rot: drop.rot, x: drop.x, score: leaf };
+      best = {
+        hold: drop.hold,
+        rot: drop.rot,
+        x: drop.x,
+        y: drop.y,
+        score: leaf,
+        path: drop.path,
+        spin: drop.spin,
+      };
     }
   }
   return best;
@@ -186,6 +211,10 @@ export function pickPlacement(sim: Sim): Placement | null {
  */
 export function playPlacement(sim: Sim, pick: Placement): ReturnType<typeof pulseAction> {
   if (pick.hold && sim.canHold) pulseAction(sim, { hold: true });
+  if (pick.path && pick.path.length) {
+    for (const step of pick.path) pulseAction(sim, step);
+    return pulseAction(sim, { hard: true });
+  }
   let guard = 20;
   while (sim.piece && sim.piece.rot !== pick.rot && guard--) {
     const before = sim.piece.rot;
@@ -213,26 +242,38 @@ export type BotHand = Placement & {
   wait: number;
   held: boolean;
   turns: number;
+  i: number;
 };
 
 export function armBot(sim: Sim, think: number): BotHand | null {
   const pick = pickPlacement(sim);
   if (!pick) return null;
-  return { ...pick, wait: think, held: false, turns: 0 };
+  return { ...pick, wait: think, held: false, turns: 0, i: 0 };
 }
 
-/** One pulse toward the pick. Null pulse means wait. */
-export function botPulse(
-  sim: Sim,
-  hand: BotHand,
-): { hold?: boolean; cw?: boolean; left?: boolean; right?: boolean; hard?: boolean } | null {
-  const p = sim.piece;
-  if (!p) return { hard: true };
-  if (hand.hold && !hand.held && sim.canHold) return { hold: true };
-  if (p.rot !== hand.rot) return { cw: true };
-  if (p.x < hand.x) return { right: true };
-  if (p.x > hand.x) return { left: true };
-  return { hard: true };
+/** One pulse along the path. Null means still thinking. */
+export function playStep(sim: Sim, hand: BotHand): ReturnType<typeof pulseAction> | null {
+  if (hand.hold && !hand.held && sim.canHold) {
+    hand.held = true;
+    return pulseAction(sim, { hold: true });
+  }
+  const path = hand.path;
+  if (!path || hand.i >= path.length) {
+    if (!sim.piece) return null;
+    return pulseAction(sim, { hard: true });
+  }
+  if (path[hand.i]!.down) {
+    let moved = false;
+    while (hand.i < path.length && path[hand.i]!.down) {
+      const ev = pulseAction(sim, { down: true });
+      if (ev === "move") moved = true;
+      hand.i += 1;
+    }
+    return moved ? "move" : "none";
+  }
+  const step = path[hand.i]!;
+  hand.i += 1;
+  return pulseAction(sim, step);
 }
 
 function spawnOf(id: PieceId): Piece {
@@ -245,35 +286,129 @@ function rotsOf(id: PieceId): Rot[] {
   return [0, 1, 2, 3];
 }
 
+type Rest = { rot: Rot; x: number; y: number; path: Step[]; spin: boolean };
+
+function hardRests(board: Board, from: Piece, kicks: boolean): Rest[] {
+  const out: Rest[] = [];
+  for (const rot of rotsOf(from.id)) {
+    for (let x = -2; x <= 8; x++) {
+      if (!reachable(board, from, rot, x, kicks)) continue;
+      const y = restY(board, from.id, rot, x);
+      if (y == null) continue;
+      out.push({ rot, x, y, path: [], spin: false });
+    }
+  }
+  return out;
+}
+
+function searchRests(board: Board, from: Piece, kicks: boolean): Rest[] {
+  const start: Piece = { id: from.id, rot: from.rot, x: from.x, y: from.y };
+  if (!fits(board, start)) return hardRests(board, from, kicks);
+  const keyOf = (x: number, y: number, rot: number) => ((y + 4) * 16 + (x + 3)) * 4 + rot;
+  const seen = new Set<number>();
+  type Node = { x: number; y: number; rot: Rot; prev: number; move: Step | null };
+  const q: Node[] = [{ x: start.x, y: start.y, rot: start.rot, prev: -1, move: null }];
+  seen.add(keyOf(start.x, start.y, start.rot));
+  const byKey = new Map<number, Rest>();
+
+  const rebuild = (i: number): Step[] => {
+    const steps: Step[] = [];
+    let n = q[i]!;
+    while (n.prev >= 0 && n.move) {
+      steps.push(n.move);
+      n = q[n.prev]!;
+    }
+    steps.reverse();
+    return steps;
+  };
+
+  const tryKick = (p: Piece, dir: 1 | -1): Piece | null => {
+    const to = ((((p.rot + dir) % 4) + 4) % 4) as Rot;
+    const table = kicks ? kicksFor(p.id, p.rot, to) : [{ x: 0, y: 0 }];
+    for (const k of table) {
+      const cand: Piece = { id: p.id, rot: to, x: p.x + k.x, y: p.y - k.y };
+      if (fits(board, cand)) return cand;
+    }
+    return null;
+  };
+
+  for (let i = 0; i < q.length && i < 520; i++) {
+    const n = q[i]!;
+    const p: Piece = { id: from.id, rot: n.rot, x: n.x, y: n.y };
+    const grounded = !fits(board, { ...p, y: p.y + 1 });
+    const k = keyOf(n.x, n.y, n.rot);
+    const spun = !!(n.move?.cw || n.move?.ccw || n.move?.flip);
+    if (grounded) {
+      const prev = byKey.get(k);
+      if (!prev) byKey.set(k, { rot: n.rot, x: n.x, y: n.y, path: rebuild(i), spin: spun });
+      else if (spun && !prev.spin) {
+        prev.spin = true;
+        prev.path = rebuild(i);
+      }
+    }
+
+    const push = (next: Piece, move: Step) => {
+      const nk = keyOf(next.x, next.y, next.rot);
+      if (seen.has(nk)) {
+        if (!fits(board, { ...next, y: next.y + 1 }) && (move.cw || move.ccw || move.flip)) {
+          const rest = byKey.get(nk);
+          if (rest && !rest.spin) {
+            rest.spin = true;
+            rest.path = rebuild(i).concat(move);
+          }
+        }
+        return;
+      }
+      if (!fits(board, next)) return;
+      if (next.y < -2 || next.y >= ROWS || next.x < -3 || next.x > 12) return;
+      seen.add(nk);
+      q.push({ x: next.x, y: next.y, rot: next.rot, prev: i, move });
+    };
+
+    push({ ...p, x: p.x - 1 }, { left: true });
+    push({ ...p, x: p.x + 1 }, { right: true });
+    push({ ...p, y: p.y + 1 }, { down: true });
+    const cw = tryKick(p, 1);
+    if (cw) push(cw, { cw: true });
+    const ccw = tryKick(p, -1);
+    if (ccw) push(ccw, { ccw: true });
+  }
+
+  const rests = [...byKey.values()];
+  return rests.length ? rests : hardRests(board, from, kicks);
+}
+
 function collectDrops(
   board: Board,
   from: Piece,
   hold: boolean,
   kicks: boolean,
   mode: ModeId,
+  paths: boolean,
 ): Drop[] {
   const before = colHeights(board);
   const well = maxWell(before);
   const danger = before.reduce((n, h) => Math.max(n, h), 0) >= 14;
   const out: Drop[] = [];
-  for (const rot of rotsOf(from.id)) {
-    for (let x = -2; x <= 8; x++) {
-      if (!reachable(board, from, rot, x, kicks)) continue;
-      const hit = evaluateDrop(board, from.id, rot, x);
-      if (!hit) continue;
-      out.push({
-        hold,
-        rot,
-        x,
-        score:
-          hit.score +
-          modeBias(mode, hit.features) +
-          greedTax(mode, from.id, hit.features, well, danger) -
-          (hold ? 1e-6 : 0),
-        board: hit.board,
-        features: hit.features,
-      });
-    }
+  const rests = paths ? searchRests(board, from, kicks) : hardRests(board, from, kicks);
+  for (const rest of rests) {
+    const hit = evaluateDrop(board, from.id, rest.rot, rest.x, rest.y, rest.spin);
+    if (!hit) continue;
+    out.push({
+      hold,
+      rot: rest.rot,
+      x: rest.x,
+      y: rest.y,
+      path: rest.path,
+      spin: rest.spin,
+      score:
+        hit.score +
+        modeBias(mode, hit.features) +
+        greedTax(mode, from.id, hit.features, well, danger) -
+        (hold ? 1e-6 : 0),
+      board: hit.board,
+      features: hit.features,
+    });
   }
   return out;
 }
@@ -304,10 +439,10 @@ function followState(sim: Sim, held: boolean): Follow {
 
 function peekNext(drop: Drop, follow: Follow, kicks: boolean, mode: ModeId): number {
   if (!follow.falling) return drop.score;
-  const ply1 = collectDrops(drop.board, spawnOf(follow.falling), false, kicks, mode);
+  const ply1 = collectDrops(drop.board, spawnOf(follow.falling), false, kicks, mode, false);
   if (follow.canHold) {
     const other = follow.hold ?? follow.queue[0];
-    if (other) ply1.push(...collectDrops(drop.board, spawnOf(other), true, kicks, mode));
+    if (other) ply1.push(...collectDrops(drop.board, spawnOf(other), true, kicks, mode, false));
   }
   if (ply1.length === 0) return drop.score - 48;
   let leaf = ply1[0]!.score;
@@ -318,9 +453,17 @@ function peekNext(drop: Drop, follow: Follow, kicks: boolean, mode: ModeId): num
   return leaf + 0.2 * drop.score;
 }
 
-/** A T that hard-drops into a 3-corner slot and clears is worth taking. No pathfinder. */
-function spinBonus(board: Board, id: PieceId, rot: Rot, x: number, y: number, lines: number): number {
-  if (id !== "T" || lines < 1) return 0;
+/** A T that twists into a 3-corner slot and clears is the human line. */
+function spinBonus(
+  board: Board,
+  id: PieceId,
+  rot: Rot,
+  x: number,
+  y: number,
+  lines: number,
+  pathSpin: boolean,
+): number {
+  if (id !== "T") return 0;
   const solid = (cx: number, cy: number) => {
     if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) return true;
     return board[cy]![cx] !== null;
@@ -328,6 +471,8 @@ function spinBonus(board: Board, id: PieceId, rot: Rot, x: number, y: number, li
   const corners =
     Number(solid(x, y)) + Number(solid(x + 2, y)) + Number(solid(x, y + 2)) + Number(solid(x + 2, y + 2));
   if (corners < 3) return 0;
+  if (pathSpin) return lines >= 2 ? 4.8 : lines === 1 ? 2.6 : 0.35;
+  if (lines < 1) return 0;
   return lines >= 2 ? 2.2 : 1.1;
 }
 

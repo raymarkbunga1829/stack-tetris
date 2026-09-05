@@ -1038,6 +1038,7 @@ export function pulseAction(
     flip?: boolean;
     hard?: boolean;
     hold?: boolean;
+    down?: boolean;
   },
 ): StepEvent {
   if (sim.phase !== "playing" || !sim.piece) return "none";
@@ -1049,6 +1050,7 @@ export function pulseAction(
     const r = hardDrop(sim);
     return r === "over" ? "over" : "lock";
   }
+  if (p.down && tryFall(sim)) return "move";
   if (p.left && tryShift(sim, -1)) return "move";
   if (p.right && tryShift(sim, 1)) return "move";
   return "none";
