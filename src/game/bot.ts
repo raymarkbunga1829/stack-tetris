@@ -8,9 +8,9 @@ import { COLS, HIDDEN_ROWS, ROWS, type PieceId, type Rot } from "./types";
  * Watch-bot. One linear scorer, one real well, every mode that will have it.
  *
  * ES still grades a rest. A 2-ply beam (this piece + Hold + NEXT) picks the
- * rest that leaves the next piece a good board, not just the greedy slam.
- * Hard-drop only: no tucks, no Zap, no 4-wide, no net. Classic only rests
- * where a NES rotate-and-shift can actually go. Sprint still finishes forty.
+ * rest that leaves the next piece a good board. Patience tax: keep the I for
+ * a Tetris, skip cheap singles that eat the well. Hard-drop only: no tucks,
+ * no Zap, no 4-wide, no net.
  */
 
 export type Placement = {
@@ -252,6 +252,9 @@ function collectDrops(
   kicks: boolean,
   mode: ModeId,
 ): Drop[] {
+  const before = colHeights(board);
+  const well = maxWell(before);
+  const danger = before.reduce((n, h) => Math.max(n, h), 0) >= 14;
   const out: Drop[] = [];
   for (const rot of rotsOf(from.id)) {
     for (let x = -2; x <= 8; x++) {
@@ -262,7 +265,11 @@ function collectDrops(
         hold,
         rot,
         x,
-        score: hit.score + modeBias(mode, hit.features) - (hold ? 1e-6 : 0),
+        score:
+          hit.score +
+          modeBias(mode, hit.features) +
+          greedTax(mode, from.id, hit.features, well, danger) -
+          (hold ? 1e-6 : 0),
         board: hit.board,
         features: hit.features,
       });
@@ -322,6 +329,36 @@ function spinBonus(board: Board, id: PieceId, rot: Rot, x: number, y: number, li
     Number(solid(x, y)) + Number(solid(x + 2, y)) + Number(solid(x, y + 2)) + Number(solid(x + 2, y + 2));
   if (corners < 3) return 0;
   return lines >= 2 ? 2.2 : 1.1;
+}
+
+/** Sprint / Blitz / Finesse need to finish. Other modes wait for a Tetris. */
+function greedTax(
+  mode: ModeId,
+  id: PieceId,
+  f: BotFeatures,
+  well: number,
+  danger: boolean,
+): number {
+  if (mode === "sprint" || mode === "blitz" || mode === "finesse") return 0;
+  if (danger) return f.lines_cleared > 0 ? 0.9 * f.lines_cleared : 0;
+  let n = 0;
+  if (f.is_tetris) n += 2.6;
+  if (id === "I" && f.lines_cleared > 0 && f.lines_cleared < 4 && well >= 2) n -= 3.4;
+  else if (id === "I" && f.lines_cleared === 0 && well >= 3) n -= 2.0;
+  else if (f.lines_cleared === 1 && well >= 3) n -= 1.8;
+  else if (f.lines_cleared === 2 && well >= 4) n -= 1.2;
+  return n;
+}
+
+function maxWell(heights: number[]): number {
+  let m = 0;
+  for (let x = 0; x < heights.length; x++) {
+    const left = x === 0 ? 99 : heights[x - 1]!;
+    const right = x === heights.length - 1 ? 99 : heights[x + 1]!;
+    const d = Math.min(left, right) - heights[x]!;
+    if (d > m) m = d;
+  }
+  return m;
 }
 
 function restY(board: Board, id: PieceId, rot: Rot, x: number): number | null {

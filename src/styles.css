@@ -260,8 +260,10 @@
 }
 
 .hud-pause.is-on {
-  background: var(--color-fg);
-  color: var(--color-bg);
+  background: transparent;
+  color: var(--color-muted);
+  padding: 0 8px;
+  box-shadow: none;
 }
 
 .watch-bar {
