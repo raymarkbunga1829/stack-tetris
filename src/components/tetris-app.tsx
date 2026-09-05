@@ -2687,7 +2687,7 @@ export function TetrisApp() {
           </div>
         )}
 
-        <div className={`stage${ui.holdRight ? " is-flip" : ""}`}>
+        <div className={`stage${ui.holdRight ? " is-flip" : ""}${ui.mode === "siege" && (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") ? " is-hull" : ""}`}>
           <aside className="rail">
             <p className="rail-label">Hold</p>
             <div
@@ -3177,6 +3177,29 @@ export function TetrisApp() {
             {ui.gesture && ui.phase === "playing" && (
               <p className="gchip">{ui.gesture}</p>
             )}
+            {ui.mode === "siege" &&
+              (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
+                <>
+                  <i className="hull-stars" aria-hidden="true" />
+                  {(ui.siege?.incoming ?? 0) > 0 && (
+                    <b className="hull-in" aria-label={`${ui.siege!.incoming} incoming`}>
+                      {ui.siege!.incoming}
+                    </b>
+                  )}
+                  <div
+                    className={`plume${ui.lockPop || ui.tintPop ? " is-hot" : ""}`}
+                    aria-hidden="true"
+                  >
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                  <p className="climb" data-qa="climb">
+                    {siegeClimb(ui)}
+                    <small>m</small>
+                  </p>
+                </>
+              )}
           </div>
 
           <aside className="rail rail-next">
@@ -3231,7 +3254,7 @@ export function TetrisApp() {
             />
           )
         )}
-        {ui.mode === "siege" && ui.siege && ui.phase === "playing" && (
+        {ui.mode === "siege" && ui.siege && (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
           <SiegeRail
             snap={ui.siege}
             onAim={() => {
@@ -3529,6 +3552,10 @@ function botStartLabel(mode: ModeId): string {
     siege: "Siege",
   };
   return `Watch ${short[mode] ?? modeOf(mode).name}`;
+}
+
+function siegeClimb(ui: Pick<Ui, "siege" | "lines">): number {
+  return (ui.siege?.kos ?? 0) * 80 + ui.lines * 12;
 }
 
 /**
