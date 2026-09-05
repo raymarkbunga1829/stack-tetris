@@ -974,8 +974,8 @@ export function TetrisApp() {
     const sim = simRef.current;
     const mode = sim?.mode ?? uiRef.current.mode;
     if (qa) return 0.02;
-    const race = mode === "sprint" || mode === "blitz";
-    if (race) return (sim && sim.level >= 10 ? 0.03 : 0.055) / pace;
+    const race = mode === "sprint" || mode === "blitz" || mode === "siege";
+    if (race) return (sim && sim.level >= 10 ? 0.03 : 0.05) / pace;
     if (sim && sim.level >= 10) return Math.max(0.04, 0.064 / pace);
     if (sim && sim.level >= 5) return 0.09 / pace;
     return 0.16 / pace;
@@ -1009,7 +1009,13 @@ export function TetrisApp() {
     }
     // One arm/slam per falling piece. think=0 must not fire every rAF on the same lock.
     if (botDoneLock.current === sim.locks) return null;
-    if (!botHand.current) botHand.current = armBot(sim, botThink(), siegeRef.current?.incoming ?? 0);
+    if (!botHand.current)
+      botHand.current = armBot(
+        sim,
+        botThink(),
+        siegeRef.current?.incoming ?? 0,
+        siegeRef.current?.hunters ?? 0,
+      );
     const hand = botHand.current;
     if (!hand) {
       const key = sim.locks;
