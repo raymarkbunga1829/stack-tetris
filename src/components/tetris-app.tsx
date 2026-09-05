@@ -74,6 +74,7 @@ import {
   inDanger,
   onBrink,
   pauseToggle,
+  resumePlay,
   pickFromNext,
   predictCollision,
   pulseAction,
@@ -423,6 +424,7 @@ export function TetrisApp() {
   const [buying, setBuying] = useState<string | null>(null);
   const [want, setWant] = useState<PowerId | null>(null);
   const [viewW, setViewW] = useState(() => (typeof window === "undefined" ? 390 : window.innerWidth));
+  const [wellGen, setWellGen] = useState(0);
   const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
   const finesseN = useRef(0);
   const finesseClean = useRef(0);
@@ -440,8 +442,13 @@ export function TetrisApp() {
   const uglySaid = useRef(false);
   const siegeRef = useRef<Siege | null>(null);
   const botHand = useRef<BotHand | null>(null);
+  const botDoneLock = useRef(-1);
+  const botUiAt = useRef(0);
   const botPace = useRef<1 | 2>(1);
   const botPlayRef = useRef(false);
+  const wellGenRef = useRef(0);
+  const wellRebuildAt = useRef(0);
+  const wellBlank = useRef(0);
   const finishRunRef = useRef<(s: Sim) => void>(() => {});
 
   useEffect(() => onKeyboard(() => setViewW(window.innerWidth)), []);
@@ -529,19 +536,12 @@ export function TetrisApp() {
     swipeRef.current = gestures;
 
     try {
-      const engine = createWell3d(canvas);
-      well3dRef.current = engine;
-      engine.setClear(
-        saveRef.current.clearWell ||
-          saveRef.current.mode === "sprint" ||
-          saveRef.current.mode === "daily",
-      );
       const ro = new ResizeObserver(() => {
-        engine.resize();
+        well3dRef.current?.resize();
         if (vizCanvas) resizeCanvas(vizCanvas);
       });
       ro.observe(well);
-      engine.resize();
+      well3dRef.current?.resize();
       if (vizCanvas) resizeCanvas(vizCanvas);
 
       const onVis = () => {
@@ -588,6 +588,23 @@ export function TetrisApp() {
           getHold: () => simRef.current?.hold ?? null,
           getBot: () => botPlayRef.current || simRef.current?.mode === "watch",
           getBanner: () => uiRef.current.banner,
+          setLevel: (n: number) => {
+            const s = simRef.current;
+            if (!s) return;
+            const lv = Math.max(1, Math.min(40, Math.round(n)));
+            s.level = lv;
+            s.lines = Math.max(s.lines, (lv - 1) * 10);
+          },
+          getWell: () => {
+            const c = canvasRef.current;
+            const engine = well3dRef.current;
+            return {
+              lost: engine ? engine.lost() : true,
+              cells: engine?.cellsDrawn() ?? 0,
+              w: c?.width ?? 0,
+              h: c?.height ?? 0,
+            };
+          },
           topOut: () => {
             const s = simRef.current;
             if (!s) return;
@@ -605,8 +622,6 @@ export function TetrisApp() {
         swipeRef.current = null;
         ro.disconnect();
         document.removeEventListener("visibilitychange", onVis);
-        engine.dispose();
-        well3dRef.current = null;
         delete window.__controlsTest;
       };
     } catch (err) {
@@ -620,8 +635,67 @@ export function TetrisApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const well = wellRef.current;
+    if (!canvas || !well) return;
+    try {
+      well3dRef.current?.dispose();
+    } catch {
+      /* ignore */
+    }
+    try {
+      const engine = createWell3d(canvas);
+      well3dRef.current = engine;
+      engine.setClear(
+        saveRef.current.clearWell ||
+          saveRef.current.mode === "sprint" ||
+          saveRef.current.mode === "daily",
+      );
+      engine.resize();
+      return () => {
+        try {
+          engine.dispose();
+        } catch {
+          /* ignore */
+        }
+        if (well3dRef.current === engine) well3dRef.current = null;
+      };
+    } catch (err) {
+      console.error("[stack] well init failed", err);
+      well3dRef.current = null;
+    }
+  }, [wellGen]);
+
+  function requestWellRebuild(force = false) {
+    const now = performance.now();
+    if (!force && now - wellRebuildAt.current < 800) return;
+    wellRebuildAt.current = now;
+    wellBlank.current = 0;
+    wellGenRef.current += 1;
+    setWellGen(wellGenRef.current);
+  }
+
   function syncUi(extra: Partial<Ui> = {}) {
     const sim = simRef.current;
+    const nextPhase = extra.phase ?? sim?.phase ?? uiRef.current.phase;
+    const urgent =
+      nextPhase === "paused" ||
+      nextPhase === "over" ||
+      nextPhase === "title" ||
+      extra.recap != null ||
+      extra.failing === true ||
+      extra.watching === false ||
+      extra.botPlay != null;
+    if (
+      isBotRun() &&
+      !urgent &&
+      (nextPhase === "playing" || nextPhase === "clearing")
+    ) {
+      const now = performance.now();
+      if (now - botUiAt.current < 100) return;
+      botUiAt.current = now;
+    }
     setUi((prev) => ({
       ...prev,
       phase: extra.phase ?? sim?.phase ?? prev.phase,
@@ -709,6 +783,7 @@ export function TetrisApp() {
     uglySaid.current = false;
     siegeRef.current = mode === "siege" ? createSiege() : null;
     botHand.current = null;
+    botDoneLock.current = -1;
     const bot = mode === "watch" || botPlayRef.current;
     botPlayRef.current = bot;
     bagN.current = sim.bag.length;
@@ -803,6 +878,7 @@ export function TetrisApp() {
     dying.current = false;
     failT.current = 0;
     wipePit();
+    requestWellRebuild(true);
     if (simRef.current) simRef.current.phase = "title";
     syncUi({
       phase: "title",
@@ -844,11 +920,14 @@ export function TetrisApp() {
 
   function botThink(): number {
     const qa = typeof location !== "undefined" && new URLSearchParams(location.search).has("qa");
-    if (qa) return 0;
+    const pace = botPace.current;
+    // Even at 20G, wait a couple of frames so the well can present. Gravity
+    // is frozen during that wait, so the piece is not buried. think=0 used to
+    // slam a fresh spawn every rAF and that blanked the canvas around lv17.
+    if (qa) return 0.02;
     const sim = simRef.current;
-    // High gravity / lock window: never wait. A drip dies mid-move.
-    if (sim && (sim.level >= 10 || sim.lockT > 0)) return 0;
-    return 0.12 / botPace.current;
+    if (sim && sim.level >= 10) return Math.max(0.04, 0.064 / pace);
+    return 0.12 / pace;
   }
 
   function isBotRun() {
@@ -868,23 +947,30 @@ export function TetrisApp() {
     syncUi({ botPlay: next });
   }
 
-  function takeBotPulse(sim: Sim, dt: number) {
+  function takeBotSlam(sim: Sim, dt: number) {
+    if (sim.phase === "clearing" || sim.phase === "paused") return null;
     if (sim.phase !== "playing" || !sim.piece) {
       botHand.current = null;
       return null;
     }
+    // One arm/slam per falling piece. think=0 must not fire every rAF on the same lock.
+    if (botDoneLock.current === sim.locks) return null;
     if (!botHand.current) botHand.current = armBot(sim, botThink());
     const hand = botHand.current;
     if (!hand) {
-      playPlacement(sim, { hold: false, rot: sim.piece.rot, x: sim.piece.x, score: 0 });
-      return null;
+      const key = sim.locks;
+      const ev = pulseAction(sim, { hard: true });
+      if (!sim.piece || sim.locks !== key) botDoneLock.current = key;
+      return ev;
     }
+    if (sim.lockT > 0 && hand.wait > 0.05) hand.wait = 0;
     hand.wait -= dt;
     if (hand.wait > 0) return null;
-    // One shot: hold → rotate → shift → hard on this tick. Gravity cannot bury a drip.
+    const key = sim.locks;
     botHand.current = null;
-    playPlacement(sim, hand);
-    return null;
+    const ev = playPlacement(sim, hand);
+    if (!sim.piece || sim.locks !== key) botDoneLock.current = key;
+    return ev;
   }
 
   function tick(dt: number) {
@@ -905,7 +991,7 @@ export function TetrisApp() {
         syncUi({ shop: false, settings: false, board: false });
         return;
       }
-      if (u.phase === "playing" || u.phase === "paused") {
+      if (u.phase === "playing" || u.phase === "clearing" || u.phase === "paused") {
         if (simRef.current) {
           pauseToggle(simRef.current);
           setMusicPaused(simRef.current.phase === "paused");
@@ -918,9 +1004,9 @@ export function TetrisApp() {
     if (keyed && !isBotRun()) usePower(keyed);
 
     if (just.confirm && u.phase === "paused" && simRef.current) {
-      simRef.current.phase = "playing";
+      resumePlay(simRef.current);
       setMusicPaused(false);
-      syncUi({ phase: "playing" });
+      syncUi({ phase: simRef.current.phase });
     }
 
     const sim = simRef.current;
@@ -996,28 +1082,64 @@ export function TetrisApp() {
     const driven = isBotRun();
     const falling = sim.piece;
     const ghostAt = falling ? ghostY(sim) : 0;
-    const pulse = driven ? takeBotPulse(sim, dt) : null;
-    const ev = advance(sim, dt, {
-      heldLeft: driven ? false : held.left,
-      heldRight: driven ? false : held.right,
-      justLeft: driven ? !!pulse?.left : just.left,
-      justRight: driven ? !!pulse?.right : just.right,
-      softDrop: driven ? false : held.down,
-      justHard: driven ? !!pulse?.hard : just.hard,
-      justCw: driven ? !!pulse?.cw : just.cw,
-      justCcw: driven ? false : just.ccw,
-      justHold: driven ? !!pulse?.hold : just.hold,
-      justFlip: driven ? false : just.flip,
-      heldCw: driven ? false : held.cw,
-      heldCcw: driven ? false : held.ccw,
-      heldHold: driven ? false : held.hold,
-      heldFlip: driven ? false : held.flip,
-      nudge: driven ? 0 : input.takeNudge(),
+    well3dRef.current?.setCalm(driven);
+    const idle = {
+      heldLeft: false,
+      heldRight: false,
+      justLeft: false,
+      justRight: false,
+      softDrop: false,
+      justHard: false,
+      justCw: false,
+      justCcw: false,
+      justHold: false,
+      justFlip: false,
+      heldCw: false,
+      heldCcw: false,
+      heldHold: false,
+      heldFlip: false,
+      nudge: 0,
       das: showPad(u.padMode) ? DAS_TOUCH : saveRef.current.dasMs / 1000,
       arr: saveRef.current.arrMs / 1000,
       sdf: saveRef.current.sdf,
-      freeze: !!u.coach,
-    });
+    };
+    let botHard = false;
+    let ev;
+    if (driven) {
+      if (sim.phase === "clearing" || !sim.piece) {
+        ev = advance(sim, dt, idle);
+      } else {
+        const slam = takeBotSlam(sim, dt);
+        if (slam) {
+          botHard = true;
+          ev = slam;
+        } else {
+          ev = advance(sim, dt, { ...idle, freeze: true });
+        }
+      }
+    } else {
+      ev = advance(sim, dt, {
+        heldLeft: held.left,
+        heldRight: held.right,
+        justLeft: just.left,
+        justRight: just.right,
+        softDrop: held.down,
+        justHard: just.hard,
+        justCw: just.cw,
+        justCcw: just.ccw,
+        justHold: just.hold,
+        justFlip: just.flip,
+        heldCw: held.cw,
+        heldCcw: held.ccw,
+        heldHold: held.hold,
+        heldFlip: held.flip,
+        nudge: input.takeNudge(),
+        das: showPad(u.padMode) ? DAS_TOUCH : saveRef.current.dasMs / 1000,
+        arr: saveRef.current.arrMs / 1000,
+        sdf: saveRef.current.sdf,
+        freeze: !!u.coach,
+      });
+    }
 
     if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 10);
     if (bannerT.current > 0) {
@@ -1143,8 +1265,8 @@ export function TetrisApp() {
       syncUi({ holdPeek: sim.piece?.id ?? null });
     }
     if (ev === "lock") {
-      if (!just.hard) sfxLock();
-      slamLock(just.hard, falling, just.hard ? ghostAt : falling?.y ?? 0);
+      if (!(botHard || just.hard)) sfxLock();
+      slamLock(botHard || just.hard, falling, botHard || just.hard ? ghostAt : falling?.y ?? 0);
       if (held.down && falling && !just.hard) {
         well3dRef.current?.softTrail(
           falling,
@@ -1542,6 +1664,11 @@ export function TetrisApp() {
     const cells = cellsOf(falling.id, falling.rot, falling.x, destY);
     const col = themeOf(saveRef.current.theme).fill[falling.id];
     if (hard) {
+      if (isBotRun()) {
+        engine.lockThump(cells, col, false);
+        if ((simRef.current?.level ?? 1) < 10) sfxHard();
+        return;
+      }
       haptic("tetris");
       engine.lockThump(cells, col, true);
       engine.punch(0.4, true);
@@ -1641,6 +1768,10 @@ export function TetrisApp() {
     });
     showCallout(spoken);
     noteStill(sim, spoken);
+    if (isBotRun()) {
+      sfxLine(spoken.rank);
+      return;
+    }
     const beat = kind === "single" ? "double" : kind;
     engine.punch(
       beat === "stack" ? 0.28 : beat === "tspin" ? 0.24 : beat === "triple" ? 0.16 : 0.1,
@@ -1753,16 +1884,20 @@ export function TetrisApp() {
     const patch: Partial<Ui> = {};
     if (combo > 0 && combo > comboSeen.current) {
       sfxCombo(combo);
-      well3dRef.current?.punch(0.16 + Math.min(0.22, combo * 0.04));
-      patch.comboPop = uiRef.current.comboPop + 1;
+      if (!isBotRun()) {
+        well3dRef.current?.punch(0.16 + Math.min(0.22, combo * 0.04));
+        patch.comboPop = uiRef.current.comboPop + 1;
+      }
     }
     comboSeen.current = sim.combo;
     if (sim.b2b) {
       const hit = difficult && b2bSeen.current;
       if (hit || !b2bSeen.current) {
         sfxB2b();
-        well3dRef.current?.punch(hit ? 0.34 : 0.2);
-        patch.b2bPop = uiRef.current.b2bPop + 1;
+        if (!isBotRun()) {
+          well3dRef.current?.punch(hit ? 0.34 : 0.2);
+          patch.b2bPop = uiRef.current.b2bPop + 1;
+        }
       }
     }
     b2bSeen.current = sim.b2b;
@@ -1781,6 +1916,20 @@ export function TetrisApp() {
   function paint() {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (well3dRef.current?.lost()) requestWellRebuild();
+    else {
+      const live = simRef.current;
+      const engine = well3dRef.current;
+      if (live && engine && live.phase !== "title" && live.phase !== "over") {
+        const occupied = !!live.piece || live.board.some((row) => row.some((c) => c));
+        if (occupied && engine.cellsDrawn() <= 0) {
+          wellBlank.current += 1;
+          if (wellBlank.current > 10) requestWellRebuild();
+        } else {
+          wellBlank.current = 0;
+        }
+      }
+    }
     const reduce =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -2059,8 +2208,8 @@ export function TetrisApp() {
     }
     if (phase === "paused") {
       if (action.name === "confirm" && simRef.current) {
-        simRef.current.phase = "playing";
-        syncUi({ phase: "playing" });
+        resumePlay(simRef.current);
+        syncUi({ phase: simRef.current.phase });
       }
       return;
     }
@@ -2342,8 +2491,8 @@ export function TetrisApp() {
     if (e.type === "pointerdown" && phase === "paused") {
       e.preventDefault();
       if (simRef.current) {
-        simRef.current.phase = "playing";
-        syncUi({ phase: "playing" });
+        resumePlay(simRef.current);
+        syncUi({ phase: simRef.current.phase });
       }
       return;
     }
@@ -2429,7 +2578,9 @@ export function TetrisApp() {
             {ui.mode === "sprint" && sprintPace(ui.clock, ui.lines, ui.sprintBest) ? (
               <small>{sprintPace(ui.clock, ui.lines, ui.sprintBest)}</small>
             ) : null}
-            {ui.phase === "playing" ? (
+            {ui.phase === "paused" ? (
+              <span className="hud-pause is-on">Paused</span>
+            ) : (
               <button
                 type="button"
                 className="hud-pause"
@@ -2445,8 +2596,6 @@ export function TetrisApp() {
               >
                 Pause
               </button>
-            ) : (
-              <span className="hud-pause is-on">Paused</span>
             )}
           </div>
         )}
@@ -2486,7 +2635,7 @@ export function TetrisApp() {
             onPointerCancel={onWellPointer}
             onLostPointerCapture={onWellPointer}
           >
-            <canvas ref={canvasRef} />
+            <canvas key={wellGen} ref={canvasRef} />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
             <div className="marquee">
               <span>
@@ -2627,12 +2776,12 @@ export function TetrisApp() {
                       e.stopPropagation();
                       unlockAudio();
                       if (simRef.current) {
-                        simRef.current.phase = "playing";
+                        resumePlay(simRef.current);
                         setMusicPaused(false);
                         setMusicTension(
                           simRef.current.mode !== "zen" && inDanger(simRef.current),
                         );
-                        syncUi({ phase: "playing" });
+                        syncUi({ phase: simRef.current.phase });
                       }
                     }}
                   >
@@ -3419,6 +3568,8 @@ declare global {
       getHold: () => PieceId | null;
       getBot: () => boolean;
       getBanner: () => string | null;
+      setLevel: (n: number) => void;
+      getWell: () => { lost: boolean; cells: number; w: number; h: number };
       topOut: () => void;
     };
   }

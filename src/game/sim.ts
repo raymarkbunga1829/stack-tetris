@@ -667,6 +667,7 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
   if (n === 4) sim.stacks += 1;
   if (sim.mode !== "zen") {
     sim.level = Math.max(
+      sim.level,
       modeOf(sim.mode).startLevel,
       Math.floor(sim.lines / LINES_PER_LEVEL) + 1,
     );
@@ -963,9 +964,14 @@ function compactBoard(sim: Sim) {
   sim.board = kept;
 }
 
+export function resumePlay(sim: Sim) {
+  if (sim.phase !== "paused") return;
+  sim.phase = sim.clearT > 0 ? "clearing" : "playing";
+}
+
 export function pauseToggle(sim: Sim) {
-  if (sim.phase === "playing") sim.phase = "paused";
-  else if (sim.phase === "paused") sim.phase = "playing";
+  if (sim.phase === "playing" || sim.phase === "clearing") sim.phase = "paused";
+  else if (sim.phase === "paused") resumePlay(sim);
 }
 
 export function undoZen(sim: Sim): boolean {
