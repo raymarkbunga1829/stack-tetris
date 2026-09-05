@@ -692,6 +692,10 @@ export function TetrisApp() {
   function syncUi(extra: Partial<Ui> = {}) {
     const sim = simRef.current;
     const nextPhase = extra.phase ?? sim?.phase ?? uiRef.current.phase;
+    const clockTick =
+      !!sim &&
+      (Math.floor(sim.clock) !== Math.floor(uiRef.current.clock) ||
+        Math.floor(sim.timeLeft ?? -1) !== Math.floor(uiRef.current.timeLeft ?? -1));
     const urgent =
       nextPhase === "paused" ||
       nextPhase === "over" ||
@@ -704,6 +708,7 @@ export function TetrisApp() {
       extra.banner != null ||
       extra.b2bPop != null ||
       extra.scorePop != null ||
+      clockTick ||
       "intro" in extra;
     if (
       isBotRun() &&
@@ -778,7 +783,7 @@ export function TetrisApp() {
   }
 
   function beginGame(mode: ModeId) {
-    saveRef.current = { ...saveRef.current, mode, played: true };
+    saveRef.current = { ...saveRef.current, mode, played: true, a2hs: true };
     writeSave(saveRef.current);
     const seed = mode === "daily" ? dailySeed() : undefined;
     const sim = createSim({ mode, seed });
@@ -916,7 +921,13 @@ export function TetrisApp() {
     failT.current = 0;
     wipePit();
     requestWellRebuild(true);
-    if (simRef.current) simRef.current.phase = "title";
+    botHand.current = null;
+    if (simRef.current) {
+      simRef.current.phase = "title";
+      simRef.current.hold = null;
+      simRef.current.next = [];
+      simRef.current.piece = null;
+    }
     syncUi({
       phase: "title",
       watching: false,
@@ -924,6 +935,8 @@ export function TetrisApp() {
       danger: false,
       brink: false,
       live: null,
+      hold: null,
+      next: [],
       recap: null,
       epitaph: null,
       cause: null,
@@ -1838,9 +1851,10 @@ export function TetrisApp() {
       syncUi({ scorePop: pts, scorePopN: uiRef.current.scorePopN + 1 });
     }
     const beat = kind === "single" ? "double" : kind;
-    engine.punch(
-      beat === "tspin" ? 0.48 : beat === "stack" ? 0.42 : beat === "triple" ? 0.2 : 0.1,
-    );
+    const bot = isBotRun();
+    const hit =
+      beat === "tspin" ? 0.48 : beat === "stack" ? 0.42 : beat === "triple" ? 0.2 : 0.1;
+    engine.punch(bot ? hit * 0.55 : hit);
     const tint =
       beat === "stack"
         ? "#f7f4ee"
@@ -1852,15 +1866,15 @@ export function TetrisApp() {
     engine.sparkRows(sim.clearRows, tint);
     engine.shatter(sim, themeOf(saveRef.current.theme));
     engine.sweep(beat);
-    if (beat === "stack" || beat === "tspin") engine.nod(0.58);
-    else if (beat === "triple") engine.nod(0.18);
+    if (beat === "stack" || beat === "tspin") engine.nod(bot ? 0.28 : 0.58);
+    else if (beat === "triple") engine.nod(bot ? 0.1 : 0.18);
     sfxLine(spoken.rank);
     if (beat === "triple" || beat === "stack" || beat === "tspin") sfxShatter();
     if (beat === "stack" || beat === "tspin") {
-      shakeRef.current = beat === "tspin" ? 11 : 9;
+      shakeRef.current = bot ? (beat === "tspin" ? 5 : 4) : beat === "tspin" ? 11 : 9;
       bangTint();
     } else if (beat === "triple") {
-      shakeRef.current = 4;
+      shakeRef.current = bot ? 2 : 4;
     }
   }
 
@@ -2638,9 +2652,9 @@ export function TetrisApp() {
               )}
             </p>
             {hudCells(ui).map((cell) => (
-              <p className="hud-cell" key={cell.label}>
+              <p className={`hud-cell${cell.label === "Time" ? " is-clock" : ""}`} key={cell.label}>
                 <span>{cell.label}</span>
-                <b>{cell.value}</b>
+                <b data-qa={cell.label === "Time" ? "hud-clock" : undefined}>{cell.value}</b>
               </p>
             ))}
             {powersAllowed(ui.mode) && !botDriving(ui) && (
@@ -3498,13 +3512,14 @@ function botDriving(ui: Pick<Ui, "botPlay" | "mode">): boolean {
 
 function botHudLabel(mode: ModeId): string {
   if (mode === "watch") return "ES bot";
+  if (mode === "sprint") return "ES Sprint";
+  if (mode === "blitz") return "ES Blitz";
   return `ES · ${modeOf(mode).name}`;
 }
 
 function botStartLabel(mode: ModeId): string {
-  if (mode === "watch") return "Watch";
+  if (mode === "watch" || mode === "marathon") return "Watch";
   const short: Partial<Record<ModeId, string>> = {
-    marathon: "Marathon",
     sprint: "Sprint",
     blitz: "Blitz",
     daily: "Daily",
@@ -3531,7 +3546,7 @@ function hudCells(ui: Ui): { label: string; value: string }[] {
   if (ui.mode === "sprint")
     return [
       { label: "Time", value: formatElapsed(ui.clock) },
-      { label: "Lines left", value: `${Math.max(0, 40 - ui.lines)}` },
+      { label: botDriving(ui) ? "Left" : "Lines left", value: `${Math.max(0, 40 - ui.lines)}` },
     ];
   if (ui.mode === "finesse")
     return [
