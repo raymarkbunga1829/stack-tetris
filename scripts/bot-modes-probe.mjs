@@ -145,6 +145,10 @@ try {
   if (!playing.pause) errors.push("sprint: Pause is gone");
   if (playing.powers) errors.push("sprint: power bar is out on a bot run");
   if (playing.credits !== 80) errors.push(`sprint: credits moved to ${playing.credits}`);
+  await page.waitForTimeout(1200);
+  const sprintClock = await page.evaluate(() => window.__controlsTest?.getClock?.() ?? 0);
+  if (sprintClock < 0.8)
+    errors.push(`sprint: clock is frozen at ${sprintClock.toFixed(2)}s while the bot plays`);
 
   await page.locator("button.hud-pause").click({ force: true });
   await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "paused", {

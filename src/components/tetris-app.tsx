@@ -78,6 +78,7 @@ import {
   pickFromNext,
   predictCollision,
   pulseAction,
+  tickClock,
   undoZen,
   type Sim,
 } from "@/game/sim";
@@ -589,6 +590,8 @@ export function TetrisApp() {
           getMode: () => simRef.current?.mode ?? uiRef.current.mode,
           getHold: () => simRef.current?.hold ?? null,
           getBot: () => botPlayRef.current,
+          getClock: () => simRef.current?.clock ?? 0,
+          getTimeLeft: () => simRef.current?.timeLeft ?? null,
           getBanner: () => uiRef.current.banner,
           getIntro: () => uiRef.current.intro,
           setLevel: (n: number) => {
@@ -1148,7 +1151,8 @@ export function TetrisApp() {
         const slam = takeBotSlam(sim, dt);
         if (slam) {
           botHard = true;
-          ev = slam;
+          const timed = tickClock(sim, dt);
+          ev = timed ?? slam;
         } else {
           ev = advance(sim, dt, { ...idle, freeze: true });
         }
@@ -1174,6 +1178,7 @@ export function TetrisApp() {
         arr: saveRef.current.arrMs / 1000,
         sdf: saveRef.current.sdf,
         freeze: !!u.coach,
+        freezeClock: !!u.coach,
       });
     }
 
@@ -1457,6 +1462,7 @@ export function TetrisApp() {
       u.slow !== sim.slowT > 0 ||
       u.shield !== sim.shield ||
       Math.floor(u.clock) !== Math.floor(sim.clock) ||
+      Math.floor(u.timeLeft ?? -1) !== Math.floor(sim.timeLeft ?? -1) ||
       u.combo !== Math.max(0, sim.combo) ||
       u.b2b !== sim.b2b
     ) {
