@@ -2299,6 +2299,10 @@
   color: var(--color-bg);
 }
 
+.set-row:disabled {
+  opacity: 0.45;
+}
+
 .score-list {
   list-style: none;
   margin: 0;

@@ -588,7 +588,7 @@ export function TetrisApp() {
           getLevel: () => simRef.current?.level ?? 1,
           getMode: () => simRef.current?.mode ?? uiRef.current.mode,
           getHold: () => simRef.current?.hold ?? null,
-          getBot: () => botPlayRef.current || simRef.current?.mode === "watch",
+          getBot: () => botPlayRef.current,
           getBanner: () => uiRef.current.banner,
           getIntro: () => uiRef.current.intro,
           setLevel: (n: number) => {
@@ -950,7 +950,7 @@ export function TetrisApp() {
   }
 
   function isBotRun() {
-    return botPlayRef.current || uiRef.current.mode === "watch" || simRef.current?.mode === "watch";
+    return botPlayRef.current;
   }
 
   function toggleBotPlay() {
@@ -961,6 +961,7 @@ export function TetrisApp() {
       return;
     }
     botPlayRef.current = next;
+    if (!next) botHand.current = null;
     sfxSelect();
     haptic("select");
     syncUi({ botPlay: next });
@@ -2550,7 +2551,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${(ui.botPlay || ui.mode === "watch") ? " is-watch" : ""}${viewW < 720 ? " is-narrow" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${(ui.botPlay) ? " is-watch" : ""}${viewW < 720 ? " is-narrow" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -2630,7 +2631,7 @@ export function TetrisApp() {
               aria-label="Hold piece"
               onPointerDown={(e) => {
                 e.preventDefault();
-                if (ui.botPlay || ui.mode === "watch") return;
+                if (ui.botPlay) return;
                 unlockAudio();
                 inputRef.current?.tap({ hold: true });
                 holdUsed.current = true;
@@ -2998,7 +2999,7 @@ export function TetrisApp() {
                     startGame();
                   }}
                 >
-                  {ui.botPlay || ui.mode === "watch" ? "Watch again" : replayRef.current ? "Play again" : "Retry"}
+                  {ui.botPlay ? "Watch again" : replayRef.current ? "Play again" : "Retry"}
                 </button>
                 {ui.recap && (
                   <button
@@ -3181,7 +3182,7 @@ export function TetrisApp() {
             }}
           />
         )}
-        {!(ui.botPlay || ui.mode === "watch") && (
+        {!botDriving(ui) && (
         <TouchPad
           onHold={(key, down) => {
             unlockAudio();
@@ -3245,7 +3246,7 @@ export function TetrisApp() {
           }
         />
         )}
-        {(ui.botPlay || ui.mode === "watch") &&
+        {botDriving(ui) &&
           (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
             <div className="watch-bar" role="status" aria-label={botHudLabel(ui.mode)}>
               <span data-qa="watch-label">{botHudLabel(ui.mode)}</span>
@@ -3428,6 +3429,9 @@ export function TetrisApp() {
           onMix={setAudioMix}
           station={ui.station}
           onStation={pickStation}
+          botPlay={ui.botPlay}
+          botAllowed={botAllowed(ui.mode === "watch" ? "marathon" : ui.mode)}
+          onBot={toggleBotPlay}
         />
         <BoardSheet
           open={ui.board}
@@ -3460,7 +3464,7 @@ export function TetrisApp() {
 }
 
 function botDriving(ui: Pick<Ui, "botPlay" | "mode">): boolean {
-  return ui.botPlay || ui.mode === "watch";
+  return ui.botPlay;
 }
 
 function botHudLabel(mode: ModeId): string {

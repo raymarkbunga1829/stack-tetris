@@ -41,6 +41,9 @@ type Props = {
   onMix: (part: "music" | "sfx", value: number) => void;
   station: StationId;
   onStation: (id: StationId) => void;
+  botPlay: boolean;
+  botAllowed: boolean;
+  onBot: () => void;
 };
 
 export function SettingsSheet({
@@ -80,6 +83,9 @@ export function SettingsSheet({
   onMix,
   station,
   onStation,
+  botPlay,
+  botAllowed,
+  onBot,
 }: Props) {
   if (!open) return null;
   return (
@@ -94,6 +100,26 @@ export function SettingsSheet({
             <X size={18} />
           </button>
         </header>
+
+        <p className="shop-blurb">Bot</p>
+        <button
+          type="button"
+          className={`set-row${botPlay ? " is-on" : ""}`}
+          data-qa="set-bot"
+          disabled={!botAllowed}
+          aria-pressed={botPlay}
+          onClick={onBot}
+        >
+          <span>ES bot</span>
+          <b>{!botAllowed ? "—" : botPlay ? "On" : "Off"}</b>
+        </button>
+        <p className="shop-note" data-qa="set-bot-note">
+          {!botAllowed
+            ? "The bot does not play Finesse."
+            : botPlay
+              ? "The bot is driving. Turn it off to take the pad."
+              : "Off. You drive. Turn it on and the ES bot takes the well."}
+        </p>
 
         <p className="shop-blurb">Mix</p>
         <label className="mix-row">

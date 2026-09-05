@@ -119,6 +119,21 @@ try {
   const paused = await look();
   if (paused.phase !== "paused") errors.push(`pause: phase is ${paused.phase}`);
   if (paused.score !== scoreAtPause) errors.push("pause: the bot still scored while paused");
+  await page.locator('[data-qa="pause-settings"]').click({ force: true });
+  await page.waitForSelector('[data-qa="set-bot"]', { timeout: 4000 });
+  const botOn = (await page.locator('[data-qa="set-bot"] b').innerText()).trim();
+  if (botOn !== "On") errors.push(`settings: bot row says ${botOn}, wanted On`);
+  await page.locator('[data-qa="set-bot"]').click({ force: true });
+  await page.waitForTimeout(200);
+  const botOff = (await page.locator('[data-qa="set-bot"] b').innerText()).trim();
+  if (botOff !== "Off") errors.push(`settings: toggle did not turn the bot off ("${botOff}")`);
+  const handed = await page.evaluate(() => window.__controlsTest?.getBot?.());
+  if (handed) errors.push("settings: the bot is still driving after Off");
+  await page.locator('[data-qa="set-bot"]').click({ force: true });
+  await page.waitForTimeout(150);
+  const botBack = (await page.locator('[data-qa="set-bot"] b').innerText()).trim();
+  if (botBack !== "On") errors.push(`settings: could not turn the bot back on ("${botBack}")`);
+  await page.locator(".shop-x").click({ force: true });
   await page.locator(".pause-card .play-btn").click({ force: true });
   await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", {
     timeout: 4000,
