@@ -91,6 +91,7 @@ export type Well3d = {
   ) => { col: number; row: number };
   lost: () => boolean;
   cellsDrawn: () => number;
+  sampleLuma: () => number;
   setCalm: (on: boolean) => void;
   dispose: () => void;
 };
@@ -114,6 +115,16 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.18;
   renderer.shadowMap.enabled = false;
+
+  const EXPOSURE = 1.18;
+  const EXPOSURE_CALM = 1.92;
+  const HEMI_I = 0.62;
+  const KEY_I = 1.7;
+  const FILL_I = 0.38;
+  const RIM_I = 0.85;
+  const ENV_I = reduce ? 0.4 : 0.92;
+  const FOG_D = 0.012;
+  const EMISSIVE_I = 0.16;
 
   let dead = false;
   let lastCells = 0;
@@ -976,6 +987,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
 
     lastCells = n;
+    if (calm) shaft.intensity *= 1.75;
     if (calm || !useComposer) renderer.render(scene, camera);
     else composer.render();
     } catch {
@@ -1453,8 +1465,38 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       }
     },
     cellsDrawn: () => lastCells,
+    sampleLuma: () => {
+      if (dead) return 0;
+      try {
+        renderer.render(scene, camera);
+        const gl = renderer.getContext();
+        const w = gl.drawingBufferWidth;
+        const h = gl.drawingBufferHeight;
+        if (w < 16 || h < 16) return 0;
+        const sw = Math.min(12, w);
+        const sh = Math.min(8, h);
+        const buf = new Uint8Array(4 * sw * sh);
+        let best = 0;
+        for (const ny of [0.1, 0.18, 0.28, 0.4, 0.52]) {
+          const x = Math.max(0, Math.floor(w * 0.5 - sw / 2));
+          const y = Math.max(0, Math.min(h - sh, Math.floor(h * ny)));
+          gl.readPixels(x, y, sw, sh, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+          let sum = 0;
+          const n = sw * sh;
+          for (let i = 0; i < n; i++) {
+            const o = i * 4;
+            sum += 0.2126 * buf[o] + 0.7152 * buf[o + 1] + 0.0722 * buf[o + 2];
+          }
+          if (n) best = Math.max(best, sum / n);
+        }
+        return best;
+      } catch {
+        return 0;
+      }
+    },
     setCalm: (on: boolean) => {
-      if (on && !calm) {
+      if (on === calm) return;
+      if (on) {
         sparks.length = 0;
         shardList.length = 0;
         streakList.length = 0;
@@ -1462,6 +1504,18 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         nodT = 0;
       }
       calm = on;
+      renderer.toneMappingExposure = on ? EXPOSURE_CALM : EXPOSURE;
+      hemi.intensity = on ? 1.12 : HEMI_I;
+      key.intensity = on ? 2.55 : KEY_I;
+      fill.intensity = on ? 0.7 : FILL_I;
+      rim.intensity = on ? 1.35 : RIM_I;
+      scene.environmentIntensity = on ? (reduce ? 0.7 : 1.35) : ENV_I;
+      solidMat.emissiveIntensity = on ? 0.55 : EMISSIVE_I;
+      if (scene.fog instanceof THREE.FogExp2) scene.fog.density = on ? 0.004 : FOG_D;
+      godMat.opacity = (reduce ? 0.06 : 0.12) * (on ? 2 : 1);
+      jewel.intensity = on ? 16 : 8;
+      bounce.intensity = on ? 14 : 8;
+      hazeMat.opacity = on ? 0.1 : 0.06;
     },
     dispose,
   };

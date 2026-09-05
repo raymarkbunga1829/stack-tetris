@@ -446,6 +446,8 @@ export function TetrisApp() {
   const botUiAt = useRef(0);
   const botPace = useRef<1 | 2>(1);
   const botPlayRef = useRef(false);
+  const introGen = useRef(0);
+  const introUntil = useRef(0);
   const wellGenRef = useRef(0);
   const wellRebuildAt = useRef(0);
   const wellBlank = useRef(0);
@@ -588,6 +590,7 @@ export function TetrisApp() {
           getHold: () => simRef.current?.hold ?? null,
           getBot: () => botPlayRef.current || simRef.current?.mode === "watch",
           getBanner: () => uiRef.current.banner,
+          getIntro: () => uiRef.current.intro,
           setLevel: (n: number) => {
             const s = simRef.current;
             if (!s) return;
@@ -601,6 +604,7 @@ export function TetrisApp() {
             return {
               lost: engine ? engine.lost() : true,
               cells: engine?.cellsDrawn() ?? 0,
+              luma: engine?.sampleLuma() ?? 0,
               w: c?.width ?? 0,
               h: c?.height ?? 0,
             };
@@ -686,7 +690,8 @@ export function TetrisApp() {
       extra.recap != null ||
       extra.failing === true ||
       extra.watching === false ||
-      extra.botPlay != null;
+      extra.botPlay != null ||
+      "intro" in extra;
     if (
       isBotRun() &&
       !urgent &&
@@ -707,6 +712,12 @@ export function TetrisApp() {
       high: saveRef.current.high,
       ...extra,
     }));
+  }
+
+  function dismissIntro() {
+    introUntil.current = 0;
+    if (!uiRef.current.intro) return;
+    syncUi({ intro: null });
   }
 
   function wipePit() {
@@ -742,7 +753,7 @@ export function TetrisApp() {
     if (wantBot && mode === "marathon") mode = "watch";
     if (uiRef.current.phase === "playing" && quietT.current > 0) {
       quietT.current = 0;
-      syncUi({ intro: null });
+      dismissIntro();
       return;
     }
     if (uiRef.current.phase === "title" && !uiRef.current.lifting) {
@@ -813,8 +824,12 @@ export function TetrisApp() {
                       : mode === "watch"
                         ? "Watch"
                         : "Go";
+    introGen.current += 1;
+    const gen = introGen.current;
+    introUntil.current = performance.now() + 1600;
     window.setTimeout(() => {
-      if (uiRef.current.phase === "playing") syncUi({ intro: null });
+      if (introGen.current !== gen) return;
+      dismissIntro();
     }, 1600);
     syncUi({
       phase: "playing",
@@ -979,6 +994,14 @@ export function TetrisApp() {
     const { held, just } = input.sample();
     const u = uiRef.current;
 
+    if (
+      u.intro &&
+      introUntil.current > 0 &&
+      performance.now() >= introUntil.current
+    ) {
+      dismissIntro();
+    }
+
     if (just.confirm || just.hard) {
       // A refused coin must fall through: the fail beat below still needs its frames.
       if ((u.phase === "title" || u.phase === "over") && wantCoin()) {
@@ -1062,7 +1085,7 @@ export function TetrisApp() {
         just.hard
       ) {
         quietT.current = 0;
-        if (u.intro) syncUi({ intro: null });
+        if (u.intro) dismissIntro();
       } else {
         quietT.current -= dt;
         return;
@@ -1696,7 +1719,7 @@ export function TetrisApp() {
     if (!sim || sim.phase !== "playing") return;
     if (quietT.current > 0) {
       quietT.current = 0;
-      if (u.intro) syncUi({ intro: null });
+      if (u.intro) dismissIntro();
     }
     if (sim.mode === "finesse" && (p.left || p.right || p.cw || p.ccw || p.flip)) {
       if (p.left || p.right) pieceBorn.current.slides += 1;
@@ -2655,8 +2678,8 @@ export function TetrisApp() {
                 {modeOf(ui.mode).carving}
               </p>
             )}
-            {ui.intro && ui.phase === "playing" && (
-              <div className="intro" aria-hidden="true">
+            {ui.intro && (ui.phase === "playing" || ui.phase === "clearing") && (
+              <div className="intro" data-qa="mode-intro" aria-hidden="true">
                 <em>{botDriving(ui) ? botHudLabel(ui.mode) : modeOf(ui.mode).name}</em>
                 <b>{ui.intro}</b>
                 <p>{modeOf(ui.mode).carving}</p>
@@ -3568,8 +3591,9 @@ declare global {
       getHold: () => PieceId | null;
       getBot: () => boolean;
       getBanner: () => string | null;
+      getIntro: () => string | null;
       setLevel: (n: number) => void;
-      getWell: () => { lost: boolean; cells: number; w: number; h: number };
+      getWell: () => { lost: boolean; cells: number; luma: number; w: number; h: number };
       topOut: () => void;
     };
   }
