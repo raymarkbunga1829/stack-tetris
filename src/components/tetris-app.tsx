@@ -1452,7 +1452,8 @@ export function TetrisApp() {
     if (siege && sim.mode === "siege" && sim.phase === "playing") {
       tickSiege(siege, dt, inDanger(sim));
       siege.dumpT += dt;
-      if (siege.dumpT >= 0.72 && siege.incoming > 0) {
+      const gap = siege.t < 28 ? 1.05 : 0.8;
+      if (siege.dumpT >= gap && siege.incoming > 0) {
         siege.dumpT = 0;
         const n = takeIncoming(siege, 1);
         if (!injectGarbage(sim, n)) {
