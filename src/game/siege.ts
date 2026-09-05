@@ -34,8 +34,10 @@ export function createSiege(): Siege {
       hp: max,
       max,
       badges: i === 3 || i === 6 ? 1 : 0,
-      aimPlayer: i % 3 === 0,
-      cd: 1.4 + i * 0.35,
+      // One hunter at the start. The rest acquire you once the stack is high.
+      aimPlayer: i === 0,
+      // First dump after a few placements, not on the first lock.
+      cd: 5.8 + i * 0.65,
       dead: false,
       tint: TINTS[i]!,
     };
