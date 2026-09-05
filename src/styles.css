@@ -176,9 +176,48 @@
   white-space: nowrap;
 }
 
+.hud-cell.is-score {
+  position: relative;
+}
+
 .hud-cell.is-score > b {
   font-size: 1.05rem;
   letter-spacing: -0.03em;
+}
+
+.score-pop {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 2px;
+  font: 700 0.78rem/1 var(--font-display);
+  letter-spacing: 0.06em;
+  color: #e8d8ff;
+  text-shadow: 0 1px 0 #000;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .score-pop {
+    animation: score-pop 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes score-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
 }
 
 /* The pocket, not the run: powers wear a CR price, so the wallet stays on
@@ -979,6 +1018,8 @@
 
 .callout.is-shout em {
   color: var(--color-fg);
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
 }
 
 .hole-hint {

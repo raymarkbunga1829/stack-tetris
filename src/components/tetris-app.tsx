@@ -78,6 +78,7 @@ import {
   pickFromNext,
   predictCollision,
   pulseAction,
+  previewClearPts,
   tickClock,
   undoZen,
   type Sim,
@@ -170,6 +171,8 @@ type Ui = {
   b2b: boolean;
   comboPop: number;
   b2bPop: number;
+  scorePop: number;
+  scorePopN: number;
   sprintBest: number | null;
   recap: {
     mode: ModeId;
@@ -384,6 +387,8 @@ export function TetrisApp() {
     b2b: false,
     comboPop: 0,
     b2bPop: 0,
+    scorePop: 0,
+    scorePopN: 0,
     sprintBest: saveRef.current.sprintBest,
     recap: null,
     tip: null,
@@ -697,6 +702,7 @@ export function TetrisApp() {
       extra.callout != null ||
       extra.banner != null ||
       extra.b2bPop != null ||
+      extra.scorePop != null ||
       "intro" in extra;
     if (
       isBotRun() &&
@@ -869,6 +875,7 @@ export function TetrisApp() {
       b2b: false,
       comboPop: 0,
       b2bPop: 0,
+      scorePop: 0,
       recap: null,
       tip: null,
       bagLine: false,
@@ -1194,7 +1201,7 @@ export function TetrisApp() {
     }
     if (calloutT.current > 0) {
       calloutT.current -= dt;
-      if (calloutT.current <= 0) syncUi({ callout: null });
+      if (calloutT.current <= 0) syncUi({ callout: null, scorePop: 0 });
     }
     if (goalT.current > 0) {
       goalT.current -= dt;
@@ -1804,6 +1811,7 @@ export function TetrisApp() {
     const sim = simRef.current;
     if (!engine || !sim) return;
     const n = sim.clearRows.length;
+    const pts = previewClearPts(sim);
     const spoken = speakClear({
       lines: n,
       tspin: sim.tSpin,
@@ -1811,9 +1819,20 @@ export function TetrisApp() {
       perfect: false,
       wasB2b: sim.b2b && (n === 4 || sim.tSpin),
       combo: Math.max(0, sim.combo + 1),
+      pts,
     });
     showCallout(spoken);
     noteStill(sim, spoken);
+    if (
+      pts > 0 &&
+      (spoken.rank === "tspin" ||
+        spoken.rank === "tst" ||
+        spoken.rank === "tetris" ||
+        spoken.rank === "pc" ||
+        spoken.rank === "mini")
+    ) {
+      syncUi({ scorePop: pts, scorePopN: uiRef.current.scorePopN + 1 });
+    }
     const beat = kind === "single" ? "double" : kind;
     engine.punch(
       beat === "tspin" ? 0.48 : beat === "stack" ? 0.42 : beat === "triple" ? 0.2 : 0.1,
@@ -2604,6 +2623,11 @@ export function TetrisApp() {
             <p className="hud-cell is-score">
               <span>Score</span>
               <b>{ui.score.toLocaleString()}</b>
+              {(ui.phase === "playing" || ui.phase === "clearing") && ui.scorePop > 0 && (
+                <em className="score-pop" key={ui.scorePopN}>
+                  +{ui.scorePop.toLocaleString()}
+                </em>
+              )}
             </p>
             {hudCells(ui).map((cell) => (
               <p className="hud-cell" key={cell.label}>
