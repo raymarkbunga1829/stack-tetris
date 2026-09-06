@@ -172,7 +172,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const p = punch * punch;
     camera.fov = BASE_FOV - p * 5;
     camera.updateProjectionMatrix();
-    camera.position.set(1.15, 11.4 + p * 0.35, dist - p * 3.4);
+    // A fixed, modest angle reveals the side facets without orbiting the grid.
+    camera.position.set(1.9, 12.4 + p * 0.35, dist - p * 3.4);
     camera.lookAt(0.05, 9.15 + p * 0.25, 0);
   }
 
@@ -215,13 +216,13 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   pitTex.colorSpace = THREE.SRGBColorSpace;
   const backMat = new THREE.MeshBasicMaterial({ map: pitTex });
   const back = new THREE.Mesh(new THREE.PlaneGeometry(10.2, 20.4), backMat);
-  back.position.set(0, 9.5, -0.7);
+  back.position.set(0, 9.5, -1.12);
   scene.add(back);
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.28, 20.8, 1.55), wallMat);
-  left.position.set(-5.28, 9.5, 0.08);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.28, 20.8, 2.05), wallMat);
+  left.position.set(-5.28, 9.5, -0.17);
   scene.add(left);
-  const right = new THREE.Mesh(new THREE.BoxGeometry(0.28, 20.8, 1.55), wallMat);
-  right.position.set(5.28, 9.5, 0.08);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(0.28, 20.8, 2.05), wallMat);
+  right.position.set(5.28, 9.5, -0.17);
   scene.add(right);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(10.9, 0.28, 1.6), wallMat);
   floor.position.set(0, -0.68, 0.08);
@@ -229,6 +230,16 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const lip = new THREE.Mesh(new THREE.BoxGeometry(10.9, 0.14, 0.38), trimMat);
   lip.position.set(0, 19.72, 0.42);
   scene.add(lip);
+
+  // Two instanced light strips: depth cues without shadow maps or extra lights.
+  const railGeo = new THREE.BoxGeometry(0.045, 19.9, 0.045);
+  const railMat = new THREE.MeshBasicMaterial({ color: 0x8edcf0 });
+  const rails = new THREE.InstancedMesh(railGeo, railMat, 2);
+  const railMatrix = new THREE.Matrix4();
+  rails.setMatrixAt(0, railMatrix.makeTranslation(-5.1, 9.5, 0.74));
+  rails.setMatrixAt(1, railMatrix.makeTranslation(5.1, 9.5, 0.74));
+  rails.instanceMatrix.needsUpdate = true;
+  scene.add(rails);
 
   const shaftTex = makeShaftTexture();
   const godMat = new THREE.MeshBasicMaterial({
@@ -273,8 +284,20 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   ticks.visible = false;
   scene.add(ticks);
 
-  const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
+  const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 2, 0.10);
+  // Neutral facet shading multiplies each skin's own piece colors. It keeps
+  // the front readable and the sides distinct even with Clear well enabled.
+  const normals = geo.getAttribute("normal");
+  const facetColors = new Float32Array(normals.count * 3);
+  for (let i = 0; i < normals.count; i++) {
+    const shade = Math.max(0.42, Math.min(1,
+      0.70 + normals.getZ(i) * 0.24 + normals.getY(i) * 0.14 - normals.getX(i) * 0.08,
+    ));
+    facetColors.set([shade, shade, shade], i * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(facetColors, 3));
   const solidMat = new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
     roughness: mobile ? 0.2 : 0.12,
     metalness: 0.32,
     clearcoat: reduce ? 0.25 : mobile ? 0.65 : 1,
@@ -328,6 +351,16 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   memory.frustumCulled = false;
   memory.count = 0;
   scene.add(solids, ghosts, hints, memory);
+
+  const shadowGeo = new THREE.PlaneGeometry(0.98, 0.98);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false,
+  });
+  const contactShadows = new THREE.InstancedMesh(shadowGeo, shadowMat, MAX_SOLID);
+  contactShadows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  contactShadows.frustumCulled = false;
+  contactShadows.count = 0;
+  scene.add(contactShadows);
 
   const pipGeo = new THREE.BoxGeometry(0.14, 0.14, 0.05);
   const pipMat = new THREE.MeshBasicMaterial({ color: 0x141414 });
@@ -694,6 +727,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const liveId = sim?.piece?.id;
     const liveHex = liveId ? theme.fill[liveId] : theme.flash;
     trimMat.color.set(liveHex);
+    railMat.color.copy(trimMat.color).multiplyScalar(clearLook ? 0.65 : 0.95);
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -831,6 +865,16 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
     solids.count = n;
     solids.instanceMatrix.needsUpdate = true;
+    // Project onto the recessed back panel, keeping the existing piece grid.
+    for (let i = 0; i < n; i++) {
+      solids.getMatrixAt(i, railMatrix);
+      railMatrix.elements[12] += 0.09;
+      railMatrix.elements[13] -= 0.11;
+      railMatrix.elements[14] = -0.66;
+      contactShadows.setMatrixAt(i, railMatrix);
+    }
+    contactShadows.count = n;
+    contactShadows.instanceMatrix.needsUpdate = true;
     pips.count = pipN;
     pips.instanceMatrix.needsUpdate = true;
     if (solids.instanceColor) solids.instanceColor.needsUpdate = true;
@@ -1447,6 +1491,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     shieldShell.geometry.dispose();
     shards.dispose();
     streaks.dispose();
+    railGeo.dispose();
+    railMat.dispose();
+    rails.dispose();
+    shadowGeo.dispose();
+    shadowMat.dispose();
+    contactShadows.dispose();
   }
 
   resize();
@@ -1467,8 +1517,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       clearLook = on;
       lastThemeId = "";
       solidMat.iridescence = on ? 0 : reduce ? 0 : 0.28;
-      solidMat.clearcoat = on ? 0.16 : reduce ? 0.25 : mobile ? 0.65 : 1;
-      solidMat.roughness = on ? 0.42 : mobile ? 0.2 : 0.12;
+      solidMat.clearcoat = on ? 0.38 : reduce ? 0.25 : mobile ? 0.65 : 1;
+      solidMat.roughness = on ? 0.30 : mobile ? 0.2 : 0.12;
       solidMat.sheen = on ? 0 : 0.22;
       solidMat.needsUpdate = true;
       applyWellLines();
