@@ -58,7 +58,7 @@ export function onKeyboard(fn: (on: boolean) => void): () => void {
 
 export function fitDpr(width: number, height: number, coarse: boolean): number {
   const raw = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
-  let dpr = Math.min(raw, coarse ? 1.75 : 2);
+  let dpr = Math.min(raw, coarse ? 1.5 : 2);
   const px = width * height * dpr * dpr;
   if (px > 4_200_000) dpr = Math.min(dpr, 1.5);
   if (px > 6_500_000) dpr = Math.min(dpr, 1.25);
