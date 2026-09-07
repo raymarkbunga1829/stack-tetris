@@ -84,7 +84,7 @@ import {
   type Sim,
 } from "@/game/sim";
 import { cellsOf, kickLabel } from "@/game/pieces";
-import { HIDDEN_ROWS, COLS, ROWS, DAS_TOUCH, LINES_PER_LEVEL, type Phase, type PieceId } from "@/game/types";
+import { HIDDEN_ROWS, COLS, ROWS, DAS_TOUCH, type Phase, type PieceId } from "@/game/types";
 import {
   buyWithCredits,
   consumePower,
@@ -2652,47 +2652,38 @@ export function TetrisApp() {
         </header>
 
         {(ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
-          <div className="hud" role="region" aria-label="Game dashboard">
-            <div className={`hud-metrics${powersAllowed(ui.mode) && !botDriving(ui) ? " has-credits" : ""}`}>
-              <p className="hud-cell is-score">
-                <span>Score</span>
-                <b>{ui.score.toLocaleString()}</b>
-                {(ui.phase === "playing" || ui.phase === "clearing") && ui.scorePop > 0 && (
-                  <em className="score-pop" key={ui.scorePopN}>
-                    +{ui.scorePop.toLocaleString()}
-                  </em>
-                )}
-              </p>
-              {hudCells(ui).map((cell) => (
-                <p className={`hud-cell${cell.label === "Time" ? " is-clock" : ""}`} key={cell.label}>
-                  <span>{cell.label}</span>
-                  <b data-qa={cell.label === "Time" ? "hud-clock" : undefined}>{cell.value}</b>
-                </p>
-              ))}
-              {powersAllowed(ui.mode) && !botDriving(ui) && (
-                <p className="hud-cell is-cr" data-qa="hud-cr">
-                  <span>Credits</span>
-                  <b key={ui.credits}>{ui.credits.toLocaleString()}</b>
-                </p>
+          <div className="hud" role="status">
+            <p className="hud-cell is-score">
+              <span>Score</span>
+              <b>{ui.score.toLocaleString()}</b>
+              {(ui.phase === "playing" || ui.phase === "clearing") && ui.scorePop > 0 && (
+                <em className="score-pop" key={ui.scorePopN}>
+                  +{ui.scorePop.toLocaleString()}
+                </em>
               )}
-            </div>
-            <div className="hud-heading">
-              <i className="hud-signal" aria-hidden="true" />
-              <em data-qa="hud-mode">{botDriving(ui) ? botHudLabel(ui.mode) : modeOf(ui.mode).name}</em>
-              <span className="hud-state">{ui.phase === "paused" ? "On hold" : ui.danger ? "Stack high" : "In play"}</span>
-            </div>
+            </p>
+            {hudCells(ui).map((cell) => (
+              <p className={`hud-cell${cell.label === "Time" ? " is-clock" : ""}`} key={cell.label}>
+                <span>{cell.label}</span>
+                <b data-qa={cell.label === "Time" ? "hud-clock" : undefined}>{cell.value}</b>
+              </p>
+            ))}
+            {powersAllowed(ui.mode) && !botDriving(ui) && (
+              <p className="hud-cell is-cr" data-qa="hud-cr">
+                <span>Credits</span>
+                <b key={ui.credits}>{ui.credits.toLocaleString()}</b>
+              </p>
+            )}
+            <em data-qa="hud-mode">{botDriving(ui) ? botHudLabel(ui.mode) : modeOf(ui.mode).name}</em>
+            {ui.mode === "sprint" && sprintPace(ui.clock, ui.lines, ui.sprintBest) ? (
+              <small>{sprintPace(ui.clock, ui.lines, ui.sprintBest)}</small>
+            ) : null}
             {ui.phase === "paused" ? (
               <span className="hud-pause is-on">Paused</span>
             ) : (
               <button
                 type="button"
                 className="hud-pause"
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter" && e.key !== " ") return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (haltPlay()) syncUi({ phase: "paused" });
-                }}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   unlockAudio();
@@ -2704,7 +2695,6 @@ export function TetrisApp() {
                 Pause
               </button>
             )}
-            <HudProgress ui={ui} />
           </div>
         )}
 
@@ -2862,7 +2852,11 @@ export function TetrisApp() {
             )}
             {ui.phase === "paused" && (
               <div className={`veil is-pause${ui.modesOpen ? " is-under-sheet" : ""}`}>
-                <div className="pause-card">
+                <div
+                  className={`pause-card${ui.modesOpen ? " is-under-modes" : ""}`}
+                  hidden={ui.modesOpen}
+                  inert={ui.modesOpen}
+                >
                   <p className="veil-kicker">Still here</p>
                   <p className="veil-title">Paused</p>
                   <button
@@ -3585,54 +3579,6 @@ function hudCells(ui: Ui): { label: string; value: string }[] {
   ];
 }
 
-function HudProgress({ ui }: { ui: Ui }) {
-  let label = `Next: level ${ui.level + 1}`;
-  let value = ui.lines % LINES_PER_LEVEL;
-  let max = LINES_PER_LEVEL;
-  let detail = `${Math.max(0, ui.level * LINES_PER_LEVEL - ui.lines)} lines to go`;
-  if (ui.mode === "sprint") {
-    label = "40-line sprint";
-    value = ui.lines;
-    max = 40;
-    detail = sprintPace(ui.clock, ui.lines, ui.sprintBest) ?? `${Math.max(0, 40 - ui.lines)} lines to go`;
-  } else if (ui.mode === "blitz") {
-    label = "Time remaining";
-    value = ui.timeLeft ?? 0;
-    max = modeOf("blitz").seconds ?? 120;
-    detail = formatClock(value);
-  } else if (ui.mode === "finesse") {
-    label = "Finesse trial";
-    value = ui.finesseN;
-    max = 20;
-    detail = `${ui.finesseN} / 20 pieces`;
-  } else if (ui.mode === "siege") {
-    label = "Last well standing";
-    max = ui.siege?.rivals.length || 8;
-    value = max - (ui.siege?.live ?? max);
-    detail = `${ui.siege?.live ?? max} rivals left`;
-  } else if (ui.mode === "zen") {
-    return <div className="hud-progress"><span>Free play</span><b>No rush. Keep building.</b></div>;
-  }
-  const progress = Math.max(0, Math.min(max, value));
-  return (
-    <div className="hud-progress">
-      <span>{label}</span>
-      <b>{detail}</b>
-      <div
-        className="hud-progress-track"
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={max}
-        aria-valuenow={progress}
-        aria-valuetext={detail}
-      >
-        <i style={{ transform: `scaleX(${progress / max})` }} />
-      </div>
-    </div>
-  );
-}
-
 function Stat({
   label,
   value,
@@ -3708,8 +3654,6 @@ declare global {
       getMode: () => ModeId;
       getHold: () => PieceId | null;
       getBot: () => boolean;
-      getClock: () => number;
-      getTimeLeft: () => number | null;
       getBanner: () => string | null;
       getIntro: () => string | null;
       setLevel: (n: number) => void;
@@ -3718,3 +3662,4 @@ declare global {
     };
   }
 }
+

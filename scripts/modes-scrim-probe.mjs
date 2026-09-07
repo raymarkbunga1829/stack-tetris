@@ -226,11 +226,15 @@ await play();
 await pause();
 await openFromPause();
 await close();
-results.closed = await page.evaluate(() => ({
-  open: !!document.querySelector(".shop-veil .modes"),
-  phase: window.__controlsTest?.getPhase?.() ?? null,
-  card: !!document.querySelector(".pause-card"),
-}));
+results.closed = await page.evaluate(() => {
+  const el = document.querySelector(".pause-card");
+  const cs = el ? getComputedStyle(el) : null;
+  return {
+    open: !!document.querySelector(".shop-veil .modes"),
+    phase: window.__controlsTest?.getPhase?.() ?? null,
+    card: !!el && cs.display !== "none" && cs.visibility !== "hidden",
+  };
+});
 
 // The other door in: Modes off the title screen, which PR #15 opened.
 await start("title");
@@ -291,7 +295,7 @@ if (!results.strip) {
 }
 
 const card = results.fromPause.pauseCard;
-if (!card || card.gone) fail.push("from pause: the Paused card is gone while Modes is open");
+if (card && !card.gone) fail.push("from pause: the Paused card is still under Modes");
 if (!results.fromTitle.titleCard || results.fromTitle.titleCard.gone)
   fail.push("from the title: the title card is gone while Modes is open");
 
