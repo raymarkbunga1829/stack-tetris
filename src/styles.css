@@ -3585,6 +3585,51 @@ html.is-ios .help-android {
   .hud-progress { font-size: 0.56rem; }
 }
 
+/* Phone play: the metric row was eating the well. Keep Pause + mode. */
+.cabinet.is-narrow .hud {
+  gap: 3px 8px;
+  padding: 4px 6px 5px;
+}
+.cabinet.is-narrow .hud-metrics {
+  gap: 4px;
+}
+.cabinet.is-narrow .hud .hud-cell {
+  padding: 3px 5px;
+  gap: 1px;
+  border-radius: 6px;
+}
+.cabinet.is-narrow .hud .hud-cell > span {
+  font-size: 0.48rem;
+}
+.cabinet.is-narrow .hud .hud-cell > b {
+  font-size: 0.78rem;
+}
+.cabinet.is-narrow .hud .hud-cell.is-score > b {
+  font-size: 0.9rem;
+}
+.cabinet.is-narrow .hud-heading > em {
+  font-size: 0.58rem;
+}
+.cabinet.is-narrow .hud .hud-pause {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.58rem;
+}
+.cabinet.is-narrow .hud-progress {
+  gap: 2px;
+  font-size: 0.5rem;
+}
+.cabinet.is-narrow .hud-progress > span,
+.cabinet.is-narrow .hud-progress > b {
+  display: none;
+}
+.cabinet.is-narrow .hud-progress-track {
+  height: 3px;
+}
+.cabinet.is-narrow.is-zen .hud-progress {
+  display: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .hud-progress-track > i { transition: transform 250ms ease-out; }
 }
