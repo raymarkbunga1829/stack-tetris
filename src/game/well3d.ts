@@ -241,6 +241,17 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   floorGold.position.set(0, -0.48, 0.38);
   scene.add(floorGold);
 
+  // Two thin cyan emitters sit in front of the metal, outside playable cells.
+  // One instanced draw call, no shadow maps or per-cell lights.
+  const railGeo = new THREE.BoxGeometry(0.045, 19.95, 0.045);
+  const railMat = new THREE.MeshBasicMaterial({ color: 0x79e9ff });
+  const lightRails = new THREE.InstancedMesh(railGeo, railMat, 2);
+  const railMatrix = new THREE.Matrix4();
+  lightRails.setMatrixAt(0, railMatrix.makeTranslation(-5.02, 9.5, 1.01));
+  lightRails.setMatrixAt(1, railMatrix.makeTranslation(5.02, 9.5, 1.01));
+  lightRails.instanceMatrix.needsUpdate = true;
+  scene.add(lightRails);
+
   const godMat = new THREE.MeshBasicMaterial({
     map: makeShaftTexture(),
     transparent: true,
@@ -284,7 +295,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   ticks.visible = false;
   scene.add(ticks);
 
-  const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
+  const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.1);
   const solidMat = new THREE.MeshPhysicalMaterial({
     roughness: mobile ? 0.14 : 0.08,
     metalness: 0.1,
@@ -704,7 +715,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     ticks.visible = sim?.mode === "sprint" && sim.phase !== "title";
     const liveId = sim?.piece?.id;
     const liveHex = liveId ? theme.fill[liveId] : theme.flash;
-    trimMat.color.set(liveHex);
+    trimMat.color.set(0xe8c46a);
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -1435,6 +1446,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     streakMat.dispose();
     wallMat.dispose();
     trimMat.dispose();
+    railGeo.dispose();
+    railMat.dispose();
+    lightRails.dispose();
     solids.dispose();
     ghosts.dispose();
     hints.dispose();
@@ -1593,9 +1607,9 @@ function makePitTexture(): THREE.CanvasTexture {
   c.height = h;
   const ctx = c.getContext("2d")!;
   const wash = ctx.createLinearGradient(0, 0, 0, h);
-  wash.addColorStop(0, "#141820");
-  wash.addColorStop(0.45, "#0c1018");
-  wash.addColorStop(1, "#080a10");
+  wash.addColorStop(0, "#152b43");
+  wash.addColorStop(0.45, "#091827");
+  wash.addColorStop(1, "#0c1e35");
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, w, h);
   const glow = ctx.createRadialGradient(w / 2, h * 0.12, 8, w / 2, h * 0.12, w * 0.55);
