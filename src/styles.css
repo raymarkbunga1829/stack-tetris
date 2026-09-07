@@ -144,10 +144,15 @@
   align-items: center;
   gap: 9px;
   min-height: 36px;
-  padding: 2px;
+  padding: 6px 8px;
   overflow: hidden;
   color: var(--color-fg);
   font: 500 0.78rem/1 var(--font-sans);
+  border-radius: 16px;
+  background: color-mix(in oklab, #141820 82%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* Every number in the strip wears its word, stacked so the row stays one
@@ -294,12 +299,13 @@
   min-height: 32px;
   padding: 0 12px;
   border: 0;
-  border-radius: 999px;
-  background: var(--color-raised);
+  border-radius: 12px;
+  background: #1a1e28;
   color: var(--color-fg);
   font: 600 0.7rem/1 var(--font-sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .hud-pause.is-on {
@@ -472,9 +478,10 @@
   place-items: center;
   min-height: 48px;
   padding: 5px;
-  background: var(--color-well);
-  border-radius: 8px;
-  border: 1px solid var(--color-line);
+  background: #0c0e14;
+  border-radius: 10px;
+  border: 1px solid #4a5060;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .pocket-sm {
@@ -524,17 +531,23 @@
   position: relative;
   min-width: 0;
   min-height: 0;
-  background: #12161e;
-  border-radius: calc(var(--radius-panel) + 4px);
-  border: 1px solid var(--color-line);
+  background: #0a0c12;
+  border-radius: 16px;
+  border: 2px solid #8a909c;
   overflow: hidden;
   touch-action: none;
-  box-shadow: inset 0 0 0 8px var(--bezel, #2a2e3a);
+  box-shadow:
+    inset 0 0 0 3px #c9a24a,
+    inset 0 0 0 10px #2e323c,
+    0 10px 28px #000;
 }
 
 .cabinet.is-slam .well,
 .cabinet.is-tint .well {
-  box-shadow: inset 0 0 0 8px var(--piece, var(--bezel, #2a2e3a));
+  box-shadow:
+    inset 0 0 0 3px var(--piece, #c9a24a),
+    inset 0 0 0 10px #2e323c,
+    0 10px 28px #000;
 }
 
 .cabinet.is-danger .well {
@@ -796,19 +809,21 @@
 
 .combo-meter {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
   z-index: 3;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 8px;
   pointer-events: none;
-  padding: 5px 8px;
-  border-radius: 10px;
-  background: color-mix(in oklab, var(--color-bg) 55%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #0d1016;
+  box-shadow:
+    0 0 0 1px #3a3e48,
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .combo-meter span,
@@ -951,7 +966,7 @@
 .combo-meter i b {
   display: block;
   height: 100%;
-  background: var(--color-fg);
+  background: linear-gradient(90deg, #c9a24a, #ffe566);
   border-radius: inherit;
 }
 
@@ -1368,14 +1383,9 @@
   gap: 0;
   min-height: 54px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 18px;
   background:
-    linear-gradient(
-      165deg,
-      color-mix(in oklab, var(--color-fg) 14%, #2a303c) 0%,
-      #1a1e28 48%,
-      #12151c 100%
-    );
+    linear-gradient(180deg, #2a303c 0%, #141820 100%);
   color: var(--color-fg);
   font: 600 0.62rem/1 var(--font-sans);
   letter-spacing: 0.06em;
@@ -1384,9 +1394,8 @@
   -webkit-user-select: none;
   user-select: none;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -8px 14px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 1px #2a2e38;
 }
 
 .pad-btn span {
@@ -1429,18 +1438,13 @@
 .pad-hard {
   min-height: 64px;
   background:
-    linear-gradient(
-      180deg,
-      #fff 0%,
-      var(--piece, var(--color-fg)) 38%,
-      color-mix(in oklab, var(--piece, var(--color-fg)) 55%, #1a1208) 100%
-    );
-  color: #12110e;
+    linear-gradient(180deg, #ffe566 0%, #e8c46a 42%, #8a6414 100%);
+  color: #1a1408;
   border: 0;
   box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--piece, #fff) 45%, transparent),
-    0 6px 20px color-mix(in oklab, var(--piece, #000) 40%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    0 0 0 1px #f0d070,
+    0 6px 18px rgba(232, 196, 106, 0.35),
+    inset 0 1px 0 #fff6c4;
   border-radius: 18px;
 }
 
@@ -3565,8 +3569,11 @@ html.is-ios .help-android {
 }
 
 .well {
-  border-color: #7d9bbb52;
-  box-shadow: inset 0 0 0 6px #0a111b, 0 0 0 1px #050a12, 0 10px 26px #0009;
+  border-color: #8a909c;
+  box-shadow:
+    inset 0 0 0 3px #c9a24a,
+    inset 0 0 0 10px #2e323c,
+    0 10px 28px #000;
 }
 
 @media (max-width: 399px), (max-height: 720px) {

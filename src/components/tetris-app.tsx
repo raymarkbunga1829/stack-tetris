@@ -3126,7 +3126,7 @@ export function TetrisApp() {
                 {ui.pred.lock ? "Lock" : ui.pred.kick ? "Kick ready" : `${ui.pred.rows} to lock`}
               </p>
             )}
-            {ui.phase === "playing" && (ui.combo > 0 || ui.b2b) && (
+            {(ui.phase === "playing" || ui.phase === "clearing") && (
               <div
                 className={`combo-meter${ui.comboPop ? " is-live" : ""}`}
               >
@@ -3134,7 +3134,7 @@ export function TetrisApp() {
                   key={`c-${ui.comboPop}`}
                   className={ui.combo > 0 ? `is-on${ui.comboPop ? " is-pop" : ""}` : ""}
                 >
-                  {ui.combo > 0 ? `x${ui.combo}` : "combo"}
+                  {ui.combo > 0 ? `x${ui.combo}` : "Combo"}
                 </span>
                 <i>
                   <b
