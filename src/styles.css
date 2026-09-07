@@ -700,14 +700,6 @@
   -webkit-backdrop-filter: none;
 }
 
-.veil.is-pause.is-under-sheet {
-  background: transparent;
-}
-
-.pause-card {
-  z-index: 21;
-}
-
 .pause-card {
   display: flex;
   flex-direction: column;
@@ -1994,9 +1986,8 @@
 }
 
 /*
- * Modes is a short sheet, so an opaque veil over it is a black wall where the
- * well used to be. The cabinet stays lit behind a scrim instead: the stack you
- * paused, the Paused card, still there while you read the list.
+ * Modes is a short sheet. Keep the well faintly lit behind a scrim.
+ * The Paused card hides while the sheet is up so it cannot bleed under it.
  */
 .shop-veil.is-modes {
   background: color-mix(in oklab, var(--color-bg) 32%, transparent);
