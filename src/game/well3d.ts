@@ -128,7 +128,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let dead = false;
   let lastCells = 0;
   let calm = false;
-  let useComposer = true;
+  let useComposer = !mobile;
   let drawN = 0;
   const onContextLost = (e: Event) => {
     e.preventDefault();
@@ -241,17 +241,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   floorGold.position.set(0, -0.48, 0.38);
   scene.add(floorGold);
 
-  // Two thin cyan emitters sit in front of the metal, outside playable cells.
-  // One instanced draw call, no shadow maps or per-cell lights.
-  const railGeo = new THREE.BoxGeometry(0.045, 19.95, 0.045);
-  const railMat = new THREE.MeshBasicMaterial({ color: 0x79e9ff });
-  const lightRails = new THREE.InstancedMesh(railGeo, railMat, 2);
-  const railMatrix = new THREE.Matrix4();
-  lightRails.setMatrixAt(0, railMatrix.makeTranslation(-5.02, 9.5, 1.01));
-  lightRails.setMatrixAt(1, railMatrix.makeTranslation(5.02, 9.5, 1.01));
-  lightRails.instanceMatrix.needsUpdate = true;
-  scene.add(lightRails);
-
   const godMat = new THREE.MeshBasicMaterial({
     map: makeShaftTexture(),
     transparent: true,
@@ -295,13 +284,13 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   ticks.visible = false;
   scene.add(ticks);
 
-  const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.1);
+  const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
   const solidMat = new THREE.MeshPhysicalMaterial({
     roughness: mobile ? 0.14 : 0.08,
     metalness: 0.1,
-    clearcoat: reduce ? 0.3 : mobile ? 0.75 : 1,
+    clearcoat: reduce ? 0.3 : mobile ? 0.35 : 1,
     clearcoatRoughness: 0.04,
-    iridescence: reduce ? 0 : 0.1,
+    iridescence: reduce || mobile ? 0 : 0.1,
     iridescenceIOR: 1.4,
     sheen: 0.35,
     sheenRoughness: 0.22,
@@ -509,16 +498,15 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let idleT = 0;
   let lastThemeId = "";
 
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(
-    new THREE.Vector2(512, 512),
-    bloomBase,
-    0.42,
-    0.72,
-  );
-  composer.addPass(bloom);
-  composer.addPass(new OutputPass());
+  const composer = useComposer ? new EffectComposer(renderer) : null;
+  const bloom = useComposer
+    ? new UnrealBloomPass(new THREE.Vector2(512, 512), bloomBase, 0.42, 0.72)
+    : null;
+  if (composer && bloom) {
+    composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+  }
 
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
@@ -538,9 +526,11 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const dpr = fitDpr(w, h, mobile);
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
-    composer.setPixelRatio(dpr);
-    composer.setSize(w, h);
-    bloom.resolution.set(w, h);
+    if (composer && bloom) {
+      composer.setPixelRatio(dpr);
+      composer.setSize(w, h);
+      bloom.resolution.set(w, h);
+    }
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     frameCamera();
@@ -715,7 +705,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     ticks.visible = sim?.mode === "sprint" && sim.phase !== "title";
     const liveId = sim?.piece?.id;
     const liveHex = liveId ? theme.fill[liveId] : theme.flash;
-    trimMat.color.set(0xe8c46a);
+    trimMat.color.set(liveHex);
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -725,12 +715,14 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       camera.position.y += (Math.random() - 0.5) * rumble;
       camera.lookAt(0.05, 9.15 + punch * punch * 0.25, 0);
     }
-    bloom.strength =
-      ((clearLook ? 0.06 : bloomBase) + punch * punch * (clearLook ? 0.14 : 0.28)) * (clearLook ? 0.28 : bloomMul) +
-      (sweepT > 0 ? 0.22 : 0) +
-      lockPulse * 0.12 +
-      zapT * 0.4 +
-      (sim && sim.slowT > 0 ? -0.06 : 0);
+    if (bloom) {
+      bloom.strength =
+        ((clearLook ? 0.06 : bloomBase) + punch * punch * (clearLook ? 0.14 : 0.28)) * (clearLook ? 0.28 : bloomMul) +
+        (sweepT > 0 ? 0.22 : 0) +
+        lockPulse * 0.12 +
+        zapT * 0.4 +
+        (sim && sim.slowT > 0 ? -0.06 : 0);
+    }
 
     const now = performance.now();
     const dt = Math.min(0.05, (now - lastDraw) / 1000);
@@ -1038,7 +1030,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       jewel.intensity = 8;
       bounce.intensity = 8;
     }
-    if (calm || !useComposer) renderer.render(scene, camera);
+    if (calm || !useComposer || !composer) renderer.render(scene, camera);
     else composer.render();
     } catch {
       try {
@@ -1432,7 +1424,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   function dispose() {
     canvas.removeEventListener("webglcontextlost", onContextLost);
     canvas.removeEventListener("webglcontextrestored", onContextRestored);
-    composer.dispose();
+    composer?.dispose();
     renderer.dispose();
     envTex.dispose();
     pitTex.dispose();
@@ -1446,9 +1438,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     streakMat.dispose();
     wallMat.dispose();
     trimMat.dispose();
-    railGeo.dispose();
-    railMat.dispose();
-    lightRails.dispose();
     solids.dispose();
     ghosts.dispose();
     hints.dispose();
@@ -1491,8 +1480,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       if (clearLook === on) return;
       clearLook = on;
       lastThemeId = "";
-      solidMat.iridescence = on ? 0 : reduce ? 0 : 0.1;
-      solidMat.clearcoat = on ? 0.16 : reduce ? 0.3 : mobile ? 0.75 : 1;
+      solidMat.iridescence = on || reduce || mobile ? 0 : 0.1;
+      solidMat.clearcoat = on ? 0.16 : reduce ? 0.3 : mobile ? 0.35 : 1;
       solidMat.roughness = on ? 0.42 : mobile ? 0.14 : 0.08;
       solidMat.sheen = on ? 0 : 0.22;
       solidMat.needsUpdate = true;
@@ -1521,7 +1510,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sampleLuma: () => {
       if (dead) return 0;
       try {
-        if (calm || !useComposer) renderer.render(scene, camera);
+        if (calm || !useComposer || !composer) renderer.render(scene, camera);
         else composer.render();
         const gl = renderer.getContext();
         const w = gl.drawingBufferWidth;
@@ -1607,9 +1596,9 @@ function makePitTexture(): THREE.CanvasTexture {
   c.height = h;
   const ctx = c.getContext("2d")!;
   const wash = ctx.createLinearGradient(0, 0, 0, h);
-  wash.addColorStop(0, "#152b43");
-  wash.addColorStop(0.45, "#091827");
-  wash.addColorStop(1, "#0c1e35");
+  wash.addColorStop(0, "#141820");
+  wash.addColorStop(0.45, "#0c1018");
+  wash.addColorStop(1, "#080a10");
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, w, h);
   const glow = ctx.createRadialGradient(w / 2, h * 0.12, 8, w / 2, h * 0.12, w * 0.55);
