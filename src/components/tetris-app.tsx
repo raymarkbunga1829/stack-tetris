@@ -2655,6 +2655,7 @@ export function TetrisApp() {
           <div className="hud" role="region" aria-label="Game dashboard">
             <div className={`hud-metrics${powersAllowed(ui.mode) && !botDriving(ui) ? " has-credits" : ""}`}>
               <p className="hud-cell is-score">
+                <HudGlyph label="Score" />
                 <span>Score</span>
                 <b>{ui.score.toLocaleString()}</b>
                 {(ui.phase === "playing" || ui.phase === "clearing") && ui.scorePop > 0 && (
@@ -2665,6 +2666,7 @@ export function TetrisApp() {
               </p>
               {hudCells(ui).map((cell) => (
                 <p className={`hud-cell${cell.label === "Time" ? " is-clock" : ""}`} key={cell.label}>
+                  <HudGlyph label={cell.label} />
                   <span>{cell.label}</span>
                   <b data-qa={cell.label === "Time" ? "hud-clock" : undefined}>{cell.value}</b>
                 </p>
@@ -3583,6 +3585,17 @@ function hudCells(ui: Ui): { label: string; value: string }[] {
     { label: "Level", value: `${ui.level}` },
     { label: "Lines", value: `${ui.lines}` },
   ];
+}
+
+function HudGlyph({ label }: { label: string }) {
+  const path = label === "Score"
+    ? "M8 3h8v6a4 4 0 0 1-8 0V3ZM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 2v6m-4 2h8"
+    : label === "Time"
+      ? "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 4v5l3 2"
+      : label === "Level"
+        ? "M5 20v-6m7 6V9m7 11V4"
+        : "M5 5h14M5 12h14M5 19h14";
+  return <svg className="hud-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
 }
 
 function HudProgress({ ui }: { ui: Ui }) {
