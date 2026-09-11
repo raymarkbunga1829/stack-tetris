@@ -3630,6 +3630,68 @@ html.is-ios .help-android {
   display: none;
 }
 
+/* Phone pad: Drop is the one-glance gold plate. Other keys go quiet
+   and the row sits lower so thumbs miss HOLD/NEXT. Huge still scales up. */
+.cabinet.is-narrow.is-play {
+  padding-left: max(4px, env(safe-area-inset-left));
+  padding-right: max(4px, env(safe-area-inset-right));
+}
+.cabinet.is-narrow .pad {
+  gap: 4px;
+  min-height: 48px;
+  grid-template-columns: minmax(132px, 2.5fr) minmax(228px, 4.5fr);
+}
+.cabinet.is-narrow .pad-move,
+.cabinet.is-narrow .pad-act {
+  gap: 3px;
+}
+.cabinet.is-narrow .pad-move {
+  grid-template-columns: repeat(3, minmax(44px, 1fr));
+}
+.cabinet.is-narrow .pad-act {
+  grid-template-columns: repeat(4, minmax(44px, 1fr)) minmax(52px, 1.4fr);
+}
+.cabinet.is-narrow .pad-btn {
+  min-height: 48px;
+  border-radius: 14px;
+  background: #161a22;
+  box-shadow: 0 0 0 1px #252a34;
+}
+.cabinet.is-narrow .pad-btn svg {
+  width: 22px;
+  height: 22px;
+  filter: none;
+  opacity: 0.88;
+}
+.cabinet.is-narrow .pad-hold {
+  background: #1a1e28;
+  box-shadow: 0 0 0 1px #3a404c;
+}
+.cabinet.is-narrow:not(.is-zen) .pad-hard {
+  min-height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff4a8 0%, #f0d24a 38%, #c9a024 100%);
+  color: #0b0c10;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 0 0 2px #ffe566,
+    0 0 0 3px #6a5010,
+    0 6px 16px rgba(232, 196, 106, 0.45),
+    inset 0 1px 0 #fffce0;
+}
+.cabinet.is-narrow.is-pad-huge .pad {
+  gap: 8px;
+  min-height: 72px;
+}
+.cabinet.is-narrow.is-pad-huge .pad-btn {
+  min-height: 64px;
+  border-radius: 18px;
+}
+.cabinet.is-narrow.is-pad-huge:not(.is-zen) .pad-hard {
+  min-height: 72px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .hud-progress-track > i { transition: transform 250ms ease-out; }
 }

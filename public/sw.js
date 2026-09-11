@@ -1,5 +1,5 @@
 /* Stack offline shell. Keep this tiny. */
-const CACHE = "stack-offline-v15";
+const CACHE = "stack-offline-v16";
 const PRECACHE = [
   "/",
   "/favicon.svg",
