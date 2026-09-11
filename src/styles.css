@@ -573,6 +573,10 @@
   z-index: 1;
 }
 
+.well canvas[hidden] {
+  display: none;
+}
+
 .well .viz {
   position: absolute;
   inset: 0;
@@ -3637,19 +3641,36 @@ html.is-ios .help-android {
   padding-right: max(4px, env(safe-area-inset-right));
 }
 .cabinet.is-narrow .pad {
-  gap: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  container-type: inline-size;
+  gap: 6px;
   min-height: 48px;
-  grid-template-columns: minmax(132px, 2.5fr) minmax(228px, 4.5fr);
 }
 .cabinet.is-narrow .pad-move,
 .cabinet.is-narrow .pad-act {
   gap: 3px;
 }
 .cabinet.is-narrow .pad-move {
+  flex: 3 1 138px;
   grid-template-columns: repeat(3, minmax(44px, 1fr));
 }
 .cabinet.is-narrow .pad-act {
+  flex: 5 1 240px;
   grid-template-columns: repeat(4, minmax(44px, 1fr)) minmax(52px, 1.4fr);
+}
+
+.cabinet.is-narrow .pad:has(.pad-undo) .pad-act {
+  flex-basis: 287px;
+  grid-template-columns: repeat(5, minmax(44px, 1fr)) minmax(52px, 1.4fr);
+}
+
+/* In landscape the controls may occupy a narrow side panel. */
+@container (max-width: 239px) {
+  .cabinet.is-narrow .pad-act,
+  .cabinet.is-narrow .pad:has(.pad-undo) .pad-act {
+    grid-template-columns: repeat(3, minmax(44px, 1fr));
+  }
 }
 .cabinet.is-narrow .pad-btn {
   min-height: 48px;
