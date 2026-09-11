@@ -20,11 +20,13 @@ export function clientToCell(
   rect: DOMRect,
   clientX: number,
   clientY: number,
+  pixelWidth = rect.width,
+  pixelHeight = rect.height,
 ): { col: number; row: number } {
-  const { cell, ox, oy } = fieldLayout(rect.width, rect.height);
+  const { cell, ox, oy } = fieldLayout(pixelWidth, pixelHeight);
   return {
-    col: Math.floor((clientX - rect.left - ox) / cell),
-    row: Math.floor((clientY - rect.top - oy) / cell),
+    col: Math.floor(((clientX - rect.left) * pixelWidth / rect.width - ox) / cell),
+    row: Math.floor(((clientY - rect.top) * pixelHeight / rect.height - oy) / cell),
   };
 }
 
@@ -52,6 +54,8 @@ export function drawWell(
   sim: Sim | null,
   shake = 0,
   theme: Theme = themeOf("ink"),
+  showGhost = true,
+  showMarks = false,
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -96,13 +100,14 @@ export function drawWell(
         cell,
         flashing ? "flash" : id,
         theme,
+        showMarks,
       );
     }
   }
 
   if (sim.piece && sim.phase !== "over") {
     const gy = ghostY(sim);
-    if (gy !== sim.piece.y) {
+    if (showGhost && gy !== sim.piece.y) {
       for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, gy)) {
         const vy = c.y - HIDDEN_ROWS;
         if (vy < 0 || vy >= VISIBLE_ROWS) continue;
@@ -118,7 +123,7 @@ export function drawWell(
       )) {
         const vy = c.y - HIDDEN_ROWS;
         if (vy < 0 || vy >= VISIBLE_ROWS) continue;
-        drawBlock(ctx, ox + c.x * cell, oy + vy * cell, cell, sim.piece.id, theme);
+        drawBlock(ctx, ox + c.x * cell, oy + vy * cell, cell, sim.piece.id, theme, showMarks);
       }
     }
   }
@@ -146,6 +151,7 @@ function drawBlock(
   cell: number,
   id: PieceId | "flash",
   theme: Theme,
+  showMarks = false,
 ) {
   const inset = Math.max(1, Math.floor(cell * 0.08));
   if (id === "flash") {
@@ -157,6 +163,15 @@ function drawBlock(
   ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
   ctx.fillStyle = theme.fill[id];
   ctx.fillRect(x + inset, y + inset, cell - inset * 2 - 1, cell - inset * 2 - 1);
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.fillRect(x + inset, y + inset, cell - inset * 2 - 1, Math.max(1, inset));
+  if (showMarks) {
+    ctx.fillStyle = "#141414";
+    ctx.font = `bold ${Math.max(7, Math.floor(cell * 0.45))}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(id, x + cell / 2, y + cell / 2);
+  }
 }
 
 function ghostBlock(
