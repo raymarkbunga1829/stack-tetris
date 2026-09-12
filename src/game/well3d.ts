@@ -241,24 +241,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   floorGold.position.set(0, -0.48, 0.38);
   scene.add(floorGold);
 
-  // Cheap stand-in for UnrealBloom on phone: a neon lip + falloff in the
-  // live piece colour. Composer stays off on coarse pointers (FPS).
-  const neonMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const neonBar = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 0.72), neonMat);
-  neonBar.position.set(0, 19.86, 0.62);
-  scene.add(neonBar);
-  const neonFallMat = neonMat.clone();
-  neonFallMat.opacity = 0;
-  const neonFall = new THREE.Mesh(new THREE.PlaneGeometry(10.2, 3.4), neonFallMat);
-  neonFall.position.set(0, 18.15, 0.18);
-  scene.add(neonFall);
-
   const godMat = new THREE.MeshBasicMaterial({
     map: makeShaftTexture(),
     transparent: true,
@@ -268,7 +250,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   });
   const god = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 18.5), godMat);
   god.position.set(0.4, 10.2, 0.35);
-  god.visible = !reduce;
+  god.visible = false;
   scene.add(god);
 
   const hazeMat = new THREE.MeshBasicMaterial({
@@ -528,7 +510,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
-  const hsl = { h: 0, s: 0, l: 0 };
   const hitPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -575,12 +556,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     dummy.scale.set(scale * (2 - squash), scale * squash, scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
-    color.set(hexCol);
-    if (!useComposer && !clearLook) {
-      color.getHSL(hsl);
-      color.setHSL(hsl.h, Math.min(1, hsl.s * 1.22 + 0.08), Math.min(0.7, hsl.l * 1.1 + 0.02));
-    }
-    color.multiplyScalar(lift);
+    color.set(hexCol).multiplyScalar(lift);
     mesh.setColorAt(i, color);
   }
 
@@ -731,21 +707,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const liveHex = liveId ? theme.fill[liveId] : theme.flash;
     trimMat.color.set(liveHex);
     trimMat.emissive.set(liveHex);
-    trimMat.emissiveIntensity = useComposer || clearLook ? 0.22 : 1.85;
-    neonMat.color.set(liveHex);
-    neonFallMat.color.set(liveHex);
-    godMat.color.set(liveHex);
-    const neonOn = !clearLook && !reduce && sim?.phase !== "title" && sim?.phase !== "paused";
-    neonMat.opacity = neonOn ? 0.92 : 0;
-    neonFallMat.opacity = neonOn ? 0.32 : 0;
-    god.visible = neonOn;
-    godMat.opacity = neonOn
-      ? theme.id === "neon"
-        ? 0.28
-        : theme.id === "night"
-          ? 0.22
-          : 0.16
-      : 0;
+    trimMat.emissiveIntensity = clearLook ? 0.12 : useComposer ? 0.22 : 0.55;
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -1010,7 +972,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (slowOn) {
       slowMat.opacity = 0.05 + 0.03 * (0.5 + 0.5 * Math.sin(now * 0.004));
     }
-    const lushShaft = !clearLook && (theme.id === "night" || theme.id === "neon" || !useComposer);
+    const lushShaft = !clearLook && (theme.id === "night" || theme.id === "neon");
     if (paused) {
       shaft.color.set(0x8a8c94);
       shaft.intensity = 6;
@@ -1040,34 +1002,31 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
 
     lastCells = n;
-    const juicy = !useComposer && !clearLook && !reduce;
-    if (calm || juicy) {
+    if (calm) {
       renderer.toneMapping = THREE.NoToneMapping;
-      renderer.toneMappingExposure = calm ? 1.22 : 1.18;
-      hemi.intensity = calm ? 1.28 : 0.92;
-      key.intensity = calm ? 2.85 : 2.15;
-      fill.intensity = calm ? 0.9 : 0.55;
-      rim.intensity = calm ? 1.5 : 1.15;
-      scene.environmentIntensity = reduce ? 0.8 : calm ? 1.5 : 1.15;
-      solidMat.emissiveIntensity = calm ? 0.82 : 0.52;
+      renderer.toneMappingExposure = 1.22;
+      hemi.intensity = 1.28;
+      key.intensity = 2.85;
+      fill.intensity = 0.9;
+      rim.intensity = 1.5;
+      scene.environmentIntensity = reduce ? 0.8 : 1.5;
+      solidMat.emissiveIntensity = 0.82;
       solidMat.metalness = 0.08;
-      if (scene.fog instanceof THREE.FogExp2) scene.fog.density = calm ? 0.0028 : 0.006;
-      shaft.intensity *= calm ? 2.05 : 1.65;
-      jewel.intensity = calm ? 20 : 14;
-      bounce.intensity = calm ? 18 : 12;
-      if (calm) {
-        godMat.opacity = Math.max(godMat.opacity, reduce ? 0.12 : 0.24);
-        hazeMat.opacity = 0.12;
-      }
+      if (scene.fog instanceof THREE.FogExp2) scene.fog.density = 0.0028;
+      shaft.intensity *= 2.05;
+      jewel.intensity = 20;
+      bounce.intensity = 18;
+      godMat.opacity = reduce ? 0.12 : 0.24;
+      hazeMat.opacity = 0.12;
     } else {
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = EXPOSURE;
+      renderer.toneMappingExposure = !useComposer ? 1.36 : EXPOSURE;
       hemi.intensity = HEMI_I;
       key.intensity = KEY_I;
       fill.intensity = FILL_I;
       rim.intensity = RIM_I;
       scene.environmentIntensity = ENV_I;
-      solidMat.emissiveIntensity = EMISSIVE_I;
+      solidMat.emissiveIntensity = !useComposer ? 0.28 : EMISSIVE_I;
       solidMat.metalness = 0.1;
       if (scene.fog instanceof THREE.FogExp2) scene.fog.density = FOG_D;
       jewel.intensity = 8;
