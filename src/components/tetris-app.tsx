@@ -34,7 +34,7 @@ import {
 import { haptic, setHaptic } from "@/game/haptics";
 import { isAndroid, isIOS, onKeyboard, showPad, type PadMode } from "@/game/device";
 import { createGestures, type GestureEmit, type GestureLabel } from "@/game/gestures";
-import { createInput, type InputApi, type Pad } from "@/game/input";
+import { createInput, handlingOf, type InputApi, type Pad } from "@/game/input";
 import { applyMissions, type MissionBook } from "@/game/missions";
 import {
   dailySeed,
@@ -57,7 +57,7 @@ import { registerOffline, watchLine } from "@/game/offline";
 import { betterRank, speakClear, type Callout, type CallRank } from "@/game/callout";
 import { shareRun } from "@/game/share-run";
 import { REPLAY_STEP, takeSnap, type Snap } from "@/game/replay";
-import { resizeCanvas } from "@/game/render";
+import { clientToCell, drawWell, resizeCanvas } from "@/game/render";
 import { createViz } from "@/game/viz";
 import { createWell3d, type Well3d } from "@/game/well3d";
 import { loadSave, recordRun, writeSave, type HapticProfile, type SaveData } from "@/game/save";
@@ -84,7 +84,7 @@ import {
   type Sim,
 } from "@/game/sim";
 import { cellsOf, kickLabel } from "@/game/pieces";
-import { HIDDEN_ROWS, COLS, ROWS, DAS_TOUCH, LINES_PER_LEVEL, type Phase, type PieceId } from "@/game/types";
+import { HIDDEN_ROWS, COLS, ROWS, LINES_PER_LEVEL, type Phase, type PieceId } from "@/game/types";
 import {
   buyWithCredits,
   consumePower,
@@ -301,6 +301,10 @@ function InstallButton() {
 export function TetrisApp() {
   const well3dRef = useRef<Well3d | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // A canvas that has owned WebGL cannot subsequently acquire a 2D context.
+  const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
+  const fallbackRef = useRef(false);
+  const [flatWell, setFlatWell] = useState(false);
   const vizCanvasRef = useRef<HTMLCanvasElement>(null);
   const wellRef = useRef<HTMLDivElement>(null);
   const simRef = useRef<Sim | null>(null);
@@ -480,6 +484,7 @@ export function TetrisApp() {
     if (!vv) return;
     const onVv = () => {
       well3dRef.current?.resize();
+      if (fallbackRef.current && fallbackCanvasRef.current) resizeCanvas(fallbackCanvasRef.current);
     };
     vv.addEventListener("resize", onVv);
     vv.addEventListener("scroll", onVv);
@@ -546,6 +551,7 @@ export function TetrisApp() {
     try {
       const ro = new ResizeObserver(() => {
         well3dRef.current?.resize();
+        if (fallbackRef.current && fallbackCanvasRef.current) resizeCanvas(fallbackCanvasRef.current);
         if (vizCanvas) resizeCanvas(vizCanvas);
       });
       ro.observe(well);
@@ -651,7 +657,7 @@ export function TetrisApp() {
   useEffect(() => {
     const canvas = canvasRef.current;
     const well = wellRef.current;
-    if (!canvas || !well) return;
+    if (!canvas || !well || fallbackRef.current) return;
     try {
       well3dRef.current?.dispose();
     } catch {
@@ -667,6 +673,7 @@ export function TetrisApp() {
       );
       engine.resize();
       return () => {
+        if (well3dRef.current !== engine) return;
         try {
           engine.dispose();
         } catch {
@@ -676,11 +683,27 @@ export function TetrisApp() {
       };
     } catch (err) {
       console.error("[stack] well init failed", err);
-      well3dRef.current = null;
+      useFlatWell();
     }
   }, [wellGen]);
 
+  function useFlatWell() {
+    if (fallbackRef.current) return;
+    fallbackRef.current = true;
+    setFlatWell(true);
+    const engine = well3dRef.current;
+    well3dRef.current = null;
+    try {
+      engine?.dispose();
+    } catch {
+      // A lost context may also reject cleanup. The independent 2D canvas is safe.
+    }
+    if (fallbackCanvasRef.current) resizeCanvas(fallbackCanvasRef.current);
+  }
+
   function requestWellRebuild(force = false) {
+    // Stay playable after a graphics failure, including new games and replays.
+    if (fallbackRef.current) return;
     const now = performance.now();
     if (!force && now - wellRebuildAt.current < 800) return;
     wellRebuildAt.current = now;
@@ -1177,9 +1200,7 @@ export function TetrisApp() {
       heldHold: false,
       heldFlip: false,
       nudge: 0,
-      das: showPad(u.padMode) ? DAS_TOUCH : saveRef.current.dasMs / 1000,
-      arr: saveRef.current.arrMs / 1000,
-      sdf: saveRef.current.sdf,
+      ...handlingOf(saveRef.current),
     };
     let botHard = false;
     let ev;
@@ -1213,9 +1234,7 @@ export function TetrisApp() {
         heldHold: held.hold,
         heldFlip: held.flip,
         nudge: input.takeNudge(),
-        das: showPad(u.padMode) ? DAS_TOUCH : saveRef.current.dasMs / 1000,
-        arr: saveRef.current.arrMs / 1000,
-        sdf: saveRef.current.sdf,
+        ...handlingOf(saveRef.current),
         freeze: !!u.coach,
         freezeClock: !!u.coach,
       });
@@ -2007,7 +2026,7 @@ export function TetrisApp() {
   function paint(dt = 1 / 60) {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (well3dRef.current?.lost()) requestWellRebuild();
+    if (well3dRef.current?.lost()) useFlatWell();
     else {
       const live = simRef.current;
       const engine = well3dRef.current;
@@ -2015,7 +2034,7 @@ export function TetrisApp() {
         const occupied = !!live.piece || live.board.some((row) => row.some((c) => c));
         if (occupied && engine.cellsDrawn() <= 0) {
           wellBlank.current += 1;
-          if (wellBlank.current > 10) requestWellRebuild();
+          if (wellBlank.current > 10) useFlatWell();
         } else {
           wellBlank.current = 0;
         }
@@ -2033,11 +2052,16 @@ export function TetrisApp() {
         ? { ...view, phase: "over", board: s.board, piece: s.piece, score: s.score, lines: s.lines }
         : null;
     }
+    const showGhost = uiRef.current.ghost && modeOf(uiRef.current.mode).ghost;
+    const shake = reduce ? Math.min(shakeRef.current, 6) : shakeRef.current;
+    if (fallbackRef.current && fallbackCanvasRef.current) {
+      drawWell(fallbackCanvasRef.current, view, shake, theme, showGhost, uiRef.current.marks);
+    }
     well3dRef.current?.draw(
       view,
-      reduce ? Math.min(shakeRef.current, 6) : shakeRef.current,
+      shake,
       theme,
-      uiRef.current.ghost && modeOf(uiRef.current.mode).ghost,
+      showGhost,
       uiRef.current.marks,
     );
     const vizCanvas = vizCanvasRef.current;
@@ -2311,12 +2335,14 @@ export function TetrisApp() {
       const sim = simRef.current;
       if (!well || !sim?.piece) return;
       const engine3 = well3dRef.current;
-      if (!well || !sim?.piece || !engine3) return;
-      const hit = engine3.clientToCell(
-        well.getBoundingClientRect(),
-        action.x,
-        action.y,
-      );
+      const flat = fallbackCanvasRef.current;
+      const rect = well.getBoundingClientRect();
+      const hit = engine3
+        ? engine3.clientToCell(rect, action.x, action.y)
+        : flat && fallbackRef.current
+          ? clientToCell(rect, action.x, action.y, flat.width, flat.height)
+          : null;
+      if (!hit) return;
       if (grabRef.current == null) grabRef.current = sim.piece.x - hit.col;
       if (dragPiece(sim, hit.col + grabRef.current, sim.piece.y)) advanceCoach("drag");
       return;
@@ -2743,7 +2769,8 @@ export function TetrisApp() {
             onPointerCancel={onWellPointer}
             onLostPointerCapture={onWellPointer}
           >
-            <canvas key={wellGen} ref={canvasRef} />
+            <canvas key={wellGen} ref={canvasRef} hidden={flatWell} data-renderer="3d" />
+            <canvas ref={fallbackCanvasRef} hidden={!flatWell} data-renderer="2d" />
             <canvas ref={vizCanvasRef} className="viz" aria-hidden="true" />
             <div className="marquee">
               <span>

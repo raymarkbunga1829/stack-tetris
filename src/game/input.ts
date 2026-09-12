@@ -1,6 +1,11 @@
 import { noteKeyboard } from "./device";
 import type { PowerId } from "./shop";
 
+/** The saved handling applies equally to touch, keyboard, and hybrid devices. */
+export function handlingOf(settings: { dasMs: number; arrMs: number; sdf: number }) {
+  return { das: settings.dasMs / 1000, arr: settings.arrMs / 1000, sdf: settings.sdf };
+}
+
 export type Pad = {
   left: boolean;
   right: boolean;
