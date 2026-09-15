@@ -46,6 +46,7 @@ const measure = async (page) => {
       const r = el.getBoundingClientRect();
       return {
         display: style.display,
+        x: r.x,
         w: r.width,
         h: r.height,
         visible: style.display !== "none" && r.height > 0,
@@ -55,7 +56,7 @@ const measure = async (page) => {
   return { cabinet, stage, well, hold, next, pad };
 };
 
-const start = async (label, { width, height, phone }) => {
+const start = async (label, { width, height, phone, padMode = "auto" }) => {
   const ctx = await browser.newContext({
     viewport: { width, height },
     hasTouch: !!phone,
@@ -63,7 +64,10 @@ const start = async (label, { width, height, phone }) => {
     deviceScaleFactor: 1,
   });
   const page = await ctx.newPage();
-  await page.addInitScript((s) => localStorage.setItem("stack-tetris-v1", s), JSON.stringify(SAVE));
+  await page.addInitScript(
+    (s) => localStorage.setItem("stack-tetris-v1", s),
+    JSON.stringify({ ...SAVE, padMode }),
+  );
   page.on("pageerror", (e) => {
     const msg = e.message.split("\n")[0];
     if (/Hydration failed|Minified React error #418|#423|#425/.test(msg)) return;
@@ -107,6 +111,9 @@ try {
     if (m.cabinet.w > 900) {
       errors.push(`${label}: cabinet is ${m.cabinet.w.toFixed(0)}px — still the wide 1100 card`);
     }
+    if (m.cabinet.w < 600) {
+      errors.push(`${label}: cabinet shrank to ${m.cabinet.w.toFixed(0)}px, smaller than the title card`);
+    }
     if (pageGutter < 0) {
       errors.push(`${label}: cabinet overflowed the page`);
     }
@@ -118,6 +125,19 @@ try {
     );
     await ctx.close();
   }
+
+  const pad = await start("1024 pad", { width: 1024, height: 800, phone: false, padMode: "on" });
+  const pm = await measure(pad.page);
+  hug("1024 pad", pm);
+  if (!pm.pad.visible) errors.push("1024 pad: pad is gone");
+  const padGap = pm.pad.visible ? pm.pad.x - pm.next.r : 0;
+  if (pm.pad.visible && (padGap < 0 || padGap > 24)) {
+    errors.push(`1024 pad: NEXT is ${padGap.toFixed(1)}px from the pad`);
+  }
+  console.log(
+    `1024 pad: cabinet ${pm.cabinet.w.toFixed(0)} well ${pm.well.w.toFixed(0)}×${pm.well.h.toFixed(0)} next-pad ${padGap.toFixed(1)}`,
+  );
+  await pad.ctx.close();
 
   const phone = await start("phone", { width: 390, height: 844, phone: true });
   const p = await measure(phone.page);
