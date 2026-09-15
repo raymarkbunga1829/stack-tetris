@@ -1996,9 +1996,11 @@
 /*
  * Modes is a short sheet. Keep the well faintly lit behind a scrim.
  * The Paused card hides while the sheet is up so it cannot bleed under it.
+ * 32% of --color-bg crushed the already-dark paused well into a void;
+ * stay light so the frozen stack still reads above / around the sheet.
  */
 .shop-veil.is-modes {
-  background: color-mix(in oklab, var(--color-bg) 32%, transparent);
+  background: color-mix(in oklab, var(--color-bg) 14%, transparent);
 }
 
 @media (min-width: 1024px) {
