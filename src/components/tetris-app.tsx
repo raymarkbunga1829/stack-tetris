@@ -806,7 +806,7 @@ export function TetrisApp() {
   }
 
   function beginGame(mode: ModeId) {
-    saveRef.current = { ...saveRef.current, mode, played: true, a2hs: true };
+    saveRef.current = { ...saveRef.current, mode, played: true };
     writeSave(saveRef.current);
     const seed = mode === "daily" ? dailySeed() : undefined;
     const sim = createSim({ mode, seed });
