@@ -2570,8 +2570,13 @@ html.is-ios .help-android {
     grid-column: 1 / -1;
     display: block;
   }
+  /* Play on a desk: the well is a 1×2 screen, so HOLD/NEXT sit flush and
+     the cabinet shrinks to that assembly. A 1100px card with a 1fr well
+     left empty bands between the rails and the stack. */
   .cabinet.is-play {
-    grid-template-columns: minmax(0, 1fr) 260px;
+    width: fit-content;
+    max-width: calc(100vw - 28px);
+    grid-template-columns: max-content 260px;
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
   .cabinet.is-play .stats {
@@ -2581,7 +2586,11 @@ html.is-ios .help-android {
   .cabinet.is-play .stage {
     grid-column: 1;
     grid-row: 2 / 4;
-    grid-template-columns: 92px minmax(0, 1fr) 92px;
+    grid-template-columns: 92px auto 92px;
+    justify-content: center;
+    justify-self: center;
+    width: max-content;
+    max-width: 100%;
     gap: 0;
   }
   .cabinet.is-play .rail {
@@ -2590,6 +2599,9 @@ html.is-ios .help-android {
   }
   .cabinet.is-play .well {
     border-radius: 0;
+    height: 100%;
+    width: auto;
+    aspect-ratio: 1 / 2;
   }
   .cabinet.is-play .pad {
     grid-column: 2;
@@ -2603,7 +2615,9 @@ html.is-ios .help-android {
   .cabinet.is-play.is-keys {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    width: min(760px, calc(100vw - 28px));
+    width: fit-content;
+    min-width: min(620px, calc(100vw - 28px));
+    max-width: calc(100vw - 28px);
   }
   .cabinet.is-play.is-keys .stage {
     grid-column: 1;
@@ -2615,7 +2629,7 @@ html.is-ios .help-android {
     grid-row: 3;
   }
   .cabinet.is-paused {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: auto;
     grid-template-rows: auto minmax(0, 1fr);
   }
   .cabinet.is-paused .foot {
@@ -2643,6 +2657,7 @@ html.is-ios .help-android {
   .cabinet.is-play .hud {
     grid-column: 1 / -1;
     grid-row: 1;
+    min-width: 0;
   }
 }
 
@@ -2651,8 +2666,11 @@ html.is-ios .help-android {
     width: min(1080px, calc(100vw - 40px));
     height: min(920px, calc(100dvh - 32px));
   }
+  .cabinet.is-play,
   .cabinet.is-play.is-keys {
-    width: min(840px, calc(100vw - 40px));
+    width: fit-content;
+    min-width: min(620px, calc(100vw - 40px));
+    max-width: calc(100vw - 40px);
   }
 }
 
