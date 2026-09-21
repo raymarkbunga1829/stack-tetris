@@ -60,7 +60,7 @@ import { REPLAY_STEP, takeSnap, type Snap } from "@/game/replay";
 import { clientToCell, drawWell, resizeCanvas } from "@/game/render";
 import { createViz } from "@/game/viz";
 import { createWell3d, type Well3d } from "@/game/well3d";
-import { loadSave, recordRun, writeSave, type HapticProfile, type SaveData } from "@/game/save";
+import { blankSave, loadSave, recordRun, writeSave, type HapticProfile, type SaveData } from "@/game/save";
 import type { StationId } from "@/game/radio";
 import { buyTheme, themeOf, type ThemeId } from "@/game/themes";
 import {
@@ -310,7 +310,9 @@ export function TetrisApp() {
   const simRef = useRef<Sim | null>(null);
   const inputRef = useRef<InputApi | null>(null);
   const vizRef = useRef(createViz());
-  const saveRef = useRef<SaveData>(loadSave());
+  const saveRef = useRef<SaveData>(blankSave());
+  // First paint must match SSR: no UA, no localStorage, no session replay.
+  const [mounted, setMounted] = useState(false);
   const rafRef = useRef(0);
   const lastTs = useRef(0);
   const shakeRef = useRef(0);
@@ -433,7 +435,7 @@ export function TetrisApp() {
   uiRef.current = ui;
   const [buying, setBuying] = useState<string | null>(null);
   const [want, setWant] = useState<PowerId | null>(null);
-  const [viewW, setViewW] = useState(() => (typeof window === "undefined" ? 390 : window.innerWidth));
+  const [viewW, setViewW] = useState(390);
   const [wellGen, setWellGen] = useState(0);
   const pulseRef = useRef<(p: Partial<Pad>) => void>(() => {});
   const finesseN = useRef(0);
@@ -495,22 +497,46 @@ export function TetrisApp() {
   }, []);
 
   useEffect(() => {
+    saveRef.current = loadSave();
+    botPlayRef.current = saveRef.current.botPlay;
     setMix({ music: saveRef.current.musicVol, sfx: saveRef.current.sfxVol });
     setStation(saveRef.current.station);
     armAudio();
     setHaptic(saveRef.current.haptic);
+    setViewW(window.innerWidth);
     setUi((p) => ({
       ...p,
       muted: saveRef.current.muted,
       high: saveRef.current.high,
+      musicVol: saveRef.current.musicVol,
+      sfxVol: saveRef.current.sfxVol,
+      station: saveRef.current.station,
       drag: saveRef.current.drag,
+      credits: saveRef.current.credits,
+      inv: saveRef.current.inv,
       theme: saveRef.current.theme,
       haptic: saveRef.current.haptic,
       hardConfirm: saveRef.current.hardConfirm,
+      ghost: saveRef.current.ghost,
+      padMode: saveRef.current.padMode,
+      padSize: saveRef.current.padSize,
+      marks: saveRef.current.marks,
+      holdRight: saveRef.current.holdRight,
+      scan: saveRef.current.scan,
+      swipeDrop: saveRef.current.swipeDrop,
+      clearWell: saveRef.current.clearWell,
+      dasMs: saveRef.current.dasMs,
+      arrMs: saveRef.current.arrMs,
+      sdf: saveRef.current.sdf,
       missions: saveRef.current.missions,
       mode: saveRef.current.mode,
+      streak: saveRef.current.streak,
+      sprintBest: saveRef.current.sprintBest,
+      botPlay: saveRef.current.botPlay,
+      coach: saveRef.current.onboarded ? null : "drag",
       standalone: isStandalone(),
     }));
+    setMounted(true);
     const mq = window.matchMedia("(display-mode: standalone)");
     const onMode = () => setUi((p) => ({ ...p, standalone: isStandalone() }));
     mq.addEventListener("change", onMode);
@@ -2651,7 +2677,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${(ui.botPlay) ? " is-watch" : ""}${viewW < 720 ? " is-narrow" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${!mounted || showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${(ui.botPlay) ? " is-watch" : ""}${viewW < 720 ? " is-narrow" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -2815,12 +2841,12 @@ export function TetrisApp() {
                 )}
                 <p className="veil-title">Stack</p>
                 <p className="veil-hint">Press start</p>
-                {isAndroid() && (
+                {mounted && isAndroid() && (
                   <p className="veil-hint">
                     Slide sideways on the stack. Tap to turn. Use Drop — don’t swipe down.
                   </p>
                 )}
-                {!!getLastReplay() && (
+                {mounted && !!getLastReplay() && (
                   <button
                     type="button"
                     className="text-btn"
@@ -3414,7 +3440,7 @@ export function TetrisApp() {
           </button>
         </footer>
         {/* An install is an offer, not a greeting: the first title belongs to Start. */}
-        {!ui.standalone && saveRef.current.played && !saveRef.current.a2hs && ui.phase === "title" && (
+        {mounted && !ui.standalone && saveRef.current.played && !saveRef.current.a2hs && ui.phase === "title" && (
           <div className="a2hs" data-qa="a2hs">
             <InstallButton />
             <button
@@ -3431,21 +3457,7 @@ export function TetrisApp() {
             </button>
           </div>
         )}
-        <p className="help">
-          {botDriving(ui) && (ui.phase === "playing" || ui.phase === "paused" || ui.phase === "clearing")
-            ? ui.mode === "zen"
-              ? "The bot is playing · Pause or Home"
-              : "The bot is playing · Pause or Leave"
-            : isAndroid()
-            ? ui.swipeDrop
-              ? "Slide left or right · tap to rotate · swipe down soft · flick or Drop slams"
-              : "Slide left or right · tap to rotate · Drop slams · Hold parks"
-            : isIOS()
-              ? "Slide left or right · tap to turn · Drop slams · Hold parks"
-              : showPad(ui.padMode)
-                ? "Drag left or right · tap to rotate · Hold parks · Drop slams"
-                : "← → move · ↑ / X rotate · F 180 · ↓ soft · Space hard · C hold · P pause"}
-        </p>
+        <p className="help">{helpCopy(ui, mounted)}</p>
         <ShopSheet
           open={ui.shop}
           credits={ui.credits}
@@ -3552,6 +3564,24 @@ export function TetrisApp() {
       </div>
     </main>
   );
+}
+
+function helpCopy(ui: Ui, mounted: boolean): string {
+  if (botDriving(ui) && (ui.phase === "playing" || ui.phase === "paused" || ui.phase === "clearing")) {
+    return ui.mode === "zen"
+      ? "The bot is playing · Pause or Home"
+      : "The bot is playing · Pause or Leave";
+  }
+  // Same pad line the server already printed — UA and keyboard arrive after mount.
+  if (!mounted) return "Drag left or right · tap to rotate · Hold parks · Drop slams";
+  if (isAndroid()) {
+    return ui.swipeDrop
+      ? "Slide left or right · tap to rotate · swipe down soft · flick or Drop slams"
+      : "Slide left or right · tap to rotate · Drop slams · Hold parks";
+  }
+  if (isIOS()) return "Slide left or right · tap to turn · Drop slams · Hold parks";
+  if (showPad(ui.padMode)) return "Drag left or right · tap to rotate · Hold parks · Drop slams";
+  return "← → move · ↑ / X rotate · F 180 · ↓ soft · Space hard · C hold · P pause";
 }
 
 function botDriving(ui: Pick<Ui, "botPlay" | "mode">): boolean {

@@ -306,10 +306,7 @@ if (results.closed.open) fail.push("Close no longer dismisses the sheet");
 if (results.closed.phase !== "paused") fail.push("Close dropped the run out of its pause");
 if (!results.closed.card) fail.push("Close left the pause without its card");
 
-// A stored save always differs from what the server guessed, so the hydration
-// grumble is noise. A real crash is not.
-const crashes = errors.filter((e) => !e.includes("Hydration failed"));
-if (crashes.length) fail.push(`page errors: ${crashes.join(" | ")}`);
+if (errors.length) fail.push(`page errors: ${errors.join(" | ")}`);
 
 if (fail.length) console.error(fail.map((f) => `- ${f}`).join("\n"));
 await browser.close();

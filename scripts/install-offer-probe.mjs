@@ -227,10 +227,7 @@ noNag(results.installed, "already installed");
 
 offers(results.veteran, "for a player who arrived with scores");
 
-// A stored save always differs from what the server guessed, and most runs here
-// start from one, so the hydration grumble is noise. A real crash is not.
-const crashes = errors.filter((e) => !e.includes("Hydration failed"));
-if (crashes.length) fail.push(`page errors: ${crashes.join(" | ")}`);
+if (errors.length) fail.push(`page errors: ${errors.join(" | ")}`);
 
 if (fail.length) console.error(fail.map((f) => `- ${f}`).join("\n"));
 await browser.close();
