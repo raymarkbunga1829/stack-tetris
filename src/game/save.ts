@@ -115,6 +115,23 @@ const DEFAULTS: SaveData = {
   botPlay: false,
 };
 
+/** Server + first-paint snapshot. No localStorage, no date-stamped missions. */
+export function blankSave(): SaveData {
+  return {
+    ...DEFAULTS,
+    inv: { ...DEFAULTS.inv },
+    themes: [...DEFAULTS.themes],
+    missions: emptyBook(),
+    scores: [],
+    sprintSplits: [],
+    receipts: [],
+    daily: { date: "", score: 0, lines: 0 },
+    dailyBoard: { date: "", rows: [] },
+    dailyPrev: { date: "", rows: [] },
+    streak: { count: 0, last: "" },
+  };
+}
+
 function clampMs(n: unknown, min: number, max: number, fallback: number): number {
   if (typeof n !== "number" || Number.isNaN(n)) return fallback;
   return Math.max(min, Math.min(max, Math.round(n)));
@@ -123,14 +140,7 @@ function clampMs(n: unknown, min: number, max: number, fallback: number): number
 export function loadSave(): SaveData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) {
-      return {
-        ...DEFAULTS,
-        inv: { ...DEFAULTS.inv },
-        themes: [...DEFAULTS.themes],
-        missions: ensureMissions(undefined),
-      };
-    }
+    if (!raw) return { ...blankSave(), missions: ensureMissions(undefined) };
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     return {
       ...DEFAULTS,
@@ -200,7 +210,7 @@ export function loadSave(): SaveData {
       botPlay: parsed.botPlay === true,
     };
   } catch {
-    return { ...DEFAULTS, inv: { ...DEFAULTS.inv }, missions: ensureMissions(undefined) };
+    return { ...blankSave(), missions: ensureMissions(undefined) };
   }
 }
 
