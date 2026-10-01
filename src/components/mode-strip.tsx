@@ -1,5 +1,24 @@
+import { useSyncExternalStore } from "react";
 import { formatElapsed, formatManilaDate, manilaDateKey, MODES, peekDailyBag, streakLive, type ModeId } from "@/game/modes";
 import { PIECE_FILL } from "@/game/pieces";
+
+/** Re-read Asia/Manila when the PWA is foregrounded (overnight resume). */
+function subscribeManilaDay(onStoreChange: () => void) {
+  const onVis = () => {
+    if (!document.hidden) onStoreChange();
+  };
+  document.addEventListener("visibilitychange", onVis);
+  return () => document.removeEventListener("visibilitychange", onVis);
+}
+
+function manilaDayClient() {
+  return manilaDateKey();
+}
+
+/** SSR + hydration stay empty so a cached document cannot flash yesterday. */
+function manilaDayServer() {
+  return "";
+}
 
 type Props = {
   mode: ModeId;
@@ -57,8 +76,8 @@ export function ModeChips({
   streak?: { count: number; last: string };
 }) {
   const featured = TITLE_MODES.includes(mode);
-  const today = manilaDateKey();
-  const days = streakLive(streak, today);
+  const today = useSyncExternalStore(subscribeManilaDay, manilaDayClient, manilaDayServer);
+  const days = today ? streakLive(streak, today) : 0;
   return (
     <div className="mode-chips" role="tablist" aria-label="Game mode">
       {MODES.filter((m) => TITLE_MODES.includes(m.id)).map((m) => (
@@ -77,8 +96,7 @@ export function ModeChips({
             <span className="chip-name">{CHIP_NAME[m.id] ?? m.name}</span>
             {m.id === "daily" && (
               <small className="chip-date">
-                {formatManilaDate(today)}
-                {days > 1 ? ` · ${days}` : ""}
+                {today ? `${formatManilaDate(today)}${days > 1 ? ` · ${days}` : ""}` : "\u00a0"}
               </small>
             )}
           </span>

@@ -1,5 +1,6 @@
-/* Stack offline shell. Keep this tiny. */
-const CACHE = "stack-offline-v21";
+/* Stack offline shell. Keep this tiny.
+ * v22 drops documents that baked yesterday's Daily chip date into the HTML. */
+const CACHE = "stack-offline-v22";
 const PRECACHE = [
   "/",
   "/favicon.svg",
