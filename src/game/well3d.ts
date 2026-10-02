@@ -272,11 +272,11 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (theme) {
       const pale = hex(theme.well).getHSL({ h: 0, s: 0, l: 0 }).l > 0.35;
       if (pale) gridTint.copy(hex(theme.grid)).multiplyScalar(0.5);
-      else gridTint.set(0xb8923a);
+      else gridTint.set(0x1c7a88);
       hazeMat.color.copy(gridTint);
     }
     const gm = grid.material as THREE.LineBasicMaterial;
-    gm.opacity = clearLook ? 0.12 : 0.38;
+    gm.opacity = clearLook ? 0.12 : 0.5;
     if (clearLook) gm.color.set(0x2a3038);
     else gm.color.copy(gridTint);
   }
@@ -286,18 +286,18 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
   const solidMat = new THREE.MeshPhysicalMaterial({
-    roughness: mobile ? 0.14 : 0.08,
-    metalness: 0.1,
-    clearcoat: reduce ? 0.3 : mobile ? 0.35 : 1,
-    clearcoatRoughness: 0.04,
+    roughness: mobile ? 0.2 : 0.08,
+    metalness: mobile ? 0.04 : 0.1,
+    clearcoat: reduce ? 0.3 : mobile ? 0.55 : 1,
+    clearcoatRoughness: mobile ? 0.12 : 0.04,
     iridescence: reduce || mobile ? 0 : 0.1,
     iridescenceIOR: 1.4,
-    sheen: 0.35,
+    sheen: mobile ? 0.06 : 0.35,
     sheenRoughness: 0.22,
-    sheenColor: new THREE.Color(0xfff4dc),
-    envMapIntensity: 1.85,
-    emissive: 0x141414,
-    emissiveIntensity: 0.12,
+    sheenColor: new THREE.Color(mobile ? 0xffffff : 0xfff4dc),
+    envMapIntensity: mobile ? 0.55 : 1.85,
+    emissive: 0x000000,
+    emissiveIntensity: mobile ? 0 : 0.12,
   });
   const ghostMat = new THREE.MeshPhysicalMaterial({
     roughness: 0.22,
@@ -510,6 +510,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
+  const hsl = { h: 0, s: 0, l: 0 };
   const hitPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -556,7 +557,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     dummy.scale.set(scale * (2 - squash), scale * squash, scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
-    color.set(hexCol).multiplyScalar(lift);
+    color.set(hexCol);
+    if (!useComposer && !clearLook) {
+      color.getHSL(hsl);
+      color.setHSL(hsl.h, Math.min(1, hsl.s + 0.1), Math.min(0.58, Math.max(0.38, hsl.l)));
+    }
+    color.multiplyScalar(lift);
     mesh.setColorAt(i, color);
   }
 
@@ -1020,17 +1026,34 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       hazeMat.opacity = 0.12;
     } else {
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = !useComposer ? 1.36 : EXPOSURE;
+      renderer.toneMappingExposure = EXPOSURE;
       hemi.intensity = HEMI_I;
       key.intensity = KEY_I;
       fill.intensity = FILL_I;
       rim.intensity = RIM_I;
       scene.environmentIntensity = ENV_I;
-      solidMat.emissiveIntensity = !useComposer ? 0.28 : EMISSIVE_I;
+      solidMat.emissiveIntensity = EMISSIVE_I;
       solidMat.metalness = 0.1;
       if (scene.fog instanceof THREE.FogExp2) scene.fog.density = FOG_D;
       jewel.intensity = 8;
       bounce.intensity = 8;
+    }
+    if (!calm && !useComposer) {
+      renderer.toneMapping = THREE.NeutralToneMapping;
+      renderer.toneMappingExposure = 1.08;
+      hemi.intensity = 0.38;
+      fill.intensity = 0.18;
+      rim.intensity = 0.45;
+      scene.environmentIntensity = 0.42;
+      solidMat.emissive.setHex(0x000000);
+      solidMat.emissiveIntensity = 0;
+      solidMat.sheen = clearLook ? 0 : 0.06;
+      solidMat.envMapIntensity = 0.5;
+      solidMat.metalness = 0.04;
+      solidMat.clearcoat = clearLook ? 0.16 : reduce ? 0.3 : 0.55;
+      if (scene.fog instanceof THREE.FogExp2) scene.fog.density = 0.007;
+      jewel.intensity = 5;
+      bounce.intensity = 3;
     }
     if (calm || !useComposer || !composer) renderer.render(scene, camera);
     else composer.render();
