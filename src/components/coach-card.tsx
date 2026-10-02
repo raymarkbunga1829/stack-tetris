@@ -76,18 +76,35 @@ export function CoachCard({ step, onSkip }: Props) {
   );
 }
 
+const ORDER = ["drag", "rotate", "hold", "drop"] as const;
+
+const TAUGHT: Record<CoachStep, readonly string[]> = {
+  drag: ["drag", "swipe", "left", "right"],
+  rotate: ["tap", "two-finger", "cw", "ccw"],
+  hold: ["hold", "long-press"],
+  drop: ["hard", "flick"],
+};
+
+function taughtStep(label: string): CoachStep | null {
+  for (const id of ORDER) {
+    if (TAUGHT[id].includes(label)) return id;
+  }
+  return null;
+}
+
+function after(step: CoachStep): CoachStep | "done" {
+  const i = ORDER.indexOf(step);
+  return i < ORDER.length - 1 ? ORDER[i + 1]! : "done";
+}
+
+/**
+ * Walk one card forward when the player does this step — or any later one.
+ * Hard/flick used to no-op on Slide/Rotate/Hold, so a first run that only
+ * slammed stayed on "Slide sideways" for the whole coin.
+ */
 export function nextCoach(step: CoachStep, label: string): CoachStep | "done" {
-  if (step === "drag" && (label === "drag" || label === "swipe" || label === "left" || label === "right")) {
-    return "rotate";
-  }
-  if (step === "rotate" && (label === "tap" || label === "two-finger" || label === "cw" || label === "ccw")) {
-    return "hold";
-  }
-  if (step === "hold" && (label === "hold" || label === "long-press")) {
-    return "drop";
-  }
-  if (step === "drop" && (label === "hard" || label === "flick")) {
-    return "done";
-  }
+  const taught = taughtStep(label);
+  if (!taught) return step;
+  if (ORDER.indexOf(taught) >= ORDER.indexOf(step)) return after(step);
   return step;
 }

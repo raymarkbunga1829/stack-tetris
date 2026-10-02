@@ -141,6 +141,22 @@ for (const [name, play] of Object.entries(taught)) {
   await ctx.close();
 }
 
+// A first run that only slams must leave "Slide sideways" — Drop used to no-op
+// on card one, so the card sat there for the whole coin.
+{
+  const { ctx, page } = await start("hard-during-slide");
+  const before = await card(page);
+  await page.locator('[data-qa="pad-hard"]').tap();
+  await page.waitForTimeout(300);
+  const after = await card(page);
+  results.hardDuringSlide = {
+    onCard: before.kicker,
+    nowOnCard: after.kicker,
+    gone: await page.evaluate(() => !document.querySelector(".coach-card")),
+  };
+  await ctx.close();
+}
+
 // The rest of the deck: rotate, Hold, Drop, and out.
 {
   const { ctx, page, touch } = await start("deck");
@@ -182,6 +198,14 @@ if (!/well|stack/i.test(said)) fail.push(`card one no longer names the well: "${
 
 if (results.twitch.advanced && !results.twitch.moved) {
   fail.push("a twitch that moved nothing still ticked card one off");
+}
+
+const slammed = results.hardDuringSlide;
+if (slammed.onCard !== "1 of 4") {
+  fail.push(`hard-during-slide did not start on card one: ${slammed.onCard}`);
+}
+if (slammed.nowOnCard === "1 of 4" && !slammed.gone) {
+  fail.push("hard drop left card one (Slide sideways) up");
 }
 
 const deck = results.deck;
