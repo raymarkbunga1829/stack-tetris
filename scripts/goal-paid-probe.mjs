@@ -132,7 +132,11 @@ const book = async () => {
         pays: em?.textContent?.trim() ?? null,
         state: mark?.textContent?.trim() ?? "",
         done: li.classList.contains("is-done"),
-        strike: getComputedStyle(li).textDecorationLine.includes("line-through"),
+        strike:
+          getComputedStyle(li).textDecorationLine.includes("line-through") ||
+          (span
+            ? getComputedStyle(span).textDecorationLine.includes("line-through")
+            : false),
         lum: lum(rgb(getComputedStyle(span ?? li).color)),
         emLum: em ? lum(rgb(getComputedStyle(em).color)) : null,
         markLum: mark ? lum(rgb(getComputedStyle(mark).color)) : null,

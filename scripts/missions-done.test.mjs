@@ -15,7 +15,11 @@ test("open daily goals stay muted; Pays may stay faint", () => {
 });
 
 test("done daily goals stay struck but do not drop to faint", () => {
-  assert.match(missions, /\.missions li\.is-done \{[\s\S]*?text-decoration:\s*line-through/);
+  assert.match(
+    missions,
+    /\.missions li\.is-done > \* \{[\s\S]*?text-decoration:\s*line-through/,
+    "strike has to live on the flex children or Chromium never paints it",
+  );
   assert.doesNotMatch(
     missions,
     /\.missions li\.is-done \{[\s\S]*?color:\s*var\(--color-faint\)/,

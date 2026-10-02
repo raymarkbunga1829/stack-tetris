@@ -2285,10 +2285,14 @@
 /*
  * Done goals stay struck, but faint-on-faint vanished on the dark sheet.
  * Keep them on the same muted tone as an open row so "Paid 50 CR Done"
- * still reads; the strike and Done/Paid copy do the finished tell.
+ * still reads. Strike the flex children — a line on the li does not paint
+ * across span/em/b in Chromium.
  */
 .missions li.is-done {
   color: var(--color-muted);
+}
+
+.missions li.is-done > * {
   text-decoration: line-through;
 }
 
