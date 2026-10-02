@@ -1,6 +1,6 @@
 /* Stack offline shell. Keep this tiny.
- * v23 drops documents that baked yesterday's Daily chip date into the HTML. */
-const CACHE = "stack-offline-v23";
+ * v24 drops documents that baked yesterday's Daily chip date into the HTML. */
+const CACHE = "stack-offline-v24";
 const PRECACHE = [
   "/",
   "/favicon.svg",
