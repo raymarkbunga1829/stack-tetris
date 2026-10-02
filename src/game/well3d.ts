@@ -1012,6 +1012,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       fill.intensity = 0.9;
       rim.intensity = 1.5;
       scene.environmentIntensity = reduce ? 0.8 : 1.5;
+      solidMat.emissive.setHex(0x141414);
       solidMat.emissiveIntensity = 0.82;
       solidMat.metalness = 0.08;
       if (scene.fog instanceof THREE.FogExp2) scene.fog.density = 0.0028;
@@ -1028,6 +1029,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       fill.intensity = FILL_I;
       rim.intensity = RIM_I;
       scene.environmentIntensity = ENV_I;
+      solidMat.emissive.setHex(0x141414);
       solidMat.emissiveIntensity = EMISSIVE_I;
       solidMat.metalness = 0.32;
       if (scene.fog instanceof THREE.FogExp2) scene.fog.density = FOG_D;
