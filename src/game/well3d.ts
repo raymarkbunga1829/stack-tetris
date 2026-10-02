@@ -497,6 +497,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let bloomMul = 1;
   let idleT = 0;
   let lastThemeId = "";
+  const chromeShaft = new THREE.Color(0xd8e4f0);
+  const chromeJewel = new THREE.Color(0xffffff);
 
   const composer = useComposer ? new EffectComposer(renderer) : null;
   const bloom = useComposer
@@ -558,6 +560,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
     color.set(hexCol).multiplyScalar(lift);
+    const peak = Math.max(color.r, color.g, color.b);
+    if (peak > 1) color.multiplyScalar(1 / peak);
     mesh.setColorAt(i, color);
   }
 
@@ -686,6 +690,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         trimMat.color.set(0xa8f0ff);
         godMat.opacity = reduce ? 0.05 : 0.1;
       }
+      chromeShaft.copy(shaft.color);
+      chromeJewel.copy(jewel.color);
       applyWellLines(theme);
     }
     if (theme.pit !== lastBg) {
@@ -705,10 +711,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
     ticks.visible = sim?.mode === "sprint" && sim.phase !== "title";
     const liveId = sim?.piece?.id;
-    const liveHex = liveId ? theme.fill[liveId] : theme.flash;
-    trimMat.color.set(liveHex);
-    trimMat.emissive.set(liveHex);
-    trimMat.emissiveIntensity = clearLook ? 0.12 : useComposer ? 0.22 : 0.55;
+    // Lip/rails stay on the skin chrome. Painting them with the falling
+    // piece fill + emissive is what bloom turns into a well-wide wash.
+    trimMat.emissiveIntensity = clearLook ? 0.12 : 0.22;
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -843,6 +848,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         dummy.updateMatrix();
         solids.setMatrixAt(n, dummy.matrix);
         color.set(theme.fill[pid]).multiplyScalar(1.2);
+        const peak = Math.max(color.r, color.g, color.b);
+        if (peak > 1) color.multiplyScalar(1 / peak);
         solids.setColorAt(n, color);
         n += 1;
       }
@@ -987,13 +994,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     } else if (slowOn) {
       shaft.color.set(0xffe0a0);
       shaft.intensity = lushShaft ? 16 : 8;
-    } else if (liveId) {
-      shaft.color.set(liveHex);
-      shaft.intensity = lushShaft ? 16 : 7;
-      jewel.color.set(liveHex);
     } else {
-      shaft.color.set(0xffe4c4);
-      shaft.intensity = lushShaft ? 12 : 6;
+      shaft.color.copy(chromeShaft);
+      shaft.intensity = liveId ? (lushShaft ? 16 : 7) : lushShaft ? 12 : 6;
+      jewel.color.copy(chromeJewel);
     }
 
     const shieldOn = !!sim && sim.shield && sim.phase !== "title";

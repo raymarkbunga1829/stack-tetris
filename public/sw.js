@@ -1,6 +1,6 @@
 /* Stack offline shell. Keep this tiny.
- * v24 drops documents that baked yesterday's Daily chip date into the HTML. */
-const CACHE = "stack-offline-v24";
+ * v25 drops the well-frame piece-tint that bloom was washing across the lip. */
+const CACHE = "stack-offline-v25";
 const PRECACHE = [
   "/",
   "/favicon.svg",
