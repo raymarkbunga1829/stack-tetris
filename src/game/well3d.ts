@@ -296,8 +296,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sheenRoughness: 0.35,
     sheenColor: new THREE.Color(0xc8f4ff),
     envMapIntensity: 1.65,
-    emissive: 0x141414,
-    emissiveIntensity: 0.16,
+    emissive: mobile ? 0x000000 : 0x141414,
+    emissiveIntensity: mobile ? 0 : 0.16,
   });
   const ghostMat = new THREE.MeshPhysicalMaterial({
     roughness: 0.22,
@@ -1033,8 +1033,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       fill.intensity = FILL_I;
       rim.intensity = RIM_I;
       scene.environmentIntensity = ENV_I;
-      solidMat.emissive.setHex(0x141414);
-      solidMat.emissiveIntensity = EMISSIVE_I;
+      // Gray candy fill is a desktop jewel trick. On phone it lifts every
+      // mino toward mint once bloom is on; keep the metal/sheen, drop the wash.
+      solidMat.emissive.setHex(mobile ? 0x000000 : 0x141414);
+      solidMat.emissiveIntensity = mobile ? 0 : EMISSIVE_I;
       solidMat.metalness = 0.32;
       if (scene.fog instanceof THREE.FogExp2) scene.fog.density = FOG_D;
       jewel.intensity = 8;
