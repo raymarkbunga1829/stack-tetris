@@ -123,7 +123,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const RIM_I = 0.85;
   const ENV_I = reduce ? 0.4 : 0.92;
   const FOG_D = 0.012;
-  const EMISSIVE_I = 0.16;
+  const EMISSIVE_I = mobile ? 0.06 : 0.16;
+  const METAL_I = mobile ? 0.18 : 0.32;
+  const SOLID_ENV = mobile ? 0.9 : 1.65;
 
   let dead = false;
   let lastCells = 0;
@@ -158,7 +160,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let ashT = 0;
   let stainCells: { x: number; y: number }[] = [];
   let lastDraw = performance.now();
-  const bloomBase = reduce ? 0.14 : mobile ? 0.4 : 0.62;
+  const bloomBase = reduce ? 0.14 : mobile ? 0.32 : 0.62;
   let clearLook = false;
 
   function frameCamera() {
@@ -286,18 +288,18 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const geo = new RoundedBoxGeometry(0.94, 0.94, 0.88, 3, 0.15);
   const solidMat = new THREE.MeshPhysicalMaterial({
-    roughness: mobile ? 0.2 : 0.12,
-    metalness: 0.32,
-    clearcoat: reduce ? 0.25 : mobile ? 0.65 : 1,
-    clearcoatRoughness: 0.06,
-    iridescence: reduce ? 0 : 0.28,
+    roughness: mobile ? 0.26 : 0.12,
+    metalness: METAL_I,
+    clearcoat: reduce ? 0.25 : mobile ? 0.42 : 1,
+    clearcoatRoughness: mobile ? 0.14 : 0.06,
+    iridescence: reduce ? 0 : mobile ? 0.2 : 0.28,
     iridescenceIOR: 1.32,
-    sheen: 0.22,
+    sheen: mobile ? 0.14 : 0.22,
     sheenRoughness: 0.35,
     sheenColor: new THREE.Color(0xc8f4ff),
-    envMapIntensity: 1.65,
+    envMapIntensity: SOLID_ENV,
     emissive: 0x141414,
-    emissiveIntensity: 0.16,
+    emissiveIntensity: EMISSIVE_I,
   });
   const ghostMat = new THREE.MeshPhysicalMaterial({
     roughness: 0.22,
@@ -706,9 +708,19 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     ticks.visible = sim?.mode === "sprint" && sim.phase !== "title";
     const liveId = sim?.piece?.id;
     const liveHex = liveId ? theme.fill[liveId] : theme.flash;
-    trimMat.color.set(liveHex);
-    trimMat.emissive.set(liveHex);
-    trimMat.emissiveIntensity = clearLook ? 0.12 : useComposer ? 0.22 : 0.55;
+    if (clearLook) {
+      trimMat.color.set(liveHex);
+      trimMat.emissive.set(liveHex);
+      trimMat.emissiveIntensity = 0.12;
+    } else if (useComposer) {
+      // Theme already painted the lip. Live-piece chase blooms the cabinet.
+      trimMat.emissive.copy(trimMat.color);
+      trimMat.emissiveIntensity = 0.05;
+    } else {
+      trimMat.color.set(liveHex);
+      trimMat.emissive.set(liveHex);
+      trimMat.emissiveIntensity = 0.55;
+    }
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -1029,7 +1041,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       rim.intensity = RIM_I;
       scene.environmentIntensity = ENV_I;
       solidMat.emissiveIntensity = EMISSIVE_I;
-      solidMat.metalness = 0.32;
+      solidMat.metalness = METAL_I;
+      solidMat.envMapIntensity = SOLID_ENV;
       if (scene.fog instanceof THREE.FogExp2) scene.fog.density = FOG_D;
       jewel.intensity = 8;
       bounce.intensity = 8;
@@ -1484,10 +1497,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       if (clearLook === on) return;
       clearLook = on;
       lastThemeId = "";
-      solidMat.iridescence = on || reduce ? 0 : 0.28;
-      solidMat.clearcoat = on ? 0.16 : reduce ? 0.25 : mobile ? 0.65 : 1;
-      solidMat.roughness = on ? 0.42 : mobile ? 0.2 : 0.12;
-      solidMat.sheen = on ? 0 : 0.22;
+      solidMat.iridescence = on || reduce ? 0 : mobile ? 0.2 : 0.28;
+      solidMat.clearcoat = on ? 0.16 : reduce ? 0.25 : mobile ? 0.42 : 1;
+      solidMat.roughness = on ? 0.42 : mobile ? 0.26 : 0.12;
+      solidMat.sheen = on ? 0 : mobile ? 0.14 : 0.22;
       solidMat.needsUpdate = true;
       applyWellLines();
     },
