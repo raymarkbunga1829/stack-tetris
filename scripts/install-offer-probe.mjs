@@ -170,9 +170,11 @@ await page.locator(".a2hs .install").click({ force: true });
 await page.waitForTimeout(200);
 results.bipUsed = await page.evaluate(() => window.__bipUsed === true);
 results.sawInstallAlert = sawInstallAlert;
+results.afterInstallClick = await look();
 
 // And it is still welcome next time they open the tab.
 await reload();
+await page.waitForSelector('[data-qa="a2hs"]', { timeout: 8000 });
 results.nextVisit = await look();
 
 // Dismiss has to stay dismissed, here and after a reload.
@@ -241,6 +243,7 @@ noNag(results.afterEarlyBip, "the first title, after an early BIP");
 
 if (!results.bipUsed) fail.push("Install did not use the deferred beforeinstallprompt");
 if (results.sawInstallAlert) fail.push("Install fell back to the browser-menu alert after BIP");
+offers(results.afterInstallClick, "after Install used the deferred prompt");
 
 // Nothing about the row belongs in a run either.
 noNag(results.midRun, "mid-run");
