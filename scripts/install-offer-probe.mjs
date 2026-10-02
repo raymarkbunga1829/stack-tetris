@@ -7,9 +7,10 @@
  * sees. So a stranger opened Stack and the loudest full-width row under the
  * mode tabs was an offer to install a game they had not played a piece of. The
  * offer now waits for a run. This one opens the game cold and reads the title
- * the way a stranger reads it, plays a run and comes home to check the offer
- * turns up, reloads to check it stuck, dismisses it and reloads again, and
- * makes sure an installed player is never asked twice.
+ * the way a stranger reads it, fires a synthetic beforeinstallprompt while the
+ * row is still unmounted, plays a run and comes home to check the offer turns
+ * up and uses that held prompt, reloads to check it stuck, dismisses it and
+ * reloads again, and makes sure an installed player is never asked twice.
  * Usage: node scripts/install-offer-probe.mjs [url]
  */
 import { chromium } from "playwright";
@@ -140,14 +141,40 @@ const results = {};
 await open("stranger");
 results.firstTitle = await look();
 
+// Chrome fires BIP on load, before the Install row exists. Hold it now and
+// make sure the cold title still stays Start-only.
+let sawInstallAlert = false;
+page.on("dialog", async (d) => {
+  sawInstallAlert = true;
+  await d.dismiss();
+});
+await page.evaluate(() => {
+  window.__bipUsed = false;
+  const ev = new Event("beforeinstallprompt", { cancelable: true });
+  ev.prompt = async () => {
+    window.__bipUsed = true;
+  };
+  window.dispatchEvent(ev);
+});
+await page.waitForTimeout(150);
+results.afterEarlyBip = await look();
+
 // They played. Coming home, the offer is welcome.
 await play();
 results.midRun = await look();
 await quitHome();
 results.afterRun = await look();
 
+// The held BIP should drive Install — not the browser-menu alert.
+await page.locator(".a2hs .install").click({ force: true });
+await page.waitForTimeout(200);
+results.bipUsed = await page.evaluate(() => window.__bipUsed === true);
+results.sawInstallAlert = sawInstallAlert;
+results.afterInstallClick = await look();
+
 // And it is still welcome next time they open the tab.
 await reload();
+await page.waitForSelector('[data-qa="a2hs"]', { timeout: 8000 });
 results.nextVisit = await look();
 
 // Dismiss has to stay dismissed, here and after a reload.
@@ -210,6 +237,13 @@ if (results.firstTitle.start && !/start/i.test(results.firstTitle.start.text))
   fail.push(`the first title reads "${results.firstTitle.start.text}" where Start should be`);
 if (results.firstTitle.chips < 3)
   fail.push(`the first title only shows ${results.firstTitle.chips} mode tabs`);
+
+// An early BIP must not sneak the offer onto a cold title.
+noNag(results.afterEarlyBip, "the first title, after an early BIP");
+
+if (!results.bipUsed) fail.push("Install did not use the deferred beforeinstallprompt");
+if (results.sawInstallAlert) fail.push("Install fell back to the browser-menu alert after BIP");
+offers(results.afterInstallClick, "after Install used the deferred prompt");
 
 // Nothing about the row belongs in a run either.
 noNag(results.midRun, "mid-run");

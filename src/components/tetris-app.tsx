@@ -250,19 +250,32 @@ function isStandalone(): boolean {
   );
 }
 
-function InstallButton() {
-  const [promptEvent, setPromptEvent] = useState<{ prompt: () => Promise<void> } | null>(null);
+/** Chrome's install event — `prompt()` is the only method we call. */
+type DeferredInstall = { prompt: () => Promise<void> };
 
-  useEffect(() => {
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      const ev = e as Event & { prompt: () => Promise<void> };
-      setPromptEvent(ev);
-    };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
-  }, []);
+/**
+ * Chrome fires `beforeinstallprompt` on load. The Install row mounts later
+ * (after a played run, on title). Hold the event as soon as this module
+ * evaluates on the client so the button can still call `prompt()`.
+ */
+let heldInstall: DeferredInstall | null = null;
+const installHolders = new Set<(ev: DeferredInstall | null) => void>();
 
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    heldInstall = e as Event & DeferredInstall;
+    for (const fn of installHolders) fn(heldInstall);
+  });
+}
+
+function InstallButton({
+  deferred,
+  onUsed,
+}: {
+  deferred: DeferredInstall | null;
+  onUsed: () => void;
+}) {
   if (isIOS()) {
     return (
       <a className="text-btn install" href="?install=1&platform=ios">
@@ -271,13 +284,13 @@ function InstallButton() {
     );
   }
 
-  if (promptEvent) {
+  if (deferred) {
     return (
       <button
         type="button"
         className="text-btn install"
         onClick={() => {
-          void promptEvent.prompt();
+          void deferred.prompt().finally(onUsed);
         }}
       >
         Install app
@@ -313,6 +326,7 @@ export function TetrisApp() {
   const saveRef = useRef<SaveData>(blankSave());
   // First paint must match SSR: no UA, no localStorage, no session replay.
   const [mounted, setMounted] = useState(false);
+  const [deferredInstall, setDeferredInstall] = useState<DeferredInstall | null>(null);
   const rafRef = useRef(0);
   const lastTs = useRef(0);
   const shakeRef = useRef(0);
@@ -464,6 +478,15 @@ export function TetrisApp() {
   const wellRebuildAt = useRef(0);
   const wellBlank = useRef(0);
   const finishRunRef = useRef<(s: Sim) => void>(() => {});
+
+  useEffect(() => {
+    const hold = (ev: DeferredInstall | null) => setDeferredInstall(ev);
+    installHolders.add(hold);
+    if (heldInstall) setDeferredInstall(heldInstall);
+    return () => {
+      installHolders.delete(hold);
+    };
+  }, []);
 
   useEffect(() => onKeyboard(() => setViewW(window.innerWidth)), []);
   useEffect(() => {
@@ -3442,7 +3465,13 @@ export function TetrisApp() {
         {/* An install is an offer, not a greeting: the first title belongs to Start. */}
         {mounted && !ui.standalone && saveRef.current.played && !saveRef.current.a2hs && ui.phase === "title" && (
           <div className="a2hs" data-qa="a2hs">
-            <InstallButton />
+            <InstallButton
+              deferred={deferredInstall}
+              onUsed={() => {
+                heldInstall = null;
+                setDeferredInstall(null);
+              }}
+            />
             <button
               type="button"
               className="a2hs-x"
