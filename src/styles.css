@@ -2282,9 +2282,18 @@
   white-space: nowrap;
 }
 
+/*
+ * Done goals stay struck, but faint-on-faint vanished on the dark sheet.
+ * Keep them on the same muted tone as an open row so "Paid 50 CR Done"
+ * still reads; the strike and Done/Paid copy do the finished tell.
+ */
 .missions li.is-done {
-  color: var(--color-faint);
+  color: var(--color-muted);
   text-decoration: line-through;
+}
+
+.missions li.is-done em {
+  color: inherit;
 }
 
 .coach-card {

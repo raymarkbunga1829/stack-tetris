@@ -110,14 +110,37 @@ const book = async () => {
   await page.waitForTimeout(200);
   await page.locator('[data-qa="pause-modes"]').click({ force: true });
   await page.waitForTimeout(300);
-  return page.evaluate(() =>
-    [...document.querySelectorAll(".missions li")].map((li) => ({
-      label: li.querySelector("span")?.textContent?.trim() ?? "",
-      pays: li.querySelector("em")?.textContent?.trim() ?? null,
-      state: li.querySelector("b")?.textContent?.trim() ?? "",
-      done: li.classList.contains("is-done"),
-    })),
-  );
+  return page.evaluate(() => {
+    const rgb = (c) => {
+      const m = String(c).match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+      return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+    };
+    const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const chip = document.createElement("span");
+    document.body.appendChild(chip);
+    chip.style.color = "var(--color-faint)";
+    const faint = lum(rgb(getComputedStyle(chip).color));
+    chip.style.color = "var(--color-muted)";
+    const muted = lum(rgb(getComputedStyle(chip).color));
+    chip.remove();
+    return [...document.querySelectorAll(".missions li")].map((li) => {
+      const em = li.querySelector("em");
+      const span = li.querySelector("span");
+      const mark = li.querySelector("b");
+      return {
+        label: span?.textContent?.trim() ?? "",
+        pays: em?.textContent?.trim() ?? null,
+        state: mark?.textContent?.trim() ?? "",
+        done: li.classList.contains("is-done"),
+        strike: getComputedStyle(li).textDecorationLine.includes("line-through"),
+        lum: lum(rgb(getComputedStyle(span ?? li).color)),
+        emLum: em ? lum(rgb(getComputedStyle(em).color)) : null,
+        markLum: mark ? lum(rgb(getComputedStyle(mark).color)) : null,
+        faint,
+        muted,
+      };
+    });
+  });
 };
 
 const park = {
@@ -219,12 +242,25 @@ if (results.keysAgain.card) fail.push("a second park pays the same goal twice");
 if (results.keysAgain.credits !== 130) fail.push("a second park moved the wallet again");
 
 const hold = results.keysBook.find((m) => m.label === "Hold a piece");
+const openGoal = results.keysBook.find((m) => !m.done);
 if (!hold) fail.push("the cabinet does not list the goal that paid");
 else {
   if (!hold.done) fail.push("the paid goal is not marked done in the book");
   if (!hold.pays || !hold.pays.includes("50 CR"))
     fail.push("the book still hides what the goal pays");
+  if (!hold.strike) fail.push("the paid goal is not struck through");
+  // Faint-on-faint made "Hold a piece — Paid 50 CR Done" vanish on the sheet.
+  const midway = (hold.faint + hold.muted) / 2;
+  if (hold.lum <= midway)
+    fail.push(`the paid goal label is still dim (${hold.lum.toFixed(1)}, faint ${hold.faint.toFixed(1)})`);
+  if (hold.emLum != null && hold.emLum <= midway)
+    fail.push(`Paid is still faint (${hold.emLum.toFixed(1)}, faint ${hold.faint.toFixed(1)})`);
+  if (hold.markLum != null && hold.markLum <= midway)
+    fail.push(`Done is still faint (${hold.markLum.toFixed(1)}, faint ${hold.faint.toFixed(1)})`);
 }
+if (openGoal?.strike) fail.push("an open goal is struck through");
+if (openGoal && openGoal.lum <= (openGoal.faint + openGoal.muted) / 2)
+  fail.push("an open goal dropped below muted");
 
 if (!results.noGoal.paid.parked) fail.push("with no Hold goal open, Hold stopped parking pieces");
 if (results.noGoal.paid.card) fail.push("a goal nobody was given still names itself");
