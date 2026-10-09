@@ -67,6 +67,39 @@ test("input resets on interruption and removes listeners on disposal", async (t)
       }
     });
   }
+  function keyup(code) {
+    const event = new Event("keyup");
+    Object.assign(event, { code, key: code });
+    window.dispatchEvent(event);
+  }
+  await t.test("a tap released between frames still lands once", () => {
+    const input = createInput();
+    try {
+      keydown("Space");
+      keyup("Space");
+      const first = input.sample();
+      assert.equal(first.just.hard, true);
+      assert.equal(first.held.hard, true);
+      const second = input.sample();
+      assert.equal(second.just.hard, false);
+      assert.equal(second.held.hard, false);
+    } finally {
+      input.dispose();
+    }
+  });
+  await t.test("a release and re-press inside one frame counts as a new press", () => {
+    const input = createInput();
+    try {
+      keydown("KeyW");
+      assert.equal(input.sample().just.cw, true);
+      keyup("KeyW");
+      keydown("KeyW");
+      assert.equal(input.sample().just.cw, true);
+      assert.equal(input.sample().just.cw, false);
+    } finally {
+      input.dispose();
+    }
+  });
   await t.test("disposal removes the visibility listener", () => {
     const removed = [];
     const remove = document.removeEventListener.bind(document);

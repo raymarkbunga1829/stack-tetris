@@ -113,7 +113,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   });
   renderer.setClearColor(0x05060a, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // ACES bleaches saturated minos toward white; Neutral keeps each piece's hue.
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.18;
   renderer.shadowMap.enabled = false;
 
@@ -539,7 +540,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const composer = useComposer ? new EffectComposer(renderer) : null;
   const bloom = useComposer
-    ? new UnrealBloomPass(new THREE.Vector2(512, 512), bloomBase, 0.42, 0.72)
+    ? new UnrealBloomPass(new THREE.Vector2(512, 512), bloomBase, 0.42, 0.9)
     : null;
   if (composer && bloom) {
     composer.addPass(new RenderPass(scene, camera));
@@ -629,9 +630,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         theme.id === "neon" || theme.id === "molten" ? 1.7 : night ? 1.55 : theme.id === "ice" ? 1.4 : theme.id === "ink" ? 1 : 1.15;
       bloomMul =
         theme.id === "neon" && !clearLook
-          ? 1.55
+          ? 1.2
           : theme.id === "night" && !clearLook
-            ? 1.28
+            ? 1.05
             : theme.id === "ice" && !clearLook
               ? 0.7
               : theme.id === "molten" && !clearLook
@@ -1074,7 +1075,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       godMat.opacity = reduce ? 0.12 : 0.24;
       hazeMat.opacity = 0.12;
     } else {
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMapping = THREE.NeutralToneMapping;
       renderer.toneMappingExposure = EXPOSURE;
       hemi.intensity = HEMI_I;
       key.intensity = KEY_I;
