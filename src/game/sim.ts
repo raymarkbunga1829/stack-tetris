@@ -638,6 +638,19 @@ function lockPiece(sim: Sim): "ok" | "clearing" | "over" {
 }
 
 function finishClear(sim: Sim): "ok" | "win" | "over" {
+  bankClear(sim);
+  if (sim.lineGoal && sim.lines >= sim.lineGoal) {
+    sim.won = true;
+    sim.phase = "over";
+    sim.lastClear = "CLEAR";
+    return "win";
+  }
+  if (!spawn(sim, takeNext(sim))) return "over";
+  return "ok";
+}
+
+/** Remove the cleared rows and pay for them, without dealing the next piece. */
+function bankClear(sim: Sim) {
   const n = sim.clearRows.length;
   const rows = new Set(sim.clearRows);
   const kept: Board = [];
@@ -704,15 +717,8 @@ function finishClear(sim: Sim): "ok" | "win" | "over" {
             : "SINGLE";
   }
   clearSpin(sim);
+  sim.clearT = 0;
   sim.phase = "playing";
-  if (sim.lineGoal && sim.lines >= sim.lineGoal) {
-    sim.won = true;
-    sim.phase = "over";
-    sim.lastClear = "CLEAR";
-    return "win";
-  }
-  if (!spawn(sim, takeNext(sim))) return "over";
-  return "ok";
 }
 
 function holdPiece(sim: Sim): boolean {
@@ -791,6 +797,8 @@ export function tickClock(sim: Sim, dt: number): "win" | null {
     sim.timeLeft -= capped;
     if (sim.timeLeft <= 0) {
       sim.timeLeft = 0;
+      // Lines that beat the buzzer count, even mid-animation.
+      if (sim.phase === "clearing") bankClear(sim);
       sim.phase = "over";
       sim.won = true;
       sim.lastClear = "TIME";

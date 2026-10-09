@@ -71,6 +71,24 @@ test("pick refuses a piece that has no room to spawn", () => {
   assert.equal(s.piece.id, live);
 });
 
+test("the buzzer banks a line clear that is still animating", () => {
+  const s = sim.createSim({ mode: "blitz", seed: 5 });
+  s.board[ROWS - 1] = Array.from({ length: COLS }, () => "J");
+  s.piece = null;
+  s.clearRows = [ROWS - 1];
+  s.clearT = 0.2;
+  s.phase = "clearing";
+  s.timeLeft = 0.01;
+  const before = s.score;
+  const ev = sim.advance(s, 1 / 30, IDLE);
+  assert.equal(ev, "win");
+  assert.equal(s.phase, "over");
+  assert.equal(s.lines, 1);
+  assert.ok(s.score > before);
+  assert.deepEqual(s.clearRows, []);
+  assert.ok(s.board[ROWS - 1].every((c) => c === null));
+});
+
 test("zap and quake wait until a line clear has finished", () => {
   const s = sim.createSim({ mode: "marathon", seed: 11 });
   fillStack(s, [0], ROWS - 3);
