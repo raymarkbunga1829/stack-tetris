@@ -95,6 +95,9 @@ function typingInField(el: EventTarget | null): boolean {
 
 export function createInput() {
   const keys = new Set<string>();
+  // Presses since the last sample. A tap that lands and lifts between two frames
+  // (fast fingers, or a frame hitch) would otherwise never reach the game.
+  const tapped = new Set<string>();
   let prev = blank();
   let inject = blank();
   let touch = blank();
@@ -114,6 +117,10 @@ export function createInput() {
     }
     if (code) keys.add(code);
     if (key === " ") keys.add("Space");
+    if (!e.repeat) {
+      if (code) tapped.add(code);
+      if (key === " ") tapped.add("Space");
+    }
     noteKeyboard();
     const power = POWER_CODES[code];
     if (power && !e.repeat) powerQ.push(power);
@@ -124,6 +131,7 @@ export function createInput() {
   };
   const clearKeys = () => {
     keys.clear();
+    tapped.clear();
     touch = blank();
     prev = blank();
     inject = blank();
@@ -140,20 +148,26 @@ export function createInput() {
   window.addEventListener("blur", clearKeys);
   document.addEventListener("visibilitychange", onVisibilityChange);
 
-  function poll(): Pad {
+  function padOf(codes: Set<string>): Pad {
     const p = blank();
-    if (keys.has("ArrowLeft") || keys.has("KeyA") || keys.has("Numpad4")) p.left = true;
-    if (keys.has("ArrowRight") || keys.has("KeyD") || keys.has("Numpad6")) p.right = true;
-    if (keys.has("ArrowDown") || keys.has("KeyS") || keys.has("Numpad2")) p.down = true;
-    if (keys.has("Space") || keys.has("Slash") || keys.has("Numpad0")) p.hard = true;
-    if (keys.has("ArrowUp") || keys.has("KeyX") || keys.has("KeyW") || keys.has("Numpad8") || keys.has("Numpad5")) {
+    if (codes.has("ArrowLeft") || codes.has("KeyA") || codes.has("Numpad4")) p.left = true;
+    if (codes.has("ArrowRight") || codes.has("KeyD") || codes.has("Numpad6")) p.right = true;
+    if (codes.has("ArrowDown") || codes.has("KeyS") || codes.has("Numpad2")) p.down = true;
+    if (codes.has("Space") || codes.has("Slash") || codes.has("Numpad0")) p.hard = true;
+    if (codes.has("ArrowUp") || codes.has("KeyX") || codes.has("KeyW") || codes.has("Numpad8") || codes.has("Numpad5")) {
       p.cw = true;
     }
-    if (keys.has("KeyZ") || keys.has("KeyQ") || keys.has("ControlLeft")) p.ccw = true;
-    if (keys.has("KeyF")) p.flip = true;
-    if (keys.has("KeyC") || keys.has("KeyH") || keys.has("ShiftLeft") || keys.has("ShiftRight")) p.hold = true;
-    if (keys.has("Escape") || keys.has("KeyP")) p.pause = true;
-    if (keys.has("Enter") || keys.has("NumpadEnter")) p.confirm = true;
+    if (codes.has("KeyZ") || codes.has("KeyQ") || codes.has("ControlLeft")) p.ccw = true;
+    if (codes.has("KeyF")) p.flip = true;
+    if (codes.has("KeyC") || codes.has("KeyH") || codes.has("ShiftLeft") || codes.has("ShiftRight")) p.hold = true;
+    if (codes.has("Escape") || codes.has("KeyP")) p.pause = true;
+    if (codes.has("Enter") || codes.has("NumpadEnter")) p.confirm = true;
+    return p;
+  }
+
+  function poll(fresh: Pad): Pad {
+    const p = padOf(keys);
+    for (const k of Object.keys(p) as (keyof Pad)[]) p[k] = p[k] || fresh[k];
 
     const pads = navigator.getGamepads?.() ?? [];
     for (const pad of pads) {
@@ -188,18 +202,22 @@ export function createInput() {
   }
 
   function sample(): InputState {
-    const held = poll();
+    const fresh = padOf(tapped);
+    tapped.clear();
+    const held = poll(fresh);
+    // A fresh press counts even if the key was also down last frame (released and re-pressed in between).
+    const edge = (k: keyof Pad) => held[k] && (!prev[k] || fresh[k]) && !skipJust[k];
     const just: Pad = {
-      left: held.left && !prev.left && !skipJust.left,
-      right: held.right && !prev.right && !skipJust.right,
-      down: held.down && !prev.down && !skipJust.down,
-      hard: held.hard && !prev.hard && !skipJust.hard,
-      cw: held.cw && !prev.cw && !skipJust.cw,
-      ccw: held.ccw && !prev.ccw && !skipJust.ccw,
-      flip: held.flip && !prev.flip && !skipJust.flip,
-      hold: held.hold && !prev.hold && !skipJust.hold,
-      pause: held.pause && !prev.pause && !skipJust.pause,
-      confirm: held.confirm && !prev.confirm && !skipJust.confirm,
+      left: edge("left"),
+      right: edge("right"),
+      down: edge("down"),
+      hard: edge("hard"),
+      cw: edge("cw"),
+      ccw: edge("ccw"),
+      flip: edge("flip"),
+      hold: edge("hold"),
+      pause: edge("pause"),
+      confirm: edge("confirm"),
     };
     prev = held;
     inject = blank();
