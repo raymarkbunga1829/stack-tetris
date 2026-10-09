@@ -44,7 +44,6 @@ const MARK: Record<PieceId, [number, number][]> = {
   ],
 };
 const MAX_GHOST = 8;
-const MAX_HINT = 8;
 const MAX_MEM = COLS * VISIBLE_ROWS;
 
 function hex(c: string) {
@@ -316,8 +315,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   });
   // Each overlay owns its material: opacity is per-material, so sharing one
   // would let whichever layer drew last flatten the others.
-  const hintMat = ghostMat.clone();
-  hintMat.opacity = 0.2;
   // Ash and stains must never read as playable cells: flat, dim, no highlight.
   const memMat = ghostMat.clone();
   memMat.opacity = 0.16;
@@ -333,15 +330,11 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const ghosts = new THREE.InstancedMesh(geo, ghostMat, MAX_GHOST);
   ghosts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   ghosts.frustumCulled = false;
-  const hints = new THREE.InstancedMesh(geo, hintMat, MAX_HINT);
-  hints.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  hints.frustumCulled = false;
-  hints.count = 0;
   const memory = new THREE.InstancedMesh(geo, memMat, MAX_MEM);
   memory.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   memory.frustumCulled = false;
   memory.count = 0;
-  scene.add(solids, ghosts, hints, memory);
+  scene.add(solids, ghosts, memory);
 
   const pipGeo = new THREE.BoxGeometry(0.14, 0.14, 0.05);
   const pipMat = new THREE.MeshBasicMaterial({ color: 0x141414 });
@@ -943,20 +936,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     ghosts.count = g;
     ghosts.instanceMatrix.needsUpdate = true;
     if (ghosts.instanceColor) ghosts.instanceColor.needsUpdate = true;
-
-    let h = 0;
-    if (sim?.hold && sim.piece && sim.phase === "playing") {
-      for (const c of cellsOf(sim.hold, 0, sim.piece.x, sim.piece.y)) {
-        const row = c.y - HIDDEN_ROWS;
-        if (row < 0 || row >= VISIBLE_ROWS) continue;
-        if (h >= MAX_HINT) break;
-        place(hints, h++, c.x, row, 0.07, theme.fill[sim.hold], 1, 0.7);
-      }
-    }
-    hints.count = h;
-    hints.instanceMatrix.needsUpdate = true;
-    if (hints.instanceColor) hints.instanceColor.needsUpdate = true;
-
     if (zapT > 0) {
       zapMesh.visible = true;
       zapMesh.position.set(0, zapY, 0.5);
@@ -1466,14 +1445,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     geo.dispose();
     solidMat.dispose();
     ghostMat.dispose();
-    hintMat.dispose();
     memMat.dispose();
     streakMat.dispose();
     wallMat.dispose();
     trimMat.dispose();
     solids.dispose();
     ghosts.dispose();
-    hints.dispose();
     memory.dispose();
     pipGeo.dispose();
     pipMat.dispose();
