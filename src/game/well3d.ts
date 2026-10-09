@@ -112,7 +112,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   });
   renderer.setClearColor(0x05060a, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // ACES bleaches saturated minos toward white; Neutral keeps each piece's hue.
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.18;
   renderer.shadowMap.enabled = false;
 
@@ -1048,7 +1049,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       godMat.opacity = reduce ? 0.12 : 0.24;
       hazeMat.opacity = 0.12;
     } else {
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMapping = THREE.NeutralToneMapping;
       renderer.toneMappingExposure = EXPOSURE;
       hemi.intensity = HEMI_I;
       key.intensity = KEY_I;
