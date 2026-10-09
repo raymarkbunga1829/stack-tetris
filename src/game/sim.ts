@@ -726,6 +726,11 @@ function holdPiece(sim: Sim): boolean {
   return true;
 }
 
+/** The swapped-in piece can top out; the app only runs the fail beat on "over". */
+function holdEvent(sim: Sim): StepEvent {
+  return sim.phase === "over" ? "over" : "hold";
+}
+
 function handleShift(sim: Sim, input: InputFrame, dt: number) {
   const dir: -1 | 0 | 1 = input.heldLeft && !input.heldRight
     ? -1
@@ -834,7 +839,7 @@ export function advance(sim: Sim, dt: number, input: InputFrame): StepEvent {
     if (primed !== "none") return primed;
   }
 
-  if (input.justHold && holdPiece(sim)) return "hold";
+  if (input.justHold && holdPiece(sim)) return holdEvent(sim);
   if (input.justFlip && tryRotate(sim, 2)) return "rotate";
   if (input.justCw && tryRotate(sim, 1)) return "rotate";
   if (input.justCcw && tryRotate(sim, -1)) return "rotate";
@@ -930,6 +935,8 @@ export function applyPower(sim: Sim, id: PowerId): boolean {
     sim.lastClear = "SHIELD";
     return true;
   }
+  // Zap and Quake shift rows, which would point the pending clearRows at the wrong lines.
+  if ((id === "zap" || id === "quake") && sim.phase === "clearing") return false;
   if (id === "zap") {
     let target = -1;
     for (let y = ROWS - 1; y >= HIDDEN_ROWS; y--) {
@@ -966,6 +973,8 @@ export function pickFromNext(sim: Sim, index: number): boolean {
   fillBag(sim);
   if (index < 0 || index >= 5 || !sim.bag[index]) return false;
   const chosen = sim.bag[index]!;
+  // A pick is a rescue, not a way to top out; refuse it before the swap commits.
+  if (!fits(sim.board, { id: chosen, rot: 0, x: 3, y: 0 })) return false;
   sim.bag[index] = sim.piece.id;
   sim.next = sim.bag.slice(0, 5);
   spawn(sim, chosen);
@@ -1039,7 +1048,7 @@ export function applyInitialActions(
   p: { hold?: boolean; cw?: boolean; ccw?: boolean; flip?: boolean },
 ): StepEvent {
   if (sim.phase !== "playing" || !sim.piece) return "none";
-  if (p.hold && holdPiece(sim)) return "hold";
+  if (p.hold && holdPiece(sim)) return holdEvent(sim);
   if (p.flip && tryRotate(sim, 2)) return "rotate";
   if (p.cw && tryRotate(sim, 1)) return "rotate";
   if (p.ccw && tryRotate(sim, -1)) return "rotate";
@@ -1060,7 +1069,7 @@ export function pulseAction(
   },
 ): StepEvent {
   if (sim.phase !== "playing" || !sim.piece) return "none";
-  if (p.hold && holdPiece(sim)) return "hold";
+  if (p.hold && holdPiece(sim)) return holdEvent(sim);
   if (p.flip && tryRotate(sim, 2)) return "rotate";
   if (p.cw && tryRotate(sim, 1)) return "rotate";
   if (p.ccw && tryRotate(sim, -1)) return "rotate";
