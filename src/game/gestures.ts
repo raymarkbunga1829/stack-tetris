@@ -59,7 +59,6 @@ export type StrokeView = {
 };
 
 const TAP_SLOP = 18;
-const LONG_MS = 430;
 const TAP_MAX_MS = 260;
 
 function viewOf(s: Stroke): StrokeView {

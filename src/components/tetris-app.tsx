@@ -3,7 +3,6 @@ import {
   armAudio,
   resumeAudio,
   setMix,
-  setMuted,
   sfxCombo,
   sfxB2b,
   sfxFinesse,
@@ -22,7 +21,6 @@ import {
   sfxShatter,
   sfxSoft,
   sfxStart,
-  sfxSweep,
   sfxTetris,
   setMusicPaused,
   setMusicTension,
@@ -50,7 +48,7 @@ import {
   type ModeId,
 } from "@/game/modes";
 import { armBot, nextGap, playStep, ZEN_LOCK_CAP, type BotHand } from "@/game/bot";
-import { clearLastAsh, clearLastStain, getDailyReplay, getLastAsh, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
+import { clearLastAsh, clearLastStain, getDailyReplay, getLastReplay, getLastStain, setDailyReplay, setLastAsh, setLastReplay, setLastStain } from "@/game/last-replay";
 import { cheapTrail, gradeFinesse, gradeTitle } from "@/game/finesse";
 import { nameRun } from "@/game/run-name";
 import { registerOffline, watchLine } from "@/game/offline";
@@ -73,7 +71,6 @@ import {
   headroom,
   inDanger,
   onBrink,
-  pauseToggle,
   resumePlay,
   pickFromNext,
   predictCollision,
@@ -625,7 +622,7 @@ export function TetrisApp() {
         const dt = Math.min(0.1, (now - lastTs.current) / 1000);
         lastTs.current = now;
         tick(dt);
-        paint(dt);
+        paint();
         rafRef.current = requestAnimationFrame(loop);
       };
       rafRef.current = requestAnimationFrame(loop);
@@ -732,11 +729,11 @@ export function TetrisApp() {
       };
     } catch (err) {
       console.error("[stack] well init failed", err);
-      useFlatWell();
+      fallBackToFlatWell();
     }
   }, [wellGen]);
 
-  function useFlatWell() {
+  function fallBackToFlatWell() {
     if (fallbackRef.current) return;
     fallbackRef.current = true;
     setFlatWell(true);
@@ -1148,7 +1145,7 @@ export function TetrisApp() {
     }
 
     const keyed = input.takePower();
-    if (keyed && !isBotRun()) usePower(keyed);
+    if (keyed && !isBotRun()) firePower(keyed);
 
     if (just.confirm && u.phase === "paused" && simRef.current) {
       resumePlay(simRef.current);
@@ -2072,10 +2069,10 @@ export function TetrisApp() {
     syncUi({ banner: text });
   }
 
-  function paint(dt = 1 / 60) {
+  function paint() {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (well3dRef.current?.lost()) useFlatWell();
+    if (well3dRef.current?.lost()) fallBackToFlatWell();
     else {
       const live = simRef.current;
       const engine = well3dRef.current;
@@ -2083,7 +2080,7 @@ export function TetrisApp() {
         const occupied = !!live.piece || live.board.some((row) => row.some((c) => c));
         if (occupied && engine.cellsDrawn() <= 0) {
           wellBlank.current += 1;
-          if (wellBlank.current > 10) useFlatWell();
+          if (wellBlank.current > 10) fallBackToFlatWell();
         } else {
           wellBlank.current = 0;
         }
@@ -2189,7 +2186,7 @@ export function TetrisApp() {
     syncUi({ shop: false });
   }
 
-  function usePower(id: PowerId) {
+  function firePower(id: PowerId) {
     unlockAudio();
     const sim = simRef.current;
     if (!sim || (sim.phase !== "playing" && sim.phase !== "clearing")) return;
@@ -3321,7 +3318,7 @@ export function TetrisApp() {
               credits={ui.credits}
               shieldOn={ui.shield}
               slowOn={ui.slow}
-              onUse={usePower}
+              onUse={firePower}
               onBuy={stockPower}
               pickOn={ui.picking}
               armed={ui.powerAsk}
@@ -3723,53 +3720,6 @@ function HudProgress({ ui }: { ui: Ui }) {
       </div>
     </div>
   );
-}
-
-function Stat({
-  label,
-  value,
-  fill,
-  hint,
-  hot,
-}: {
-  label: string;
-  value: string;
-  fill?: number;
-  hint?: string;
-  hot?: "amber" | "red";
-}) {
-  return (
-    <div className={`stat${hot ? ` is-${hot}` : ""}`}>
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
-      {hint && <span className="stat-hint">{hint}</span>}
-      {fill != null && (
-        <i className="stat-pip" style={{ width: `${Math.max(0, Math.min(1, fill)) * 100}%` }} />
-      )}
-    </div>
-  );
-}
-
-function TickScore({ value }: { value: number }) {
-  const [shown, setShown] = useState(value);
-  useEffect(() => {
-    if (Math.abs(shown - value) < 1) {
-      setShown(value);
-      return;
-    }
-    let raf = 0;
-    const step = () => {
-      setShown((s) => {
-        const next = s + (value - s) * 0.24;
-        if (Math.abs(value - next) < 1) return value;
-        return next;
-      });
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [value, shown]);
-  return <Stat label="Score" value={Math.round(shown).toLocaleString()} />;
 }
 
 declare global {
