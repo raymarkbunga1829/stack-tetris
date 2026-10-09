@@ -24,7 +24,6 @@ type Echo = {
 
 let bus: Bus | null = null;
 let armed = false;
-let muted = false;
 let musicVol = 1;
 let sfxVol = 1;
 let leadMute = 0;
@@ -125,7 +124,6 @@ export function getMix() {
 export function setMix(next: { music?: number; sfx?: number }) {
   if (next.music != null) musicVol = clamp01(next.music);
   if (next.sfx != null) sfxVol = clamp01(next.sfx);
-  muted = isMuted();
   applyGains();
   if (musicVol > 0 && musicBed && !musicRaf) {
     musicNext = bus ? bus.ctx.currentTime + 0.05 : 0;
@@ -135,10 +133,6 @@ export function setMix(next: { music?: number; sfx?: number }) {
 
 export function setMuted(next: boolean) {
   setMix({ music: next ? 0 : 1, sfx: next ? 0 : 1 });
-}
-
-function makeNoise(ctx: AudioContext): AudioBuffer {
-  return makeLfsr(ctx, false, 8);
 }
 
 /** A dead sample through the master. Some browsers only open the tap for a source started in the gesture. */

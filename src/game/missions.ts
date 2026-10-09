@@ -30,10 +30,8 @@ export function emptyBook(): MissionBook {
 }
 
 export function dailyMissions(date = utcDateKey()): MissionBook {
-  const seed = hashSeed(`stack-missions-${date}`);
   const order = [0, 1, 2, 3, 4];
   for (let i = order.length - 1; i > 0; i--) {
-    seed;
     const j = (hashSeed(`${date}-${i}`) + i * 7) % (i + 1);
     const t = order[i]!;
     order[i] = order[j]!;
