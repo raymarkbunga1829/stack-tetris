@@ -175,7 +175,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let ashT = 0;
   let stainCells: { x: number; y: number }[] = [];
   let lastDraw = performance.now();
-  const bloomBase = reduce ? 0.14 : mobile ? 0.28 : 0.62;
+  // Phones keep real bloom: minos draw after it, so it only costs frame time.
+  const bloomBase = reduce ? 0.14 : mobile ? 0.5 : 0.62;
   let clearLook = false;
 
   function frameCamera() {
@@ -593,8 +594,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (composer && bloom) {
       composer.setPixelRatio(dpr);
       composer.setSize(w, h);
-      // Full-canvas bloom is what stalled the phone. Half-res still glows.
-      bloom.resolution.set(mobile ? 256 : Math.min(w, 640), mobile ? 256 : Math.min(h, 640));
+      // Full-canvas bloom is what stalled the phone; a capped buffer still glows.
+      bloom.resolution.set(Math.min(w, mobile ? 384 : 640), Math.min(h, mobile ? 384 : 640));
     }
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -810,7 +811,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
     if (bloom) {
       bloom.strength =
-        (clearLook ? CLEAR_BLOOM : bloomBase * bloomMul) +
+        (clearLook ? CLEAR_BLOOM : Math.max(CLEAR_BLOOM, bloomBase * bloomMul)) +
         punch * punch * (clearLook ? 0.14 : 0.42) * bloomMul +
         (sweepT > 0 ? 0.1 : 0) +
         lockPulse * 0.18 +
