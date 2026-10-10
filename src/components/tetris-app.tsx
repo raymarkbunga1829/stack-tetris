@@ -1929,16 +1929,7 @@ export function TetrisApp() {
     const hit =
       beat === "tspin" ? 0.48 : beat === "stack" ? 0.42 : beat === "triple" ? 0.2 : 0.1;
     engine.punch(bot ? hit * 0.55 : hit);
-    const tint =
-      beat === "stack"
-        ? "#f7f4ee"
-        : beat === "tspin"
-          ? "#d4c4f0"
-          : beat === "triple"
-            ? "#d4c4f0"
-            : "#e8d4a0";
-    engine.sparkRows(sim.clearRows, tint);
-    engine.shatter(sim, themeOf(saveRef.current.theme));
+    engine.clearFlash(sim.clearRows, kind);
     engine.sweep(beat);
     if (beat === "stack" || beat === "tspin") engine.nod(bot ? 0.28 : 0.58);
     else if (beat === "triple") engine.nod(bot ? 0.1 : 0.18);
