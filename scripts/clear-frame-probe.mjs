@@ -131,6 +131,12 @@ async function oneRun(i) {
   const worstPerClear = out.clears.map((c) =>
     Math.max(0, ...out.frames.filter((f) => f.t >= c.t && f.t <= c.t + CLEAR_WINDOW_MS).map((f) => f.dt)),
   );
+  // The same "worst frame in a window" over a quiet stretch before each clear,
+  // so the max-of-N bias has a baseline to be read against.
+  const quiet = out.clears
+    .map((c) => c.t - 1500)
+    .filter((t0) => !out.clears.some((c) => c.t + CLEAR_WINDOW_MS >= t0 && c.t <= t0 + CLEAR_WINDOW_MS))
+    .map((t0) => Math.max(0, ...out.frames.filter((f) => f.t >= t0 && f.t <= t0 + CLEAR_WINDOW_MS).map((f) => f.dt)));
   // A long task that starts just before the clear frame is the clear's own work.
   const ltClear = out.longTasks.filter((l) => out.clears.some((c) => l.t >= c.t - 120 && l.t <= c.t + CLEAR_WINDOW_MS));
   const ltRest = out.longTasks.filter((l) => !ltClear.includes(l));
@@ -146,12 +152,14 @@ async function oneRun(i) {
     rest: stats(restDts),
     all: stats([...clearDts, ...restDts]),
     worstPerClear: stats(worstPerClear),
+    worstPerQuietWindow: stats(quiet),
     firstClearWorst: worstPerClear[0] ?? null,
     longTasksInClears: { n: ltClear.length, ms: sum(ltClear), max: Math.max(0, ...ltClear.map((l) => +l.d.toFixed(0))) },
     longTasksElsewhere: { n: ltRest.length, ms: sum(ltRest) },
     _clearDts: clearDts,
     _restDts: restDts,
     _worst: worstPerClear,
+    _quiet: quiet,
   };
 }
 
@@ -159,12 +167,17 @@ const results = [];
 for (let i = 0; i < runs; i++) {
   const r = await oneRun(i);
   results.push(r);
-  const { _clearDts, _restDts, _worst, ...shown } = r;
+  const { _clearDts, _restDts, _worst, _quiet, ...shown } = r;
   console.log(JSON.stringify(shown));
 }
 await browser.close();
 
 const pool = (k) => results.flatMap((r) => r[k]);
+const raw = flag("raw", "");
+if (raw) {
+  const { appendFileSync } = await import("node:fs");
+  appendFileSync(raw, JSON.stringify({ clear: pool("_clearDts"), rest: pool("_restDts"), worst: pool("_worst"), quiet: pool("_quiet"), first: results.map((r) => r.firstClearWorst) }) + "\n");
+}
 console.log(
   JSON.stringify(
     {
@@ -172,6 +185,7 @@ console.log(
       clearWindow: stats(pool("_clearDts")),
       rest: stats(pool("_restDts")),
       worstFramePerClear: stats(pool("_worst")),
+      worstFramePerQuietWindow: stats(pool("_quiet")),
     },
     null,
     2,
