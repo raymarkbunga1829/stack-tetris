@@ -1,4 +1,5 @@
 import { cellsOf } from "./pieces";
+import { ghostLook, pieceTone } from "./piece-tone";
 import { ghostY, type Sim } from "./sim";
 import { themeOf, type Theme } from "./themes";
 import { COLS, HIDDEN_ROWS, VISIBLE_ROWS, type PieceId } from "./types";
@@ -111,7 +112,7 @@ export function drawWell(
       for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, gy)) {
         const vy = c.y - HIDDEN_ROWS;
         if (vy < 0 || vy >= VISIBLE_ROWS) continue;
-        ghostBlock(ctx, ox + c.x * cell, oy + vy * cell, cell, theme);
+        ghostBlock(ctx, ox + c.x * cell, oy + vy * cell, cell, theme, sim.piece.id);
       }
     }
     if (sim.phase !== "clearing") {
@@ -161,7 +162,7 @@ function drawBlock(
   }
   ctx.fillStyle = theme.deep[id];
   ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
-  ctx.fillStyle = theme.fill[id];
+  ctx.fillStyle = css(pieceTone(theme.fill[id]));
   ctx.fillRect(x + inset, y + inset, cell - inset * 2 - 1, cell - inset * 2 - 1);
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.fillRect(x + inset, y + inset, cell - inset * 2 - 1, Math.max(1, inset));
@@ -174,16 +175,21 @@ function drawBlock(
   }
 }
 
+function css({ r, g, b }: { r: number; g: number; b: number }) {
+  return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+}
+
 function ghostBlock(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   cell: number,
   theme: Theme,
+  id: PieceId,
 ) {
-  const inset = Math.max(1, Math.floor(cell * 0.18));
-  ctx.strokeStyle = theme.ghost;
-  ctx.lineWidth = Math.max(1, Math.floor(cell * 0.08));
+  const inset = Math.max(1, Math.floor(cell * 0.1));
+  ctx.strokeStyle = css(ghostLook(theme.fill[id], theme.pit, 0, null).tone);
+  ctx.lineWidth = Math.max(2, Math.floor(cell * 0.11));
   ctx.strokeRect(
     x + inset + 0.5,
     y + inset + 0.5,
