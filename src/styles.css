@@ -139,6 +139,43 @@
   text-transform: uppercase;
 }
 
+/* Sits over the cabinet so it shows on the game-over screen too, where the topbar is hidden. */
+.update-pill {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top)) + 40px);
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in oklab, var(--color-fg) 22%, transparent);
+  border-radius: 999px;
+  background: var(--color-fg);
+  color: var(--color-bg);
+  font: 600 0.78rem/1 var(--font-sans);
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  touch-action: manipulation;
+  animation: update-pill-in var(--motion-fast) var(--ease-out);
+}
+
+.update-pill:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+@keyframes update-pill-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-pill {
+    animation: none;
+  }
+}
+
 .hud {
   display: flex;
   align-items: center;

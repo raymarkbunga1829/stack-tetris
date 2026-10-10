@@ -16,6 +16,7 @@ dist-ios
 artifacts
 attachments
 screenshots
+smoke-results
 tmp
 .DS_Store
 AGENTS.md

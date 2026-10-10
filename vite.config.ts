@@ -6,6 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
+// @ts-expect-error JS plugin alongside the TS vite config
+import { serviceWorkerPlugin } from "./scripts/sw-build-plugin.mjs";
 
 /**
  * Finish PGLite bootstrap during dev-server setup (before traffic). Vite awaits
@@ -141,6 +143,8 @@ export default defineConfig(({ command }) => ({
     authPopupPlugin(),
     // PWA head + ?install=1 tutorial page; runs before Start/Nitro.
     grokPwaPlugin(),
+    // Stamps and emits /sw.js per build; never hand-bump a cache version.
+    serviceWorkerPlugin(),
     tailwindcss(),
     tanstackStart(),
     ...(command === "build"

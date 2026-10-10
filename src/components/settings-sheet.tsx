@@ -10,6 +10,8 @@ const HANDLING_PRESETS = [
   { name: "Fast", dasMs: 100, arrMs: 16, sdf: 40 },
 ] as const;
 
+const BUILD_ID = (import.meta.env.VITE_STACK_BUILD as string | undefined) ?? "dev";
+
 type Props = {
   open: boolean;
   haptic: HapticProfile;
@@ -359,6 +361,9 @@ export function SettingsSheet({
         <p className="shop-note">
           {credits.toLocaleString()} CR on hand. Ghost (the landing picture) is on
           for every mode except Arcade.
+        </p>
+        <p className="shop-note build-stamp" data-qa="build-id">
+          Build {BUILD_ID}
         </p>
       </div>
     </div>
