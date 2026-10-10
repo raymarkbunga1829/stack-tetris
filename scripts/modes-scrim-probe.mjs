@@ -12,43 +12,22 @@
  * the same trip from the title screen.
  * Usage: node scripts/modes-scrim-probe.mjs [url]
  */
-import { chromium } from "playwright";
+import { launchBrowser, openApp } from "./smoke-kit.mjs";
 
 const url = process.argv[2] || "http://127.0.0.1:8080/?qa=1";
 
-const browser = await chromium.launch({
-  headless: true,
-  args: ["--no-sandbox", "--disable-dev-shm-usage"],
-});
+const browser = await launchBrowser();
 
 const errors = [];
 let page;
 
 /** A player who has seen the coach before, on a phone, mode already set. */
 const start = async (label) => {
-  const ctx = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 1,
-    hasTouch: true,
-    isMobile: true,
-  });
-  page = await ctx.newPage();
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "stack-tetris-v1",
-      JSON.stringify({
-        version: 4,
-        onboarded: true,
-        tipSeen: true,
-        a2hs: true,
-        mode: "marathon",
-        credits: 120,
-      }),
-    );
-  });
-  page.on("pageerror", (e) => errors.push(`${label}: ${e.message.split("\n")[0]}`));
-  await page.goto(url, { waitUntil: "networkidle", timeout: 45000 });
-  await page.waitForTimeout(500);
+  ({ page } = await openApp(browser, url, {
+    label,
+    errors,
+    save: { version: 4, onboarded: true, tipSeen: true, a2hs: true, mode: "marathon", credits: 120 },
+  }));
 };
 
 /** A run with something in the well worth seeing: six pieces slammed home. */
