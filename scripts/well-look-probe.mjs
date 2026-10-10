@@ -160,7 +160,7 @@ async function runCase(skin, theme, size, clearWell) {
   try {
     await page.locator('[data-qa="play"]').dispatchEvent("pointerdown");
     await page.clock.runFor(200);
-    await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", { timeout: 15000 });
+    await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", null, { timeout: 15000 });
     const skip = page.locator(".coach-skip");
     if (await skip.count()) await skip.dispatchEvent("click");
     await settleIntro(page);
@@ -215,14 +215,32 @@ async function settleIntro(page) {
   await page.clock.runFor(500);
 }
 
+/**
+ * The bot keeps playing, and the canvas can trail the drawn-cell list by a
+ * frame; freezing the run and rendering a few identical frames lines them up.
+ */
+async function still(page, fn) {
+  await page.evaluate(() => window.__controlsTest.freeze(true));
+  await page.clock.runFor(50);
+  try {
+    await fn();
+  } finally {
+    await page.evaluate(() => window.__controlsTest.freeze(false));
+  }
+}
+
 async function runWatch(skin, theme) {
   const size = SIZES.find((s) => s.name === "phone") ?? SIZES[0];
   const label = `${skin}/${size.name}/watch`;
   const { ctx, page, errs } = await openPage(skin, size, baseSave(skin, { botPlay: true }));
   try {
-    await page.locator('[data-qa="watch-bot"]').dispatchEvent("click");
-    await page.clock.runFor(300);
-    await page.waitForFunction(() => window.__controlsTest?.getPhase?.() === "playing", { timeout: 15000 });
+    await page.locator('[data-qa="watch-bot"]').dispatchEvent("pointerdown");
+    // The fake clock is installed, so poll by advancing it rather than waitForFunction.
+    for (let i = 0; ; i++) {
+      await page.clock.runFor(100);
+      if ((await page.evaluate(() => window.__controlsTest?.getPhase?.())) === "playing") break;
+      if (i >= 100) throw new Error("Watch never reached play");
+    }
     await settleIntro(page);
     let clears = 0;
     for (let i = 0; i < 400 && clears < 6; i++) {
@@ -230,11 +248,11 @@ async function runWatch(skin, theme) {
       const phase = await page.evaluate(() => window.__controlsTest.getPhase());
       if (phase === "over") break;
       if (phase !== "clearing") {
-        if (i % 40 === 20) await capture(page, `${label}/play#${i}`, theme, { minShare: LIMITS.passShare, live: true });
+        if (i % 40 === 20) await still(page, () => capture(page, `${label}/play#${i}`, theme, { minShare: LIMITS.passShare, live: true }));
         continue;
       }
       clears += 1;
-      await capture(page, `${label}/clear${clears}`, theme, { minShare: LIMITS.passShare });
+      await still(page, () => capture(page, `${label}/clear${clears}`, theme, { minShare: LIMITS.passShare }));
       await page.clock.runFor(400);
     }
     if (clears === 0) failures.push(`${label}: the bot never cleared a line`);
@@ -252,7 +270,17 @@ async function runWatch(skin, theme) {
  */
 async function capture(page, label, theme, opts = {}) {
   const box = await page.locator(".well").boundingBox();
-  const drawn = await page.evaluate(() => window.__controlsTest.getDrawn());
+  // A frame can land between reading the cells and the screenshot (it happens
+  // mid-clear while rows drop), so only keep a shot both reads agree on.
+  const getDrawn = () => page.evaluate(() => window.__controlsTest.getDrawn());
+  let drawn = await getDrawn();
+  let shot;
+  for (let i = 0; i < 4; i++) {
+    shot = await page.screenshot({ clip: box, animations: "allow" });
+    const after = await getDrawn();
+    if (JSON.stringify(after) === JSON.stringify(drawn)) break;
+    drawn = after;
+  }
   const fall = await page.evaluate(() => window.__controlsTest.getGhost());
   const ghost = opts.ghost ? fall : [];
   const live = await page.evaluate(() => window.__controlsTest.getPiece());
@@ -271,7 +299,6 @@ async function capture(page, label, theme, opts = {}) {
     },
     { drawn, ghost, bare },
   );
-  const shot = await page.screenshot({ clip: box, animations: "allow" });
   const sampled = await page.evaluate(
     async ({ png, box, points }) => {
       const img = new Image();
