@@ -46,6 +46,7 @@ const MARK: Record<PieceId, [number, number][]> = {
   ],
 };
 const MAX_GHOST = 8;
+const MAX_GLOW = 16;
 const MAX_MEM = COLS * VISIBLE_ROWS;
 
 function hex(c: string) {
@@ -92,6 +93,8 @@ export type Well3d = {
   ) => { col: number; row: number };
   /** Client point of a visible cell's front face, for QA sampling. */
   cellToClient: (rect: DOMRect, col: number, row: number) => { x: number; y: number };
+  /** Stack cells drawn last frame at full size, with their (possibly mid-drop) row. */
+  stackCells: () => { x: number; y: number; id: PieceId }[];
   lost: () => boolean;
   cellsDrawn: () => number;
   sampleLuma: () => number;
@@ -127,7 +130,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const RIM_I = 0.85;
   const ENV_I = reduce ? 0.4 : 0.92;
   const FOG_D = 0.012;
-  const LIP_GLOW = 0.42;
+  const LIP_GLOW = 0.7;
+  const TRIM_GLOW = mobile ? 0.4 : 0.32;
+  /** Clear well keeps a softer glow than the full look, but a glow. */
+  const CLEAR_BLOOM = reduce ? 0.12 : 0.3;
+  /** HDR luminance of the hidden glow cells behind the live piece and fresh locks. */
+  const GLOW_LUMA = 1.5;
   const PLACED_LIFT = 1;
   const LIVE_LIFT = 1.15;
   const POP_LIFT = 1.35;
@@ -222,6 +230,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   });
   const themeTrim = new THREE.Color(0xa8f0ff);
   const themeShaft = new THREE.Color(0xd8e4f0);
+  const accent = new THREE.Color(0xa8f0ff);
+  const accentGoal = new THREE.Color(0xa8f0ff);
 
   const pitTex = makePitTexture();
   pitTex.colorSpace = THREE.SRGBColorSpace;
@@ -291,12 +301,12 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       const pale = hex(theme.well).getHSL({ h: 0, s: 0, l: 0 }).l > 0.35;
       if (pale) gridTint.copy(hex(theme.grid)).multiplyScalar(0.5);
       else gridTint.set(0x4ad4e8);
-      hazeMat.color.copy(gridTint);
     }
     const gm = grid.material as THREE.LineBasicMaterial;
     gm.opacity = clearLook ? 0.12 : 0.38;
     if (clearLook) gm.color.set(0x2a3038);
     else gm.color.copy(gridTint);
+    hazeMat.color.copy(gridTint);
   }
   const ticks = makeSprintTicks();
   ticks.visible = false;
@@ -347,6 +357,15 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   live.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   live.frustumCulled = false;
   live.count = 0;
+  // Bright copies of the live piece and fresh locks, only in the bloomed scene:
+  // bloom spreads them into a halo in the piece colour, and the mino drawn on
+  // top in the front pass hides the copy itself, so the face never brightens.
+  const glowMat = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false });
+  const glowCells = new THREE.InstancedMesh(geo, glowMat, MAX_GLOW);
+  glowCells.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  glowCells.frustumCulled = false;
+  glowCells.count = 0;
+  scene.add(glowCells);
   const ghosts = new THREE.InstancedMesh(ghostEdgeGeo, ghostEdgeMat, MAX_GHOST);
   ghosts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   ghosts.frustumCulled = false;
@@ -518,7 +537,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
   const composer = useComposer ? new EffectComposer(renderer) : null;
   const bloom = useComposer
-    ? new UnrealBloomPass(new THREE.Vector2(512, 512), bloomBase, 0.42, 0.9)
+    ? new UnrealBloomPass(new THREE.Vector2(512, 512), bloomBase, 0.42, 0.72)
     : null;
   if (composer && bloom) {
     composer.addPass(new RenderPass(scene, camera));
@@ -534,6 +553,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const hit = new THREE.Vector3();
 
   let lastBg = "";
+  const drawnStack: { x: number; y: number; id: PieceId }[] = [];
 
   function resize() {
     const parent = canvas.parentElement;
@@ -730,15 +750,29 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
 
     ticks.visible = sim?.mode === "sprint" && sim.phase !== "title";
     const liveId = sim?.piece?.id;
-    // The cabinet keeps the skin's trim on every path; tinting it, the shaft or
-    // the jewel light with the live piece floods the frame in that colour.
-    trimMat.color.copy(themeTrim).multiplyScalar(mobile ? 0.4 : 0.55);
-    trimMat.emissive.setHex(0x000000);
-    trimMat.emissiveIntensity = 0.03;
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - lastDraw) / 1000);
+    lastDraw = now;
+
+    // The cabinet, lip, shaft and jewel light take the falling piece's colour
+    // and hold it until the next one spawns. Minos are drawn after this pass,
+    // so none of it can reach a mino face.
+    if (!sim || sim.phase === "title") accentGoal.copy(themeTrim);
+    else if (sim.piece && sim.phase !== "over") {
+      const t = pieceTone(sim.omenOn ? "#e8c46a" : theme.fill[sim.piece.id], LIVE_LIFT);
+      accentGoal.setRGB(t.r, t.g, t.b, THREE.SRGBColorSpace);
+    }
+    accent.lerp(accentGoal, reduce ? 1 : 1 - Math.exp(-dt * 9));
+    trimMat.color.copy(accent).multiplyScalar(mobile ? 0.5 : 0.62);
+    trimMat.emissive.copy(accent);
+    trimMat.emissiveIntensity = TRIM_GLOW;
     trimMat.envMapIntensity = mobile ? 0.55 : 0.8;
-    lipMat.color.copy(themeTrim).multiplyScalar(0.45);
-    lipMat.emissive.copy(themeTrim);
+    lipMat.color.copy(accent).multiplyScalar(0.45);
+    lipMat.emissive.copy(accent);
     lipMat.emissiveIntensity = LIP_GLOW;
+    jewel.color.copy(accent);
+    godMat.color.copy(accent);
+    if (!clearLook) (grid.material as THREE.LineBasicMaterial).color.copy(gridTint).lerp(accent, 0.45);
 
     frameCamera();
     if (nodT > 0) camera.position.y -= nodT * 0.62;
@@ -749,18 +783,15 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       camera.lookAt(0.05, 9.15 + punch * punch * 0.25, 0);
     }
     if (bloom) {
-      bloom.strength = clearLook
-        ? 0.06
-        : (bloomBase + punch * punch * 0.42) * bloomMul +
-          (sweepT > 0 ? 0.28 : 0) +
-          lockPulse * 0.18 +
-          zapT * 0.55 +
-          (sim && sim.slowT > 0 ? -0.08 : 0);
+      bloom.strength =
+        (clearLook ? CLEAR_BLOOM : bloomBase * bloomMul) +
+        punch * punch * (clearLook ? 0.14 : 0.42) * bloomMul +
+        (sweepT > 0 ? 0.1 : 0) +
+        lockPulse * 0.18 +
+        zapT * 0.55 +
+        (sim && sim.slowT > 0 ? -0.08 : 0);
     }
 
-    const now = performance.now();
-    const dt = Math.min(0.05, (now - lastDraw) / 1000);
-    lastDraw = now;
     if (!reduce) punch = Math.max(0, punch - dt * 3.4);
     else punch = 0;
     nodT = Math.max(0, nodT - dt * 3.6);
@@ -789,6 +820,22 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     let n = 0;
     let liveN = 0;
     let pipN = 0;
+    let glowN = 0;
+    const glow = (col: number, row: number, z: number, hexCol: string, k: number) => {
+      if (glowN >= MAX_GLOW || k <= 0.01) return;
+      const p = cellPos(col, row, z);
+      dummy.position.set(p.x, p.y, p.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(0.92);
+      dummy.updateMatrix();
+      glowCells.setMatrixAt(glowN, dummy.matrix);
+      toneInto(hexCol, LIVE_LIFT);
+      const l = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+      color.multiplyScalar((k * GLOW_LUMA) / Math.max(l, 0.08));
+      glowCells.setColorAt(glowN, color);
+      glowN += 1;
+    };
+    drawnStack.length = 0;
     const stamp = (id: PieceId, col: number, row: number, z: number) => {
       if (!showMarks) return;
       for (const [ox, oy] of MARK[id]) {
@@ -845,6 +892,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             squash,
           );
           if (showMarks) stamp(id as PieceId, x, row + below * settle + sink, 0.42);
+          if (thump) glow(x, row + below * settle + sink, 0, theme.fill[id as PieceId], lockPulse);
+          drawnStack.push({ x, y: row + below * settle + sink, id: id as PieceId });
         }
       }
       if (sim.piece && sim.phase !== "over" && sim.phase !== "clearing") {
@@ -855,6 +904,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
           place(live, liveN++, c.x, row, 0.1, liveHex, 1.06 + pickT * 0.22 + sim.lockSpark * 0.1 + (omen ? 0.08 : 0), liveLift);
+          glow(c.x, row, 0.1, liveHex, 0.7 + 0.3 * Math.min(1, pickT + sim.lockSpark));
           stamp(sim.piece.id, c.x, row, 0.48);
         }
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, sim.piece.y)) {
@@ -882,6 +932,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
     solids.count = n;
     solids.instanceMatrix.needsUpdate = true;
+    glowCells.count = glowN;
+    glowCells.instanceMatrix.needsUpdate = true;
+    if (glowCells.instanceColor) glowCells.instanceColor.needsUpdate = true;
     live.count = liveN;
     live.instanceMatrix.needsUpdate = true;
     if (live.instanceColor) live.instanceColor.needsUpdate = true;
@@ -1010,7 +1063,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       shaft.color.set(0xffe0a0);
       shaft.intensity = lushShaft ? 16 : 8;
     } else if (liveId) {
-      shaft.color.copy(themeShaft);
+      shaft.color.copy(themeShaft).lerp(accent, 0.6);
       shaft.intensity = lushShaft ? 16 : 7;
     } else {
       shaft.color.set(0xffe4c4);
@@ -1471,6 +1524,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     (back.material as THREE.Material).dispose();
     geo.dispose();
     gemMat.dispose();
+    glowMat.dispose();
+    glowCells.dispose();
     overlayMat.dispose();
     ghostEdgeMat.dispose();
     ghostEdgeGeo.dispose();
@@ -1535,6 +1590,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     failBeat,
     clientToCell,
     cellToClient,
+    stackCells: () => drawnStack.slice(),
     lost: () => {
       if (dead) return true;
       try {
@@ -1721,8 +1777,8 @@ function makeShaftTexture(): THREE.CanvasTexture {
   c.height = h;
   const ctx = c.getContext("2d")!;
   const g = ctx.createLinearGradient(w / 2, 0, w / 2, h);
-  g.addColorStop(0, "rgba(160, 230, 255, 0.45)");
-  g.addColorStop(0.28, "rgba(120, 200, 230, 0.12)");
+  g.addColorStop(0, "rgba(255, 255, 255, 0.45)");
+  g.addColorStop(0.28, "rgba(220, 220, 220, 0.12)");
   g.addColorStop(1, "rgba(20, 24, 40, 0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);

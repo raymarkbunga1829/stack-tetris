@@ -58,6 +58,17 @@ test("lock pops keep the piece's own colour instead of the skin's flash white", 
   assert.doesNotMatch(well, /multiplyScalar\([^)]*\);\s*\n\s*(solids|live|shards)\.setColorAt/);
 });
 
+test("the frame, lip, jewel and shaft light follow the falling piece, and its glow sits in the bloomed scene", () => {
+  assert.match(well, /accentGoal\.setRGB\(/, "the accent no longer tracks the live piece");
+  for (const target of ["trimMat.emissive", "lipMat.emissive", "jewel.color", "godMat.color"]) {
+    assert.match(well, new RegExp(`${target.replace(".", "\\.")}\\.copy\\(accent\\)`), `${target} is pinned to the skin`);
+  }
+  assert.match(well, /shaft\.color\.copy\(themeShaft\)\.lerp\(accent/);
+  assert.match(well, /scene\.add\(glowCells\)/);
+  assert.doesNotMatch(well, /front\.add\([^)]*\bglowCells\b/);
+  assert.match(well, /new UnrealBloomPass\(.*,\s*0\.72\)/, "bloom threshold moved off 0.72");
+});
+
 test("nothing in CSS brightens the canvas or tints the well in danger", () => {
   const slam = block(css, "@keyframes well-slam");
   assert.doesNotMatch(slam, /filter/, "well-slam must stay transform-only");
