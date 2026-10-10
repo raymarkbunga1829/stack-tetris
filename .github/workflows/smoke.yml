@@ -1,0 +1,136 @@
+name: Smoke
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Deployment URL to smoke (e.g. https://stack-tetris.vercel.app/)
+        required: true
+
+concurrency:
+  group: smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: read
+
+env:
+  # GitHub environment Vercel reports this project's Preview deployments under.
+  PREVIEW_ENVIRONMENT: ${{ vars.SMOKE_PREVIEW_ENVIRONMENT || 'Preview – stack-tetris' }}
+
+jobs:
+  smoke:
+    name: Smoke (Vercel Preview)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Wait for the Vercel Preview of this commit
+        id: preview
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.pull_request.head.sha;
+            const environment = process.env.PREVIEW_ENVIRONMENT;
+            const deadline = Date.now() + 15 * 60 * 1000;
+            core.info(`Waiting for a "${environment}" deployment of ${sha}`);
+            while (Date.now() < deadline) {
+              const { data: deployments } = await github.rest.repos.listDeployments({
+                ...context.repo, sha, environment, per_page: 10,
+              });
+              for (const d of deployments) {
+                const { data: statuses } = await github.rest.repos.listDeploymentStatuses({
+                  ...context.repo, deployment_id: d.id, per_page: 10,
+                });
+                const latest = statuses[0];
+                if (latest?.state === 'success' && latest.environment_url) {
+                  core.info(`Preview ready: ${latest.environment_url}`);
+                  core.setOutput('url', latest.environment_url);
+                  return;
+                }
+                if (['failure', 'error'].includes(latest?.state)) {
+                  core.setFailed(`Vercel Preview deployment ${latest.state}: ${latest.target_url || latest.log_url || ''}`);
+                  return;
+                }
+              }
+              await new Promise((r) => setTimeout(r, 15000));
+            }
+            core.setFailed(`No successful "${environment}" deployment for ${sha} within 15 minutes`);
+
+      - name: Pick the smoke target
+        id: target
+        env:
+          URL: ${{ steps.preview.outputs.url || inputs.url }}
+          BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          REQUIRE_PREVIEW: ${{ vars.SMOKE_REQUIRE_PREVIEW }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' ${BYPASS:+-H "x-vercel-protection-bypass: $BYPASS"} "$URL")
+          echo "GET $URL -> $code"
+          if [ "$code" = 200 ]; then
+            echo "url=$URL" >> "$GITHUB_OUTPUT"
+            echo "mode=preview" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -n "$BYPASS" ]; then
+            echo "::error::$URL answered $code even with VERCEL_AUTOMATION_BYPASS_SECRET — the secret is wrong or stale (Vercel → Project → Settings → Deployment Protection → Protection Bypass for Automation)."
+            exit 1
+          fi
+          msg="$URL is behind Vercel Deployment Protection ($code) and the VERCEL_AUTOMATION_BYPASS_SECRET repository secret is not set"
+          if [ "$REQUIRE_PREVIEW" = 1 ]; then
+            echo "::error::$msg."
+            exit 1
+          fi
+          echo "::warning::$msg, so this run smokes a local production build of the same commit instead. Add the secret to test the Preview itself."
+          echo "mode=local" >> "$GITHUB_OUTPUT"
+          echo "url=http://127.0.0.1:8080/" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build and serve this commit locally
+        if: steps.target.outputs.mode == 'local'
+        run: |
+          npm run build
+          nohup node scripts/serve-built.mjs 8080 > serve-built.log 2>&1 &
+          for i in $(seq 1 60); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/)" = 200 ] && exit 0
+            sleep 1
+          done
+          cat serve-built.log
+          exit 1
+
+      - name: Smoke
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          SMOKE_URL: ${{ steps.target.outputs.url }}
+          SMOKE_MODE: ${{ steps.target.outputs.mode }}
+        run: |
+          if [ "$SMOKE_MODE" = local ]; then
+            echo "> **Smoked a local production build** — the Preview is protected and \`VERCEL_AUTOMATION_BYPASS_SECRET\` is not set." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          npm run smoke
+
+      - name: Upload smoke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results
+          path: |
+            smoke-results/
+            serve-built.log
+          if-no-files-found: ignore
+          retention-days: 14

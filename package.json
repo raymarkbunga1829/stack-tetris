@@ -18,6 +18,7 @@
     "cap:open": "npx cap open ios",
     "typecheck": "tsc --noEmit",
     "test": "node --test 'scripts/**/*.test.mjs'",
+    "smoke": "node scripts/smoke.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

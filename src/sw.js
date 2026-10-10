@@ -1,12 +1,15 @@
 /* Stack offline shell. Keep this tiny.
- * v28 draws minos and the ghost unlit, after bloom, so nothing can wash them out.
- * v27 keeps the falling piece and placed minos saturated and outlines the ghost.
- * v26 stops the held piece's cells from riding on the falling piece.
- * v25 picks up the saturated phone well under bloom.
- * v22+ dropped documents that baked yesterday's Daily chip date into the HTML. */
-const CACHE = "stack-offline-v28";
-const PRECACHE = [
-  "/",
+ * Template only: scripts/sw-build-plugin.mjs emits /sw.js on every build with
+ * VERSION and ASSETS filled in, so each deploy installs a new worker and cache.
+ * Never bump a version here by hand. */
+const VERSION = "dev";
+const ASSETS = [];
+
+const CACHE = `stack-offline-${VERSION}`;
+// Required: if any of these fail the install fails and the current worker keeps
+// serving, so a half-cached build can never take over offline play.
+const SHELL = ["/", ...ASSETS];
+const EXTRAS = [
   "/favicon.svg",
   "/og.jpg",
   "/icons/icon-192.png",
@@ -18,8 +21,12 @@ const PRECACHE = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE).catch(() => undefined)),
+    caches.open(CACHE).then(async (cache) => {
+      await cache.addAll(SHELL.map((url) => new Request(url, { cache: "no-cache" })));
+      await Promise.all(EXTRAS.map((url) => cache.add(url).catch(() => undefined)));
+    }),
   );
+  // First install takes over at once; later builds wait for the page's prompt.
   if (!self.registration.active) self.skipWaiting();
 });
 
@@ -33,26 +40,13 @@ self.addEventListener("activate", (event) => {
             .filter((key) => key.startsWith("stack-offline-") && key !== CACHE)
             .map((key) => caches.delete(key)),
         ),
-      ),
+      )
+      .then(() => self.clients.claim()),
   );
-  self.clients.claim();
 });
 
 self.addEventListener("message", (event) => {
-  const data = event.data;
-  if (data === "SKIP_WAITING") {
-    self.skipWaiting();
-    return;
-  }
-  if (data && data.type === "PRECACHE" && Array.isArray(data.urls)) {
-    event.waitUntil(
-      caches.open(CACHE).then((cache) =>
-        Promise.all(
-          data.urls.map((url) => cache.add(url).catch(() => undefined)),
-        ),
-      ),
-    );
-  }
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
 function sameOrigin(url) {
@@ -62,6 +56,7 @@ function sameOrigin(url) {
 function skipPath(url) {
   const p = url.pathname;
   return (
+    p === "/sw.js" ||
     p.startsWith("/api/") ||
     p.startsWith("/auth") ||
     p.startsWith("/__auth") ||
@@ -90,15 +85,15 @@ async function cacheFirst(request) {
 }
 
 async function networkFirst(request) {
+  const cache = await caches.open(CACHE);
   try {
     const fresh = await fetch(request);
-    if (fresh.ok) {
-      const cache = await caches.open(CACHE);
-      cache.put(request, fresh.clone());
-    }
+    if (fresh.ok) cache.put(request, fresh.clone());
     return fresh;
   } catch {
-    const hit = (await caches.match(request)) || (await caches.match("/"));
+    // Prefer this build's own document so offline HTML matches cached assets.
+    const hit =
+      (await cache.match(request)) || (await cache.match("/")) || (await caches.match(request));
     if (hit) return hit;
     return new Response("<!doctype html><title>Stack</title>", {
       status: 503,

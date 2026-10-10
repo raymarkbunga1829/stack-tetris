@@ -9,14 +9,11 @@
  * well without a reload.
  * Usage: node scripts/well-blank-probe.mjs [url]
  */
-import { chromium } from "playwright";
+import { launchBrowser, openApp } from "./smoke-kit.mjs";
 
 const url = process.argv[2] || "http://127.0.0.1:8080/?qa=1";
 
-const browser = await chromium.launch({
-  headless: true,
-  args: ["--no-sandbox", "--disable-dev-shm-usage"],
-});
+const browser = await launchBrowser();
 
 const errors = [];
 const SAVE = {
@@ -30,21 +27,7 @@ const SAVE = {
 };
 
 try {
-  const ctx = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    hasTouch: true,
-    isMobile: true,
-    deviceScaleFactor: 1,
-  });
-  const page = await ctx.newPage();
-  await page.addInitScript((s) => localStorage.setItem("stack-tetris-v1", s), JSON.stringify(SAVE));
-  page.on("pageerror", (e) => {
-    const msg = e.message.split("\n")[0];
-    if (/Hydration failed|Minified React error #418|#423|#425/.test(msg)) return;
-    errors.push(`page: ${msg}`);
-  });
-  await page.goto(url, { waitUntil: "networkidle", timeout: 45000 });
-  await page.waitForTimeout(400);
+  const { page } = await openApp(browser, url, { label: "page", errors, save: SAVE });
 
   if (!(await page.locator('[data-qa="watch-bot"]').isVisible())) {
     errors.push("title: Watch bot is not on the title");

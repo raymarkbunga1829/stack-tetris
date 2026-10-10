@@ -61,6 +61,8 @@ function cellPos(col: number, row: number, z = 0) {
   };
 }
 
+export type ClearKind = "single" | "double" | "triple" | "stack" | "tspin";
+
 export type Well3d = {
   resize: () => void;
   draw: (sim: Sim | null, shake: number, theme: Theme, showGhost?: boolean, showMarks?: boolean) => void;
@@ -71,7 +73,7 @@ export type Well3d = {
   setClear: (on: boolean) => void;
   sparkRows: (boardRows: number[], hexCol: string) => void;
   lockThump: (cells: { x: number; y: number }[], hexCol: string, slam?: boolean) => void;
-  shatter: (sim: Sim, theme: Theme) => void;
+  clearFlash: (boardRows: number[], kind: ClearKind) => void;
   sweep: (kind: "stack" | "tspin" | "clear" | "single" | "double" | "triple") => void;
   hardStreak: (
     piece: { id: PieceId; rot: number; x: number; y: number },
@@ -415,6 +417,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   });
   const sparkPts = new THREE.Points(sparkGeo, sparkMat);
   sparkPts.frustumCulled = false;
+  // Always in the draw list (empty draw range when idle): hiding it pushed the
+  // PointsMaterial compile onto the first zap or top-out.
+  sparkGeo.setDrawRange(0, 0);
   scene.add(sparkPts);
 
   const MAX_SHARDS = 80;
@@ -444,6 +449,27 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   sweepMesh.position.set(0, 10, 0.55);
   sweepMesh.visible = false;
   scene.add(sweepMesh);
+
+  // Line clears: a glow behind each cleared row and one blade across it, all in
+  // one additive draw. Per-cell shards and sparks were the phone's worst frames.
+  // It stays in the scene at count 0 so its shader compiles before the first clear.
+  const MAX_CLEAR_ROWS = 4;
+  const clearFxMat = new THREE.MeshBasicMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const clearFx = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), clearFxMat, MAX_CLEAR_ROWS * 2);
+  clearFx.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  clearFx.frustumCulled = false;
+  clearFx.count = 0;
+  clearFx.setColorAt(0, new THREE.Color(0x000000));
+  scene.add(clearFx);
+  const clearTint = new THREE.Color();
+  const clearYs: number[] = [];
+  let clearFxT = 0;
+  let clearFxMax = 0;
+  let clearFxKind: ClearKind = "single";
 
   const zapMat = new THREE.MeshBasicMaterial({
     color: 0xb8fff8,
@@ -529,7 +555,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   let lockPulse = 0;
   const lockKeys = new Set<string>();
   let sweepT = 0;
-  let sweepKind: "stack" | "tspin" | "clear" | "single" | "double" | "triple" | null = null;
+  let sweepKind: "stack" | "tspin" | "clear" | null = null;
   let sparkLifeMul = 1;
   let bloomMul = 1;
   let idleT = 0;
@@ -806,6 +832,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     stepShards(dt);
     stepStreaks(dt);
     stepSweep(dt);
+    stepClearFx(dt);
     idleT += dt;
 
     const title = !sim || sim.phase === "title";
@@ -1192,7 +1219,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     sparkGeo.setDrawRange(0, n);
     sparkGeo.attributes.position!.needsUpdate = true;
     sparkGeo.attributes.color!.needsUpdate = true;
-    sparkPts.visible = n > 0;
   }
 
   function lockThump(cells: { x: number; y: number }[], _hexCol: string, slam = true) {
@@ -1202,37 +1228,77 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     if (slam) punchCam(0.28, true);
   }
 
-  function shatter(sim: Sim, theme: Theme) {
-    if (reduce || calm) return;
-    for (const by of sim.clearRows) {
+  function clearFlash(boardRows: number[], kind: ClearKind) {
+    clearYs.length = 0;
+    for (const by of boardRows) {
       const row = by - HIDDEN_ROWS;
-      if (row < 0 || row >= VISIBLE_ROWS) continue;
-      for (let x = 0; x < COLS; x++) {
-        const id = sim.board[by]![x] as PieceId | null;
-        if (!id) continue;
-        const p = cellPos(x, row, 0);
-        shardList.push({
-          x: p.x,
-          y: p.y,
-          z: 0.15,
-          vx: (Math.random() - 0.5) * 3.2,
-          vy: -1.2 - Math.random() * 3.8,
-          vz: 0.4 + Math.random() * 1.6,
-          life: 0.42 + Math.random() * 0.22 * sparkLifeMul,
-          max: 0.55,
-          hexCol: theme.fill[id],
-          spin: (Math.random() - 0.5) * 8,
-        });
-      }
+      if (row < 0 || row >= VISIBLE_ROWS || clearYs.length >= MAX_CLEAR_ROWS) continue;
+      clearYs.push(VISIBLE_ROWS - 1 - row);
     }
-    while (shardList.length > MAX_SHARDS) shardList.shift();
+    clearFxKind = kind;
+    const big = kind === "stack" || kind === "tspin";
+    clearFxMax = CLEAR_TIME + (big ? 0.14 : 0.04);
+    clearFxT = clearYs.length ? clearFxMax : 0;
+    clearTint.set(
+      kind === "stack" ? 0xfff4e0 : kind === "tspin" || kind === "triple" ? 0xdccef8 : 0xf2e8cc,
+    );
+  }
+
+  function stepClearFx(dt: number) {
+    if (clearFxT <= 0) {
+      clearFx.count = 0;
+      return;
+    }
+    clearFxT = Math.max(0, clearFxT - dt);
+    const u = 1 - clearFxT / clearFxMax;
+    const big = clearFxKind === "stack" || clearFxKind === "tspin";
+    // Reduced motion gets one soft swell on the rows and no moving blade.
+    const soft = reduce || calm;
+    // Peaks stay under the bloom threshold so the glow does not spill onto the
+    // stack; only the blade is allowed to bloom.
+    const glow = soft
+      ? 0.34 * Math.sin(Math.PI * u)
+      : (big ? 0.84 : clearFxKind === "triple" ? 0.76 : 0.68) * (1 - u) * (1 - u);
+    let k = 0;
+    for (let i = 0; i < clearYs.length; i++) {
+      const y = clearYs[i]!;
+      dummy.position.set(0, y, -0.5);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(COLS, 0.96, 1);
+      dummy.updateMatrix();
+      clearFx.setMatrixAt(k, dummy.matrix);
+      color.copy(clearTint).multiplyScalar(glow);
+      clearFx.setColorAt(k, color);
+      k += 1;
+      if (soft) continue;
+      // Rows cascade so a Tetris reads as one cut through the stack, not four.
+      const lag = i * (big ? 0.07 : 0.05);
+      const s = Math.max(0, Math.min(1, (u - lag) / 0.62));
+      if (s <= 0 || s >= 1) continue;
+      const travel = 1 - (1 - s) * (1 - s);
+      const dir = clearFxKind === "tspin" ? -1 : 1;
+      const half = COLS / 2 + 0.4;
+      dummy.position.set(dir * (-half + travel * half * 2), y, 0.5);
+      dummy.scale.set(big ? 0.36 : 0.24, 1.02, 1);
+      dummy.updateMatrix();
+      clearFx.setMatrixAt(k, dummy.matrix);
+      color.copy(clearTint).multiplyScalar((big ? 1.9 : 1.3) * (1 - s * 0.55));
+      clearFx.setColorAt(k, color);
+      k += 1;
+    }
+    clearFx.count = k;
+    clearFx.instanceMatrix.needsUpdate = true;
+    if (clearFx.instanceColor) clearFx.instanceColor.needsUpdate = true;
   }
 
   function sweep(kind: "stack" | "tspin" | "clear" | "single" | "double" | "triple") {
     if (reduce || calm) return;
-    sweepKind = kind;
-    sweepT =
-      kind === "single" ? 0.18 : kind === "double" ? 0.24 : kind === "triple" ? 0.3 : kind === "clear" ? 0.22 : 0.36;
+    // Smaller clears already get clearFlash's blade; a second band over the
+    // whole well only reads as clutter there.
+    if (kind === "stack" || kind === "tspin" || kind === "clear") {
+      sweepKind = kind;
+      sweepT = kind === "clear" ? 0.22 : 0.36;
+    }
     punchCam(
       kind === "tspin" ? 0.38 : kind === "stack" ? 0.34 : kind === "triple" ? 0.14 : kind === "double" ? 0.1 : 0.06,
     );
@@ -1414,40 +1480,14 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       sweepMesh.visible = false;
       return;
     }
-    const max =
-      sweepKind === "single"
-        ? 0.28
-        : sweepKind === "double"
-          ? 0.2
-          : sweepKind === "triple"
-            ? 0.32
-            : sweepKind === "clear"
-              ? 0.22
-              : 0.38;
+    const max = sweepKind === "clear" ? 0.22 : 0.38;
     sweepT = Math.max(0, sweepT - dt);
     const u = 1 - sweepT / max;
     sweepMesh.visible = true;
     sweepMesh.position.y = 19.2 - u * 20.4;
     const fade = 1 - u;
-    sweepMat.opacity =
-      sweepKind === "stack"
-        ? 0.5 * fade
-        : sweepKind === "triple"
-          ? 0.38 * fade
-          : sweepKind === "double"
-            ? 0.3 * fade
-            : 0.2 * fade;
-    sweepMat.color.set(
-      sweepKind === "tspin"
-        ? 0xc9d6ea
-        : sweepKind === "stack"
-          ? 0xf7f4ee
-          : sweepKind === "triple"
-            ? 0xd4c4f0
-            : sweepKind === "double"
-              ? 0xe8d4a0
-              : 0xa8b4c4,
-    );
+    sweepMat.opacity = sweepKind === "stack" ? 0.5 * fade : 0.2 * fade;
+    sweepMat.color.set(sweepKind === "tspin" ? 0xc9d6ea : sweepKind === "stack" ? 0xf7f4ee : 0xa8b4c4);
   }
 
   function teachTrail(cells: { x: number; y: number }[], hexCol: string) {
@@ -1557,6 +1597,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     shieldShell.geometry.dispose();
     shards.dispose();
     streaks.dispose();
+    clearFx.geometry.dispose();
+    clearFxMat.dispose();
+    clearFx.dispose();
   }
 
   resize();
@@ -1580,7 +1623,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     },
     sparkRows,
     lockThump,
-    shatter,
+    clearFlash,
     sweep,
     hardStreak,
     powerFx,
@@ -1635,6 +1678,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         sparks.length = 0;
         shardList.length = 0;
         streakList.length = 0;
+        clearFxT = 0;
         punch = 0;
         nodT = 0;
       }
