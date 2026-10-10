@@ -2992,16 +2992,16 @@ export function TetrisApp() {
                   >
                     Home
                   </button>
+                  {/* These open sheets over the card, so they act on click: opened on
+                      pointerdown, the tap's own click lands on whatever the sheet put
+                      under the finger (Modes would pick a mode and drop the pause). */}
                   <div className="pause-links">
                     <button
                       type="button"
                       className="text-btn"
                       data-qa="pause-store"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openShop();
-                      }}
+                      onPointerDown={stopPointer}
+                      onClick={() => openShop()}
                     >
                       Store
                     </button>
@@ -3009,11 +3009,8 @@ export function TetrisApp() {
                       type="button"
                       className="text-btn"
                       data-qa="pause-settings"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openSettings();
-                      }}
+                      onPointerDown={stopPointer}
+                      onClick={() => openSettings()}
                     >
                       Settings
                     </button>
@@ -3021,9 +3018,8 @@ export function TetrisApp() {
                       type="button"
                       className="text-btn"
                       data-qa="pause-modes"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                      onPointerDown={stopPointer}
+                      onClick={() => {
                         unlockAudio();
                         syncUi({ modesOpen: true });
                       }}
@@ -3619,6 +3615,12 @@ function helpCopy(ui: Ui, mounted: boolean): string {
   if (isIOS()) return "Slide left or right · tap to turn · Drop slams · Hold parks";
   if (showPad(ui.padMode)) return "Drag left or right · tap to rotate · Hold parks · Drop slams";
   return "← → move · ↑ / X rotate · F 180 · ↓ soft · Space hard · C hold · P pause";
+}
+
+/** Keep a press off the well's gestures without cancelling the click it becomes. */
+function stopPointer(e: React.PointerEvent) {
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 function botDriving(ui: Pick<Ui, "botPlay" | "mode">): boolean {
