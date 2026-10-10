@@ -186,7 +186,6 @@ async function runCase(skin, theme, size, clearWell) {
       const piece = kind === "lock" ? { id: "O", rot: 0, x: 1, y: 2 } : DROP_I;
       await page.evaluate(([r, p]) => window.__controlsTest.stage({ rows: r, piece: p }), [rows, piece]);
       await page.clock.runFor(250);
-      const before = await page.evaluate(() => window.__controlsTest.getBoard());
       await page.evaluate(() => window.__controlsTest.setKeys(["Space"]));
       await page.clock.runFor(17);
       await page.evaluate(() => window.__controlsTest.setKeys([]));
@@ -194,16 +193,7 @@ async function runCase(skin, theme, size, clearWell) {
       for (const ms of at) {
         await page.clock.runFor(ms - t);
         t = ms;
-        // Rows that are clearing animate away; everything else must stay put and in colour.
-        const { board, phase } = await page.evaluate(() => ({
-          board: window.__controlsTest.getBoard(),
-          phase: window.__controlsTest.getPhase(),
-        }));
-        const keep =
-          phase !== "clearing"
-            ? board
-            : board.map((row, y) => (row.every((c) => c) ? row.map(() => null) : row.map((c, x) => (before[y][x] ? c : null))));
-        await capture(page, `${label}/${kind}@${ms}ms`, theme, { board: keep, minShare: LIMITS.passShare });
+        await capture(page, `${label}/${kind}@${ms}ms`, theme, { minShare: LIMITS.passShare });
       }
     }
     if (errs.length) failures.push(`${label}: page error ${errs[0]}`);
@@ -216,12 +206,13 @@ async function runCase(skin, theme, size, clearWell) {
 
 /** The "Go" card dims the well; staged frames start once it and its fade are gone. */
 async function settleIntro(page) {
-  for (let i = 0; i < 40; i++) {
-    const intro = await page.evaluate(() => window.__controlsTest.getIntro());
-    if (!intro) break;
-    await page.clock.runFor(200);
+  // Any input dismisses it; a soft-drop tap happens before the stack is staged.
+  if (await page.evaluate(() => window.__controlsTest.getIntro())) {
+    await page.evaluate(() => window.__controlsTest.setKeys(["ArrowDown"]));
+    await page.clock.runFor(34);
+    await page.evaluate(() => window.__controlsTest.setKeys([]));
   }
-  await page.clock.runFor(600);
+  await page.clock.runFor(500);
 }
 
 async function runWatch(skin, theme) {
@@ -243,10 +234,7 @@ async function runWatch(skin, theme) {
         continue;
       }
       clears += 1;
-      const before = await page.evaluate(() => window.__controlsTest.getBoard());
-      const keep = before.map((row) => (row.every((c) => c) ? row.map(() => null) : row));
-      // Inside the first 38% of a clear nothing has started to fall yet.
-      await capture(page, `${label}/clear${clears}`, theme, { board: keep, minShare: LIMITS.passShare });
+      await capture(page, `${label}/clear${clears}`, theme, { minShare: LIMITS.passShare });
       await page.clock.runFor(400);
     }
     if (clears === 0) failures.push(`${label}: the bot never cleared a line`);
@@ -264,11 +252,13 @@ async function runWatch(skin, theme) {
  */
 async function capture(page, label, theme, opts = {}) {
   const box = await page.locator(".well").boundingBox();
-  const board = opts.board ?? (await page.evaluate(() => window.__controlsTest.getBoard()));
-  const ghost = opts.ghost ? await page.evaluate(() => window.__controlsTest.getGhost()) : [];
+  const drawn = await page.evaluate(() => window.__controlsTest.getDrawn());
+  const fall = await page.evaluate(() => window.__controlsTest.getGhost());
+  const ghost = opts.ghost ? fall : [];
   const live = await page.evaluate(() => window.__controlsTest.getPiece());
+  const bare = bareCell(drawn, fall);
   const points = await page.evaluate(
-    ({ board, ghost }) => {
+    ({ drawn, ghost, bare }) => {
       const pt = (x, y) => {
         const p = window.__controlsTest.cellPoint(x, y);
         return { px: p.x, py: p.y };
@@ -276,15 +266,10 @@ async function capture(page, label, theme, opts = {}) {
       const a = pt(0, 19);
       const b = pt(9, 19);
       const cell = (b.px - a.px) / 9;
-      const minos = [];
-      board.forEach((row, y) =>
-        row.forEach((id, x) => {
-          if (id) minos.push({ id, x, y, ...pt(x, y) });
-        }),
-      );
-      return { cell, minos, ghost: ghost.map((g) => ({ ...g, ...pt(g.x, g.y) })), pit: pt(8, 9) };
+      const minos = drawn.map((c) => ({ ...c, ...pt(c.x, c.y) }));
+      return { cell, minos, ghost: ghost.map((g) => ({ ...g, ...pt(g.x, g.y) })), pit: pt(bare.x, bare.y) };
     },
-    { board, ghost },
+    { drawn, ghost, bare },
   );
   const shot = await page.screenshot({ clip: box, animations: "allow" });
   const sampled = await page.evaluate(
@@ -435,6 +420,21 @@ async function sampleRef(pngBuf, play) {
   } finally {
     await page.close();
   }
+}
+
+/**
+ * The pit is sampled from an empty cell with no mino beside it, outside the
+ * columns the falling piece and its ghost occupy (their halo tints the pit).
+ */
+function bareCell(drawn, fall) {
+  const near = (x, y) => drawn.some((c) => Math.abs(c.x - x) <= 1 && Math.abs(c.y - y) <= 1.5);
+  const lane = new Set(fall.flatMap((g) => [g.x - 1, g.x, g.x + 1]));
+  for (let y = 0; y < 20; y++) {
+    for (const x of [8, 1, 9, 0, 7, 2]) {
+      if (!lane.has(x) && !near(x, y)) return { x, y };
+    }
+  }
+  return { x: 8, y: 9 };
 }
 
 function judgeMino(theme, m, pit) {

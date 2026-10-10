@@ -696,8 +696,7 @@ export function TetrisApp() {
             s.lockT = 0;
             s.lockSpark = 0;
           },
-          getBoard: () =>
-            (simRef.current?.board ?? []).slice(HIDDEN_ROWS).map((row) => row.slice()),
+          getDrawn: () => well3dRef.current?.stackCells() ?? [],
           getGhost: () => {
             const s = simRef.current;
             if (!s?.piece) return [];
@@ -3799,7 +3798,8 @@ declare global {
         rows: string[];
         piece?: { id: PieceId; rot: 0 | 1 | 2 | 3; x: number; y: number };
       }) => void;
-      getBoard: () => (PieceId | null)[][];
+      /** Stack cells the well drew last frame; `y` is a visible row, fractional while rows drop. */
+      getDrawn: () => { x: number; y: number; id: PieceId }[];
       /** Landing cells of the falling piece, in visible rows. */
       getGhost: () => { x: number; y: number }[];
       cellPoint: (col: number, row: number) => { x: number; y: number } | null;
