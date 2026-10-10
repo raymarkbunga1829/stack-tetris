@@ -235,6 +235,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const themeShaft = new THREE.Color(0xd8e4f0);
   const accent = new THREE.Color(0xa8f0ff);
   const accentGoal = new THREE.Color(0xa8f0ff);
+  const accentHsl = { h: 0, s: 0, l: 0 };
+  const ACCENT_MIN_L = 0.55;
 
   const pitTex = makePitTexture();
   pitTex.colorSpace = THREE.SRGBColorSpace;
@@ -788,6 +790,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     else if (sim.piece && sim.phase !== "over") {
       const t = pieceTone(sim.omenOn ? "#e8c46a" : theme.fill[sim.piece.id], LIVE_LIFT);
       accentGoal.setRGB(t.r, t.g, t.b, THREE.SRGBColorSpace);
+      // Dark-piece skins (LCD) would otherwise dim the pit their ghost is tuned for.
+      accentGoal.getHSL(accentHsl, THREE.SRGBColorSpace);
+      if (accentHsl.l < ACCENT_MIN_L) accentGoal.setHSL(accentHsl.h, accentHsl.s, ACCENT_MIN_L, THREE.SRGBColorSpace);
     }
     accent.lerp(accentGoal, reduce ? 1 : 1 - Math.exp(-dt * 9));
     trimMat.color.copy(accent).multiplyScalar(mobile ? 0.5 : 0.62);
