@@ -445,6 +445,7 @@ export function TetrisApp() {
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const [buying, setBuying] = useState<string | null>(null);
+  const [applyUpdate, setApplyUpdate] = useState<(() => void) | null>(null);
   const [want, setWant] = useState<PowerId | null>(null);
   const [viewW, setViewW] = useState(390);
   const [wellGen, setWellGen] = useState(0);
@@ -569,10 +570,7 @@ export function TetrisApp() {
     const stopLine = watchLine((online) => {
       setUi((p) => (p.offline === !online ? p : { ...p, offline: !online }));
     });
-    const stopSw = registerOffline(() => {
-      const phase = uiRef.current.phase;
-      return phase === "title" || phase === "over";
-    });
+    const stopSw = registerOffline((apply) => setApplyUpdate(() => apply));
     return () => {
       mq.removeEventListener("change", onMode);
       stopLine();
@@ -2722,6 +2720,19 @@ export function TetrisApp() {
             <p className="hi">Best {ui.high.toLocaleString()}</p>
           )}
         </header>
+
+        {/* Menus only: reloading mid-run would throw the run away. */}
+        {applyUpdate && (ui.phase === "title" || ui.phase === "over") && (
+          <button
+            type="button"
+            className="update-pill"
+            data-qa="update-ready"
+            aria-live="polite"
+            onClick={applyUpdate}
+          >
+            Update ready, tap to reload
+          </button>
+        )}
 
         {(ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
           <div className="hud" role="region" aria-label="Game dashboard">

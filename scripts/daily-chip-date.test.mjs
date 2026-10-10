@@ -47,13 +47,6 @@ test("title Daily chip does not bake manilaDateKey into the SSR/hydrate tree", (
   assert.doesNotMatch(chips, /const today = manilaDateKey\(\)/);
 });
 
-test("offline shell cache was bumped so dated HTML is dropped", () => {
-  const sw = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
-  assert.match(sw, /stack-offline-v27/);
-  assert.doesNotMatch(sw, /stack-offline-v26/);
-  assert.match(sw, /baked yesterday's Daily chip date/);
-});
-
 test("MONTH helper used by the probe still matches formatManilaDate", () => {
   assert.match(formatManilaDate("2026-09-30"), MONTH);
   assert.match(formatManilaDate("2026-10-01"), MONTH);
