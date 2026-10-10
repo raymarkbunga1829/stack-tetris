@@ -4,14 +4,13 @@ export type Hsv = { h: number; s: number; v: number };
 
 /** Share of the gap to full saturation a chromatic mino closes. */
 export const SAT_PULL = 0.62;
-/** Linear luminance ceilings for resting and lifted (live, placed) chromatic minos. */
-export const BODY_LUMA_CAP = 0.26;
-export const LIFT_LUMA_CAP = 0.34;
-export const YELLOW_HEADROOM = 0.75;
-/** Lifts at or above this are deliberate lock / pick flashes and may go white. */
-export const FLASH_LIFT = 1.5;
-export const GHOST_EDGE_IDLE = 0.86;
-export const GHOST_FILL = 0.14;
+/** Brightest a lifted mino gets (live piece, lock pop). Above this it would read as white. */
+export const MAX_LIFT = 1.4;
+/** How much of each lift step goes into value. */
+const LIFT_GAIN = 0.3;
+export const GHOST_EDGE_IDLE = 0.94;
+/** WCAG-style contrast the ghost outline keeps against the pit. */
+export const GHOST_CONTRAST = 3;
 
 export function hexToRgb(hex: string): Rgb {
   const h = hex.replace("#", "");
@@ -45,57 +44,60 @@ export function luma({ r, g, b }: Rgb) {
   return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
 }
 
-const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-const toSrgb = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
-
-function scaleLinear({ r, g, b }: Rgb, k: number): Rgb {
-  return { r: toSrgb(toLinear(r) * k), g: toSrgb(toLinear(g) * k), b: toSrgb(toLinear(b) * k) };
+export function contrast(a: Rgb, b: Rgb) {
+  const la = luma(a);
+  const lb = luma(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
+
+const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
 
 const smooth = (a: number, b: number, t: number) => {
   const u = Math.max(0, Math.min(1, (t - a) / (b - a)));
   return u * u * (3 - 2 * u);
 };
 
+const mix = (a: Rgb, b: Rgb, t: number): Rgb => ({
+  r: a.r + (b.r - a.r) * t,
+  g: a.g + (b.g - a.g) * t,
+  b: a.b + (b.b - a.b) * t,
+});
+
 /**
- * Mino albedo for the lit 3D well. Env reflections, clearcoat and ACES all add
- * white on top, so a pastel skin colour has to go in deeper than it reads in
- * the flat UI. Grey and deliberately pale skins (Monolith, LCD, Quiet, the
- * palest Ice and Sakura cells) are left mostly as they are.
- * `lift` brightens within a luminance ceiling instead of multiplying past 1,
- * which is what blew the live piece out to cream.
+ * The face colour a mino is drawn with. The well draws minos unlit, after
+ * bloom and tone mapping, so this is the colour that reaches the screen.
+ * Chromatic skin colours are pulled toward full saturation; grey and
+ * deliberately pale skins (Monolith, LCD, Quiet, the palest Ice and Sakura
+ * cells) keep their own look. `lift` above 1 brightens value only, and never
+ * past `MAX_LIFT`, so no state can turn a mino white.
  */
 export function pieceTone(hex: string, lift = 1): Rgb {
-  const src = hexToRgb(hex);
-  if (lift >= FLASH_LIFT) return src;
-  const base = rgbToHsv(src);
+  const base = rgbToHsv(hexToRgb(hex));
   const chroma = base.s * base.v;
   const lightness = base.v - chroma / 2;
   const w = smooth(0.1, 0.28, chroma) * (1 - smooth(0.8, 0.92, lightness));
   const yellow = 1 - smooth(0, 1, Math.abs(base.h * 360 - 54) / 26);
   const s = base.s + (1 - base.s) * Math.min(1, SAT_PULL + 0.25 * yellow) * w;
-  const v = lift < 1 ? base.v * lift : Math.min(1, base.v * (1 + (lift - 1) * 0.3));
-  const rgb = hsvToRgb({ h: base.h, s, v });
-  if (w === 0) return rgb;
-  // Yellow, cyan and green carry far more luminance than red or blue at the
-  // same value, and the well's lights push that excess straight to white.
-  // Yellow only reads as yellow when it is bright; held to the same ceiling
-  // as blue it turns olive, so it gets headroom while it stays fully saturated.
-  const cap = (lift > 1 ? LIFT_LUMA_CAP : BODY_LUMA_CAP) * (1 + YELLOW_HEADROOM * yellow);
-  const y = luma(rgb);
-  const limit = y + (Math.min(y, cap) - y) * w;
-  return y > limit ? scaleLinear(rgb, limit / y) : rgb;
+  const k = Math.min(lift, MAX_LIFT);
+  const v = k < 1 ? base.v * k : Math.min(1, base.v * (1 + (k - 1) * LIFT_GAIN));
+  return hsvToRgb({ h: base.h, s, v });
 }
 
 /**
- * The landing ghost is an outline in the piece colour over a faint tint, so
- * it can never be read as a locked mino. Locking pulses the outline faster.
+ * The landing ghost is a solid outline in the piece colour with nothing
+ * inside, so it can never be read as a locked mino. On a pit too close to the
+ * piece colour (Monolith, LCD) the outline is pushed toward white or black
+ * until it holds `GHOST_CONTRAST`. Locking pulses it, but it never fades out.
  */
-export function ghostLook(hex: string, now: number, lockFrac: number | null) {
-  const tone = pieceTone(hex, 1.2);
+export function ghostLook(hex: string, pitHex: string, now: number, lockFrac: number | null) {
+  const pit = hexToRgb(pitHex);
+  const piece = pieceTone(hex, 1.15);
+  const away = luma(pit) > 0.18 ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
+  let tone = piece;
+  for (let t = 0.1; contrast(tone, pit) < GHOST_CONTRAST && t <= 1.001; t += 0.1) tone = mix(piece, away, t);
   const edge =
     lockFrac == null
-      ? GHOST_EDGE_IDLE + 0.1 * Math.sin(now * 0.0036)
-      : 0.5 + 0.45 * (0.5 + 0.5 * Math.sin(now * (0.014 + lockFrac * 0.05)));
-  return { tone, edge, fill: GHOST_FILL };
+      ? GHOST_EDGE_IDLE + 0.06 * Math.sin(now * 0.0036)
+      : 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(now * (0.014 + lockFrac * 0.05)));
+  return { tone, edge };
 }

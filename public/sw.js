@@ -1,9 +1,10 @@
 /* Stack offline shell. Keep this tiny.
+ * v28 draws minos and the ghost unlit, after bloom, so nothing can wash them out.
  * v27 keeps the falling piece and placed minos saturated and outlines the ghost.
  * v26 stops the held piece's cells from riding on the falling piece.
  * v25 picks up the saturated phone well under bloom.
  * v22+ dropped documents that baked yesterday's Daily chip date into the HTML. */
-const CACHE = "stack-offline-v27";
+const CACHE = "stack-offline-v28";
 const PRECACHE = [
   "/",
   "/favicon.svg",

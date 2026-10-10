@@ -1275,17 +1275,16 @@
   animation: well-slam 0.32s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* Motion only: a brightness filter here would wash every mino on each drop. */
 @keyframes well-slam {
   0% {
     transform: translateY(10px) scale(1.03);
-    filter: brightness(1.25);
   }
   40% {
     transform: translateY(-3px) scale(0.99);
   }
   100% {
     transform: none;
-    filter: none;
   }
 }
 
@@ -3306,25 +3305,16 @@ html.is-ios .help-android {
   }
 }
 
-.cabinet.is-danger .well::before,
+/* Danger and brink stay on the rim and in the pit behind the stack: a wash
+   over the canvas would tint exactly the rows the player is trying to read. */
 .cabinet.is-topout .well::before {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  height: 38%;
   z-index: 2;
   pointer-events: none;
-  background: linear-gradient(to bottom, rgba(180, 40, 40, 0.38), transparent);
-}
-
-.cabinet.is-brink .well::before {
-  height: 48%;
-  background: linear-gradient(to bottom, rgba(214, 52, 42, 0.58), transparent);
-}
-
-.cabinet.is-topout .well::before {
   height: 100%;
   background: linear-gradient(to bottom, rgba(214, 52, 42, 0.62), rgba(120, 24, 20, 0.18));
   animation: topout-wash 1.25s ease-out forwards;
