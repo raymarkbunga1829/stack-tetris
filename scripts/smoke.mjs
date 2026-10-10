@@ -256,10 +256,10 @@ const CHECKS = [
     id: "no-reload",
     title: "First visit does not reload itself",
     async run({ open }) {
-      // The one check that lets the service worker in: its first install used to
-      // swap itself in and reload the title, eating whatever the player tapped.
-      // It was a race (whether the page was listening when the new worker hit
-      // "installed"), so a pass here is necessary, not sufficient.
+      // The one check that lets the service worker in. Its first install claims
+      // the page, and that controller change must neither reload the title (it
+      // eats whatever the player tapped) nor offer the update pill. It used to be
+      // a race, so a pass here is necessary, not sufficient.
       const { page } = await open({ save: RETURNING, serviceWorkers: "allow" });
       const controlled = await page
         .waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 15000 })
@@ -270,6 +270,10 @@ const CHECKS = [
       expect(
         (await page.evaluate(() => window.__controlsTest?.getPhase?.())) === "title",
         "the title did not survive the service worker taking over",
+      );
+      expect(
+        !(await page.locator('[data-qa="update-ready"]').count()),
+        "a first visit offered the update pill",
       );
       return { controlled, loads };
     },
