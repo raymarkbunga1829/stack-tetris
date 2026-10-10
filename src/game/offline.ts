@@ -1,63 +1,98 @@
-/** Register the offline shell. Fail quiet. Never swap mid-run. */
+/** Register the offline shell and report when a newer build is waiting. Fail quiet. */
 
-function shellUrls(): string[] {
-  const urls = new Set<string>(["/", window.location.pathname || "/"]);
-  document.querySelectorAll("script[src], link[rel='stylesheet'], link[rel='icon']").forEach((el) => {
-    const href = (el as HTMLScriptElement).src || (el as HTMLLinkElement).href;
-    if (href && href.startsWith(window.location.origin)) urls.add(href);
-  });
-  return [...urls];
-}
+const CHECK_GAP_MS = 15_000;
+const SWAP_TIMEOUT_MS = 4_000;
 
-export function registerOffline(canReload: () => boolean): () => void {
+/**
+ * `onReady(apply)` fires when a new build is installed and waiting (or another
+ * tab already switched to it). Calling `apply` activates it and reloads. The
+ * swap only ever happens on that call, so a run is never interrupted.
+ */
+export function registerOffline(onReady: (apply: () => void) => void): () => void {
   if (typeof window === "undefined") return () => {};
   if (!("serviceWorker" in navigator)) return () => {};
   if (!import.meta.env.PROD) return () => {};
 
-  let asked = false;
+  const sw = navigator.serviceWorker;
+  let reg: ServiceWorkerRegistration | null = null;
   let cancelled = false;
+  let applied = false;
+  let reloading = false;
+  let lastCheck = 0;
+  let tick = 0;
+  // The first install claims the page too; only later controller changes mean a new build.
+  let hadController = Boolean(sw.controller);
 
-  const trySwap = (reg: ServiceWorkerRegistration) => {
-    if (cancelled || !reg.waiting || !navigator.onLine || !canReload()) return;
-    asked = true;
-    reg.waiting.postMessage("SKIP_WAITING");
+  const reload = () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  };
+
+  const apply = () => {
+    const waiting = reg?.waiting;
+    if (!waiting) {
+      reload();
+      return;
+    }
+    applied = true;
+    waiting.postMessage("SKIP_WAITING");
+    // Documents are network-first, so a reload lands on the new build even if
+    // the worker swap stalls.
+    window.setTimeout(reload, SWAP_TIMEOUT_MS);
+  };
+
+  const offer = () => {
+    if (!cancelled && reg?.waiting && sw.controller) onReady(apply);
+  };
+
+  const check = () => {
+    if (!reg || cancelled || Date.now() - lastCheck < CHECK_GAP_MS) return;
+    lastCheck = Date.now();
+    void reg.update().catch(() => undefined);
   };
 
   const onController = () => {
-    if (asked && canReload()) window.location.reload();
+    if (applied) reload();
+    else if (hadController && !cancelled) onReady(reload);
+    hadController = true;
   };
 
-  navigator.serviceWorker.addEventListener("controllerchange", onController);
+  // iOS home-screen apps resume from memory without reloading, so check on resume.
+  const onVisible = () => {
+    if (document.visibilityState === "visible") check();
+  };
 
-  void navigator.serviceWorker
+  sw.addEventListener("controllerchange", onController);
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("pageshow", check);
+  window.addEventListener("online", check);
+
+  void sw
     .register("/sw.js", { updateViaCache: "none" })
-    .then((reg) => {
+    .then((r) => {
       if (cancelled) return;
-      const active = reg.active ?? navigator.serviceWorker.controller;
-      if (active) active.postMessage({ type: "PRECACHE", urls: shellUrls() });
-      trySwap(reg);
-      reg.addEventListener("updatefound", () => {
-        const sw = reg.installing;
-        sw?.addEventListener("statechange", () => {
-          if (sw.state === "installed") trySwap(reg);
+      reg = r;
+      offer();
+      r.addEventListener("updatefound", () => {
+        const next = r.installing;
+        next?.addEventListener("statechange", () => {
+          if (next.state === "installed") offer();
         });
       });
-      const tick = window.setInterval(() => {
-        void reg.update().catch(() => undefined);
-        trySwap(reg);
-      }, 60_000);
-      if (cancelled) window.clearInterval(tick);
-      cleanup = () => window.clearInterval(tick);
+      tick = window.setInterval(check, 60_000);
     })
     .catch(() => {
       /* online game unchanged */
     });
 
-  let cleanup = () => {};
   return () => {
     cancelled = true;
-    cleanup();
-    navigator.serviceWorker.removeEventListener("controllerchange", onController);
+    window.clearInterval(tick);
+    sw.removeEventListener("controllerchange", onController);
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("pageshow", check);
+    window.removeEventListener("online", check);
   };
 }
 
