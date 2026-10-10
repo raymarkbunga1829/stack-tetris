@@ -345,6 +345,7 @@ export function TetrisApp() {
   const comboSeen = useRef(-1);
   const b2bSeen = useRef(false);
   const failT = useRef(0);
+  const qaFreeze = useRef(false);
   const dying = useRef(false);
   const coinAt = useRef(0);
   const dangerSaid = useRef(false);
@@ -676,6 +677,40 @@ export function TetrisApp() {
             s.phase = "over";
             s.toppedOut = true;
             finishRunRef.current(s);
+          },
+          freeze: (on: boolean) => {
+            qaFreeze.current = on;
+          },
+          stage: ({ rows, piece }) => {
+            const s = simRef.current;
+            if (!s) return;
+            qaFreeze.current = true;
+            const top = ROWS - rows.length;
+            s.board = s.board.map((row, y) =>
+              row.map((_, x) => {
+                const ch = y >= top ? rows[y - top]?.[x] : undefined;
+                return ch && ch !== "." ? (ch as PieceId) : null;
+              }),
+            );
+            if (piece) s.piece = { ...piece, y: piece.y + HIDDEN_ROWS };
+            s.lockT = 0;
+            s.lockSpark = 0;
+          },
+          getBoard: () =>
+            (simRef.current?.board ?? []).slice(HIDDEN_ROWS).map((row) => row.slice()),
+          getGhost: () => {
+            const s = simRef.current;
+            if (!s?.piece) return [];
+            return cellsOf(s.piece.id, s.piece.rot, s.piece.x, ghostY(s)).map((c) => ({
+              x: c.x,
+              y: c.y - HIDDEN_ROWS,
+            }));
+          },
+          cellPoint: (col: number, row: number) => {
+            const c = canvasRef.current;
+            const engine = well3dRef.current;
+            if (!c || !engine) return null;
+            return engine.cellToClient(c.getBoundingClientRect(), col, row);
           },
         };
       }
@@ -1281,8 +1316,8 @@ export function TetrisApp() {
         heldFlip: held.flip,
         nudge: input.takeNudge(),
         ...handlingOf(saveRef.current),
-        freeze: !!u.coach,
-        freezeClock: !!u.coach,
+        freeze: !!u.coach || qaFreeze.current,
+        freezeClock: !!u.coach || qaFreeze.current,
       });
     }
 
@@ -3757,6 +3792,17 @@ declare global {
       setLevel: (n: number) => void;
       getWell: () => { lost: boolean; cells: number; luma: number; w: number; h: number };
       topOut: () => void;
+      /** Hold gravity, lock and clock so a staged frame stays put. */
+      freeze: (on: boolean) => void;
+      /** `rows` are the bottom board rows, top to bottom; `.` is empty. `piece.y` is a visible row. */
+      stage: (fixture: {
+        rows: string[];
+        piece?: { id: PieceId; rot: 0 | 1 | 2 | 3; x: number; y: number };
+      }) => void;
+      getBoard: () => (PieceId | null)[][];
+      /** Landing cells of the falling piece, in visible rows. */
+      getGhost: () => { x: number; y: number }[];
+      cellPoint: (col: number, row: number) => { x: number; y: number } | null;
     };
   }
 }
