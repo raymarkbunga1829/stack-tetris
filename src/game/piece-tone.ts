@@ -83,6 +83,11 @@ export function pieceTone(hex: string, lift = 1): Rgb {
   return hsvToRgb({ h: base.h, s, v });
 }
 
+/** Pale pits get dark ghosts, and need the well lit brightly to stay pale. */
+export function palePit(pitHex: string) {
+  return luma(hexToRgb(pitHex)) > 0.18;
+}
+
 /**
  * The landing ghost is a solid outline in the piece colour with nothing
  * inside, so it can never be read as a locked mino. On a pit too close to the
@@ -92,7 +97,7 @@ export function pieceTone(hex: string, lift = 1): Rgb {
 export function ghostLook(hex: string, pitHex: string, now: number, lockFrac: number | null) {
   const pit = hexToRgb(pitHex);
   const piece = pieceTone(hex, 1.15);
-  const away = luma(pit) > 0.18 ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
+  const away = palePit(pitHex) ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
   let tone = piece;
   for (let t = 0.1; contrast(tone, pit) < GHOST_CONTRAST && t <= 1.001; t += 0.1) tone = mix(piece, away, t);
   const edge =
