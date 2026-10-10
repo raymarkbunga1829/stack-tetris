@@ -1282,7 +1282,9 @@ export function TetrisApp() {
     };
     let botHard = false;
     let ev;
-    if (driven) {
+    if (driven && qaFreeze.current) {
+      ev = undefined;
+    } else if (driven) {
       if (sim.phase === "clearing" || !sim.piece) {
         ev = advance(sim, dt, idle);
       } else {
