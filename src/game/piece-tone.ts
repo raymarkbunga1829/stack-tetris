@@ -97,9 +97,12 @@ export function palePit(pitHex: string) {
 export function ghostLook(hex: string, pitHex: string, now: number, lockFrac: number | null) {
   const pit = hexToRgb(pitHex);
   const piece = pieceTone(hex, 1.15);
-  const away = palePit(pitHex) ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
+  const pale = palePit(pitHex);
+  const away = pale ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
+  // A pale pit renders darker than its hex once lit, so aim the ghost further off it.
+  const need = pale ? 7 : GHOST_CONTRAST;
   let tone = piece;
-  for (let t = 0.1; contrast(tone, pit) < GHOST_CONTRAST && t <= 1.001; t += 0.1) tone = mix(piece, away, t);
+  for (let t = 0.1; contrast(tone, pit) < need && t <= 1.001; t += 0.1) tone = mix(piece, away, t);
   const edge =
     lockFrac == null
       ? GHOST_EDGE_IDLE + 0.06 * Math.sin(now * 0.0036)
