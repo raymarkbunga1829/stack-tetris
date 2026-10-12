@@ -7,7 +7,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { cellsOf } from "./pieces";
-import { ghostLook, palePit, pieceTone } from "./piece-tone";
+import { ghostLook, pieceTone } from "./piece-tone";
 import { fitDpr } from "./device";
 import { DANGER_ROWS, ghostY, headroom, type Sim } from "./sim";
 import type { Theme } from "./themes";
@@ -234,8 +234,6 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const themeTrim = new THREE.Color(0xa8f0ff);
   const themeShaft = new THREE.Color(0xd8e4f0);
   const accent = new THREE.Color(0xa8f0ff);
-  const accentGoal = new THREE.Color(0xa8f0ff);
-  const accentHsl = { h: 0, s: 0, l: 0 };
 
   const pitTex = makePitTexture();
   pitTex.colorSpace = THREE.SRGBColorSpace;
@@ -754,7 +752,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
         shaft.color.set(0xd8e4f0);
         bounce.color.set(0x3a4a62);
         jewel.color.set(0xffffff);
-        trimMat.color.set(0xa8f0ff);
+        // Monolith's grey stack loses its edge against the pit under cyan bloom.
+        trimMat.color.set(theme.id === "monolith" ? 0x7c7e84 : 0xa8f0ff);
         godMat.opacity = reduce ? 0.05 : 0.1;
       }
       applyWellLines(theme);
@@ -782,19 +781,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     const dt = Math.min(0.05, (now - lastDraw) / 1000);
     lastDraw = now;
 
-    // The cabinet, lip, shaft and jewel light take the falling piece's colour
-    // and hold it until the next one spawns. Minos are drawn after this pass,
-    // so none of it can reach a mino face.
-    if (!sim || sim.phase === "title") accentGoal.copy(themeTrim);
-    else if (sim.piece && sim.phase !== "over") {
-      const t = pieceTone(sim.omenOn ? "#e8c46a" : theme.fill[sim.piece.id], LIVE_LIFT);
-      accentGoal.setRGB(t.r, t.g, t.b, THREE.SRGBColorSpace);
-      // Dark-piece skins (LCD) would otherwise dim the pit their ghost is tuned for.
-      const minL = palePit(theme.pit) ? 0.8 : 0.55;
-      accentGoal.getHSL(accentHsl, THREE.SRGBColorSpace);
-      if (accentHsl.l < minL) accentGoal.setHSL(accentHsl.h, accentHsl.s, minL, THREE.SRGBColorSpace);
-    }
-    accent.lerp(accentGoal, reduce ? 1 : 1 - Math.exp(-dt * 9));
+    // The cabinet, lip, shaft and jewel light stay on the skin's chrome. Tinting
+    // them with the falling piece recoloured the whole frame every spawn.
+    accent.lerp(themeTrim, reduce ? 1 : 1 - Math.exp(-dt * 9));
     trimMat.color.copy(accent).multiplyScalar(mobile ? 0.5 : 0.62);
     trimMat.emissive.copy(accent);
     trimMat.emissiveIntensity = TRIM_GLOW;
@@ -1096,7 +1085,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
       shaft.color.set(0xffe0a0);
       shaft.intensity = lushShaft ? 16 : 8;
     } else if (liveId) {
-      shaft.color.copy(themeShaft).lerp(accent, 0.6);
+      shaft.color.copy(themeShaft);
       shaft.intensity = lushShaft ? 16 : 7;
     } else {
       shaft.color.set(0xffe4c4);

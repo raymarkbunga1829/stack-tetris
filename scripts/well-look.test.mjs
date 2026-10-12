@@ -58,12 +58,13 @@ test("lock pops keep the piece's own colour instead of the skin's flash white", 
   assert.doesNotMatch(well, /multiplyScalar\([^)]*\);\s*\n\s*(solids|live|shards)\.setColorAt/);
 });
 
-test("the frame, lip, jewel and shaft light follow the falling piece, and its glow sits in the bloomed scene", () => {
-  assert.match(well, /accentGoal\.setRGB\(/, "the accent no longer tracks the live piece");
+test("the frame, lip, jewel and shaft light stay on the skin's chrome, and the piece glow sits in the bloomed scene", () => {
+  assert.match(well, /accent\.lerp\(themeTrim,/, "the accent no longer eases to the skin trim");
+  assert.doesNotMatch(well, /accent\w*\.(setRGB|setHSL|copy)\(/, "the accent is being set from something other than the skin");
   for (const target of ["trimMat.emissive", "lipMat.emissive", "jewel.color", "godMat.color"]) {
-    assert.match(well, new RegExp(`${target.replace(".", "\\.")}\\.copy\\(accent\\)`), `${target} is pinned to the skin`);
+    assert.match(well, new RegExp(`${target.replace(".", "\\.")}\\.copy\\(accent\\)`), `${target} no longer follows the accent`);
   }
-  assert.match(well, /shaft\.color\.copy\(themeShaft\)\.lerp\(accent/);
+  assert.doesNotMatch(well, /shaft\.color\.copy\(themeShaft\)\.lerp\(/, "the shaft light chases the piece again");
   assert.match(well, /scene\.add\(glowCells\)/);
   assert.doesNotMatch(well, /front\.add\([^)]*\bglowCells\b/);
   assert.match(well, /new UnrealBloomPass\(.*,\s*0\.72\)/, "bloom threshold moved off 0.72");
