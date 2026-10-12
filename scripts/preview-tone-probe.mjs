@@ -101,20 +101,28 @@ try {
 
     await page.screenshot({ timeout: 90000, path: `${out}/${tag}-${size.name}.png` });
     const clips = await page.evaluate(() =>
-      [...document.querySelectorAll(".rail")].map((rail) => {
-        const r = rail.getBoundingClientRect();
-        const last = [...rail.querySelectorAll(".pocket")].pop()?.getBoundingClientRect();
-        const pad = 8;
-        return {
-          x: Math.max(0, r.x - pad),
-          y: Math.max(0, r.y - pad),
-          width: r.width + pad * 2,
-          height: (last ? last.bottom - r.y : r.height) + pad * 2,
-        };
-      }),
+      [...document.querySelectorAll(".rail")]
+        .filter((rail) => rail.getBoundingClientRect().height > 0)
+        .map((rail) => {
+          const r = rail.getBoundingClientRect();
+          const bottom = Math.max(
+            r.y + 40,
+            ...[...rail.querySelectorAll(".pocket")].map((p) => p.getBoundingClientRect().bottom),
+          );
+          const pad = 8;
+          return {
+            name: rail.classList.contains("rail-next") ? "next" : "hold",
+            clip: {
+              x: Math.max(0, r.x - pad),
+              y: Math.max(0, r.y - pad),
+              width: r.width + pad * 2,
+              height: bottom - r.y + pad * 2,
+            },
+          };
+        }),
     );
-    for (const [i, clip] of clips.entries()) {
-      await page.screenshot({ clip, timeout: 90000, path: `${out}/${tag}-${size.name}-${i ? "next" : "hold"}.png` });
+    for (const { name, clip } of clips) {
+      await page.screenshot({ clip, timeout: 90000, path: `${out}/${tag}-${size.name}-${name}.png` });
     }
     await ctx.close();
   }
