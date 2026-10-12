@@ -83,6 +83,22 @@ export function pieceTone(hex: string, lift = 1): Rgb {
   return hsvToRgb({ h: base.h, s, v });
 }
 
+/** How dark a preview mino's shading goes, as a `pieceTone` lift. */
+export const PREVIEW_DEEP_LIFT = 0.55;
+
+export function toneCss({ r, g, b }: Rgb) {
+  return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+}
+
+/**
+ * Colours for the Next and Hold previews. The face is the well's own
+ * `pieceTone`, and the shading is the same tone darkened, not the skin's
+ * `deep` colour, which is greyer and would pull the preview off the well's hue.
+ */
+export function previewTone(hex: string) {
+  return { face: toneCss(pieceTone(hex)), deep: toneCss(pieceTone(hex, PREVIEW_DEEP_LIFT)) };
+}
+
 /** Pale pits get dark ghosts, and need the well lit brightly to stay pale. */
 export function palePit(pitHex: string) {
   return luma(hexToRgb(pitHex)) > 0.18;
