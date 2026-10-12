@@ -1,3 +1,4 @@
+import { previewTone } from "@/game/piece-tone";
 import { SHAPES } from "@/game/pieces";
 import { GEM_NAME, themeOf, type ThemeId } from "@/game/themes";
 import type { PieceId } from "@/game/types";
@@ -11,9 +12,7 @@ export function MiniPiece({ id, theme }: { id: PieceId | null; theme?: ThemeId }
   const maxY = Math.max(...cells.map((c) => c.y));
   const w = maxX + 1;
   const h = maxY + 1;
-  const skin = themeOf(theme);
-  const fill = skin.fill[id];
-  const deep = skin.deep[id];
+  const { face, deep } = previewTone(themeOf(theme).fill[id]);
   return (
     <div
       className="mini"
@@ -31,8 +30,8 @@ export function MiniPiece({ id, theme }: { id: PieceId | null; theme?: ThemeId }
           style={{
             gridColumn: c.x + 1,
             gridRow: c.y + 1,
-            background: fill,
-            ["--gem" as string]: fill,
+            background: face,
+            ["--gem" as string]: face,
             ["--gem-deep" as string]: deep,
           }}
         />
