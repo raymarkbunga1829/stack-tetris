@@ -29,12 +29,16 @@ const out = process.argv[3] || "/tmp/rim-glow";
 mkdirSync(out, { recursive: true });
 
 const themesSrc = readFileSync(join(HERE, "../src/game/themes.ts"), "utf8");
-const SKINS = (process.env.SKINS || [...new Set([...themesSrc.matchAll(/id: "(\w+)",[\s\S]*?fill: \{/g)].map((m) => m[1]))].map((m) => m[1]).join(",")).split(",");
+const SKINS = (process.env.SKINS || [...new Set([...themesSrc.matchAll(/id: "(\w+)",[\s\S]*?fill: \{/g)].map((m) => m[1]))].join(",")).split(",");
 
-/** sRGB distance x255 between a chrome region and its no-piece baseline. */
-export const CHROME_MAX = 6;
-/** The shaft beside the piece must brighten at least this much (x255); the mino edge alone gives about 35. */
-export const HALO_MIN = 45;
+/**
+ * sRGB distance x255 between a chrome region and its no-piece baseline. The
+ * ghost and danger pulses alone move it by about 5; a bloomed piece glow moved
+ * it by 15 to 110.
+ */
+export const CHROME_MAX = 8;
+/** The shaft just below the piece must brighten at least this much (x255); about 12 with no glow. */
+export const HALO_MIN = 20;
 
 const HIGH = [
   "Z.......L.",
@@ -105,7 +109,8 @@ async function runSkin(skin, size, clearWell) {
   await page.addInitScript((s) => localStorage.setItem("stack-tetris-v1", s), JSON.stringify(save));
   try {
     await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
-    await page.addStyleTag({ content: ".well canvas { animation: none !important; }" });
+    // The lock chip sits over the space above the well; it is DOM, not glow.
+    await page.addStyleTag({ content: ".well canvas { animation: none !important; } .pred-chip { visibility: hidden !important; }" });
     await page.clock.runFor(600);
     await page.locator('[data-qa="play"]').dispatchEvent("pointerdown");
     await page.clock.runFor(200);
@@ -121,11 +126,12 @@ async function runSkin(skin, size, clearWell) {
 
     for (const c of CASES.filter((k) => !process.env.CASES || process.env.CASES.split(",").includes(k.name))) {
       const hidden = { ...c.piece, y: -2 };
-      const base = await frame(page, c.rows, hidden);
-      const lit = await frame(page, c.rows, c.piece);
+      const base = await frame(page, c.rows, hidden, c.piece);
+      const lit = await frame(page, c.rows, c.piece, c.piece);
       if (process.env.SHOTS === "1") {
         const tag = `${skin}-${size.name}${clearWell ? "" : "-bloom"}-${c.name}`;
         writeFileSync(join(out, `${tag}.png`), lit.shot);
+        if (process.env.SHOTS_BASE === "1") writeFileSync(join(out, `${tag}-base.png`), base.shot);
       }
       const chromeShift = Math.max(...Object.keys(base.regions).filter((k) => k !== "halo").map((k) => dist(base.regions[k], lit.regions[k])));
       const halo = dist(base.regions.halo, lit.regions.halo);
@@ -143,7 +149,8 @@ async function runSkin(skin, size, clearWell) {
   }
 }
 
-async function frame(page, rows, piece) {
+/** Stage `piece` and sample the regions around where `around` is drawn. */
+async function frame(page, rows, piece, around) {
   await page.evaluate(([r, p]) => window.__controlsTest.stage({ rows: r, piece: p }), [rows, piece]);
   await page.clock.runFor(400);
   const shot = await page.screenshot({ animations: "allow" });
@@ -192,7 +199,7 @@ async function frame(page, rows, piece) {
         halo: box(piece.x - 0.4, row + 1.15, piece.x + 2.4, row + 1.45),
       };
     },
-    { png: shot.toString("base64"), piece },
+    { png: shot.toString("base64"), piece: around },
   );
   return { shot, regions };
 }
