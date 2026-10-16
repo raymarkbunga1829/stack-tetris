@@ -47,6 +47,9 @@ const MARK: Record<PieceId, [number, number][]> = {
 };
 const MAX_GHOST = 8;
 const MAX_GLOW = 16;
+/** Halo quad width in cells, and its depth: behind the back of every mino. */
+const HALO_CELLS = 4.4;
+const HALO_Z = -0.5;
 const MAX_MEM = COLS * VISIBLE_ROWS;
 
 function hex(c: string) {
@@ -136,8 +139,8 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   const TRIM_GLOW = mobile ? 0.4 : 0.32;
   /** Clear well keeps a softer glow than the full look, but a glow. */
   const CLEAR_BLOOM = reduce ? 0.12 : 0.3;
-  /** HDR luminance of the hidden glow cells behind the live piece and fresh locks. */
-  const GLOW_LUMA = 1.5;
+  /** Peak strength of the halo behind the live piece and fresh locks, per cell. */
+  const HALO_GAIN = 0.8;
   const PLACED_LIFT = 1;
   const LIVE_LIFT = 1.15;
   const POP_LIFT = 1.35;
@@ -359,15 +362,30 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   live.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   live.frustumCulled = false;
   live.count = 0;
-  // Bright copies of the live piece and fresh locks, only in the bloomed scene:
-  // bloom spreads them into a halo in the piece colour, and the mino drawn on
-  // top in the front pass hides the copy itself, so the face never brightens.
-  const glowMat = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false });
-  const glowCells = new THREE.InstancedMesh(geo, glowMat, MAX_GLOW);
-  glowCells.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  glowCells.frustumCulled = false;
-  glowCells.count = 0;
-  scene.add(glowCells);
+  // The halo around the live piece and fresh locks. Bloom can't be kept off the
+  // rim: it blurs the whole frame, so a top-row piece washed the lip, rails and
+  // cabinet in its colour. This soft glow is drawn in the front pass behind the
+  // minos (depth keeps it off every face) and clipped to the shaft.
+  renderer.localClippingEnabled = true;
+  const haloTex = makeHaloTexture();
+  const haloMat = new THREE.MeshBasicMaterial({
+    map: haloTex,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    fog: false,
+    clippingPlanes: [
+      new THREE.Plane(new THREE.Vector3(1, 0, 0), 5),
+      new THREE.Plane(new THREE.Vector3(-1, 0, 0), 5),
+      new THREE.Plane(new THREE.Vector3(0, -1, 0), 19.5),
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.45),
+    ],
+  });
+  const halos = new THREE.InstancedMesh(new THREE.PlaneGeometry(HALO_CELLS, HALO_CELLS), haloMat, MAX_GLOW);
+  halos.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  halos.frustumCulled = false;
+  halos.count = 0;
   const ghosts = new THREE.InstancedMesh(ghostEdgeGeo, ghostEdgeMat, MAX_GHOST);
   ghosts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   ghosts.frustumCulled = false;
@@ -378,6 +396,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
   memory.count = 0;
   scene.add(memory);
   front.add(solids, live, ghosts);
+  front.add(halos);
 
   const pipGeo = new THREE.BoxGeometry(0.14, 0.14, 0.05);
   const pipMat = new THREE.MeshBasicMaterial({ color: 0x141414, toneMapped: false });
@@ -843,18 +862,17 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     let liveN = 0;
     let pipN = 0;
     let glowN = 0;
-    const glow = (col: number, row: number, z: number, hexCol: string, k: number) => {
+    const glow = (col: number, row: number, hexCol: string, k: number) => {
       if (glowN >= MAX_GLOW || k <= 0.01) return;
-      const p = cellPos(col, row, z);
+      const p = cellPos(col, row, HALO_Z);
       dummy.position.set(p.x, p.y, p.z);
       dummy.rotation.set(0, 0, 0);
-      dummy.scale.setScalar(0.92);
+      dummy.scale.setScalar(1);
       dummy.updateMatrix();
-      glowCells.setMatrixAt(glowN, dummy.matrix);
+      halos.setMatrixAt(glowN, dummy.matrix);
       toneInto(hexCol, LIVE_LIFT);
-      const l = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
-      color.multiplyScalar((k * GLOW_LUMA) / Math.max(l, 0.08));
-      glowCells.setColorAt(glowN, color);
+      color.multiplyScalar((k * HALO_GAIN) / Math.max(color.r, color.g, color.b, 0.2));
+      halos.setColorAt(glowN, color);
       glowN += 1;
     };
     drawnStack.length = 0;
@@ -914,7 +932,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
             squash,
           );
           if (showMarks) stamp(id as PieceId, x, row + below * settle + sink, 0.42);
-          if (thump) glow(x, row + below * settle + sink, 0, theme.fill[id as PieceId], lockPulse);
+          if (thump) glow(x, row + below * settle + sink, theme.fill[id as PieceId], lockPulse);
           drawnStack.push({ x, y: row + below * settle + sink, id: id as PieceId });
         }
       }
@@ -926,7 +944,7 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
           const row = c.y - HIDDEN_ROWS;
           if (row < 0 || row >= VISIBLE_ROWS) continue;
           place(live, liveN++, c.x, row, 0.1, liveHex, 1.06 + pickT * 0.22 + sim.lockSpark * 0.1 + (omen ? 0.08 : 0), liveLift);
-          glow(c.x, row, 0.1, liveHex, 0.7 + 0.3 * Math.min(1, pickT + sim.lockSpark));
+          glow(c.x, row, liveHex, 0.7 + 0.3 * Math.min(1, pickT + sim.lockSpark));
           stamp(sim.piece.id, c.x, row, 0.48);
         }
         for (const c of cellsOf(sim.piece.id, sim.piece.rot, sim.piece.x, sim.piece.y)) {
@@ -954,9 +972,9 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     }
     solids.count = n;
     solids.instanceMatrix.needsUpdate = true;
-    glowCells.count = glowN;
-    glowCells.instanceMatrix.needsUpdate = true;
-    if (glowCells.instanceColor) glowCells.instanceColor.needsUpdate = true;
+    halos.count = glowN;
+    halos.instanceMatrix.needsUpdate = true;
+    if (halos.instanceColor) halos.instanceColor.needsUpdate = true;
     live.count = liveN;
     live.instanceMatrix.needsUpdate = true;
     if (live.instanceColor) live.instanceColor.needsUpdate = true;
@@ -1559,8 +1577,10 @@ export function createWell3d(canvas: HTMLCanvasElement): Well3d {
     (back.material as THREE.Material).dispose();
     geo.dispose();
     gemMat.dispose();
-    glowMat.dispose();
-    glowCells.dispose();
+    haloTex.dispose();
+    haloMat.dispose();
+    halos.geometry.dispose();
+    halos.dispose();
     overlayMat.dispose();
     ghostEdgeMat.dispose();
     ghostEdgeGeo.dispose();
@@ -1830,5 +1850,28 @@ function makeShaftTexture(): THREE.CanvasTexture {
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** White with a Gaussian alpha falloff that reaches zero at the quad's edge. */
+function makeHaloTexture(): THREE.DataTexture {
+  const n = 64;
+  const data = new Uint8Array(n * n * 4);
+  const sigma = 0.95 / (HALO_CELLS / 2);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const dx = ((x + 0.5) / n) * 2 - 1;
+      const dy = ((y + 0.5) / n) * 2 - 1;
+      const r2 = dx * dx + dy * dy;
+      const a = r2 >= 1 ? 0 : Math.exp(-r2 / (2 * sigma * sigma)) * (1 - r2);
+      const o = (y * n + x) * 4;
+      data[o] = data[o + 1] = data[o + 2] = 255;
+      data[o + 3] = Math.round(a * 255);
+    }
+  }
+  const tex = new THREE.DataTexture(data, n, n);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
   return tex;
 }

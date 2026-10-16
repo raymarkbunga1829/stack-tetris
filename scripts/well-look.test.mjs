@@ -58,15 +58,18 @@ test("lock pops keep the piece's own colour instead of the skin's flash white", 
   assert.doesNotMatch(well, /multiplyScalar\([^)]*\);\s*\n\s*(solids|live|shards)\.setColorAt/);
 });
 
-test("the frame, lip, jewel and shaft light stay on the skin's chrome, and the piece glow sits in the bloomed scene", () => {
+test("the frame, lip, jewel and shaft light stay on the skin's chrome, and the piece glow stays in the shaft", () => {
   assert.match(well, /accent\.lerp\(themeTrim,/, "the accent no longer eases to the skin trim");
   assert.doesNotMatch(well, /accent\w*\.(setRGB|setHSL|copy)\(/, "the accent is being set from something other than the skin");
   for (const target of ["trimMat.emissive", "lipMat.emissive", "jewel.color", "godMat.color"]) {
     assert.match(well, new RegExp(`${target.replace(".", "\\.")}\\.copy\\(accent\\)`), `${target} no longer follows the accent`);
   }
   assert.doesNotMatch(well, /shaft\.color\.copy\(themeShaft\)\.lerp\(/, "the shaft light chases the piece again");
-  assert.match(well, /scene\.add\(glowCells\)/);
-  assert.doesNotMatch(well, /front\.add\([^)]*\bglowCells\b/);
+  // Bloom blurs the whole frame, so a piece glow fed to it washes the rim and cabinet.
+  assert.match(well, /front\.add\(halos\)/, "the piece halo left the front pass");
+  assert.doesNotMatch(well, /scene\.add\([^)]*\bhalos\b/, "the piece halo is fed to bloom again");
+  assert.match(well, /const haloMat = [\s\S]*?clippingPlanes: \[/, "the piece halo is no longer clipped to the shaft");
+  assert.match(well, /localClippingEnabled = true/);
   assert.match(well, /new UnrealBloomPass\(.*,\s*0\.72\)/, "bloom threshold moved off 0.72");
 });
 
