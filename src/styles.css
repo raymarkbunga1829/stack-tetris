@@ -1581,6 +1581,16 @@
   pointer-events: none;
 }
 
+/* The results card keeps the play layout, so the well, Hold and Next stay put;
+   the strips around it hold their space without showing a dead run. */
+.cabinet.is-over .hud,
+.cabinet.is-over .powers,
+.cabinet.is-over .siege,
+.cabinet.is-over .watch-bar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .cabinet:not(.is-play) .pad,
 .cabinet:not(.is-play) .powers {
   display: none;
@@ -3291,7 +3301,7 @@ html.is-ios .help-android {
 }
 
 .veil.is-polaroid {
-  background: color-mix(in oklab, var(--color-bg) 78%, transparent);
+  background: color-mix(in oklab, var(--color-bg) 93%, transparent);
   justify-content: center;
   padding: 18px 14px;
 }
