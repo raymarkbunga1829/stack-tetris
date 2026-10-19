@@ -2722,7 +2722,7 @@ export function TetrisApp() {
   return (
     <main className="shell">
       <div
-        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${!mounted || showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${(ui.botPlay) ? " is-watch" : ""}${viewW < 720 ? " is-narrow" : ""}`}
+        className={`cabinet${ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused" || ui.phase === "over" ? " is-play" : ""}${ui.phase === "paused" ? " is-paused" : ""}${ui.phase === "over" ? " is-over" : ""}${ui.picking ? " is-pick" : ""}${!mounted || showPad(ui.padMode) ? "" : " is-keys"}${ui.padSize === "huge" ? " is-pad-huge" : ""}${ui.danger ? " is-danger" : ""}${ui.brink ? " is-brink" : ""}${ui.failing ? " is-topout" : ""}${ui.lockPop ? " is-slam" : ""}${ui.tintPop ? " is-tint" : ""}${ui.takeover ? " is-takeover" : ""}${ui.cinema ? " is-cinema" : ""}${ui.mode === "zen" ? " is-zen" : ""}${ui.mode === "sprint" ? " is-sprint" : ""}${ui.mode === "siege" ? " is-siege" : ""}${(ui.botPlay) ? " is-watch" : ""}${viewW < 720 ? " is-narrow" : ""}`}
         style={{
           ["--bezel" as string]: themeOf(ui.theme).frame,
           ["--accent" as string]: ui.live
@@ -2761,8 +2761,8 @@ export function TetrisApp() {
           </button>
         )}
 
-        {(ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
-          <div className="hud" role="region" aria-label="Game dashboard">
+        {ui.phase !== "title" && (
+          <div className="hud" role="region" aria-label="Game dashboard" aria-hidden={ui.phase === "over" || undefined}>
             <div className={`hud-metrics${showHudCredits(ui, viewW) ? " has-credits" : ""}`}>
               <p className="hud-cell is-score">
                 <span>Score</span>
@@ -3359,7 +3359,7 @@ export function TetrisApp() {
             />
           )
         )}
-        {ui.mode === "siege" && ui.siege && (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
+        {ui.mode === "siege" && ui.siege && ui.phase !== "title" && (
           <SiegeRail
             snap={ui.siege}
             onAim={() => {
@@ -3435,8 +3435,7 @@ export function TetrisApp() {
           }
         />
         )}
-        {botDriving(ui) &&
-          (ui.phase === "playing" || ui.phase === "clearing" || ui.phase === "paused") && (
+        {botDriving(ui) && ui.phase !== "title" && (
             <div className="watch-bar" role="status" aria-label={botHudLabel(ui.mode)}>
               <span data-qa="watch-label">{botHudLabel(ui.mode)}</span>
               <button
